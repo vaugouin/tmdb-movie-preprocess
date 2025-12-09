@@ -1,0 +1,13 @@
+numpy
+pandas
+requests
+pymysql
+beautifulsoup4
+lxml
+html5lib
+schedule
+pytz
+thefuzz
+spacy
+psutil
+python-dotenv>=1.0.0
