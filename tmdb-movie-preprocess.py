@@ -570,12 +570,12 @@ try:
             strtotalruntime = ""
             cp.f_setservervariable("strtmdbmoviepreprocesstotalruntime",strtotalruntime,strtotalruntimedesc,0)
 
-            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 20: 'TMDB_KEYWORD', 30: 'TMDB_MOVIE_LANG_META'}
-            arrprocessscope = {2: 'T2S_MOVIE_TECHNICAL'}
-            arrprocessscope = {20: 'TMDB_KEYWORD'}
-            arrprocessscope = {6: 'T2S_PERSON'}
-            arrprocessscope = {4: 'T2S_MOVIE'}
-            arrprocessscope = {5: 'T2S_SERIE'}
+            #arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 20: 'TMDB_KEYWORD', 30: 'TMDB_MOVIE_LANG_META'}
+            #arrprocessscope = {2: 'T2S_MOVIE_TECHNICAL'}
+            #arrprocessscope = {20: 'TMDB_KEYWORD'}
+            #arrprocessscope = {6: 'T2S_PERSON'}
+            #arrprocessscope = {4: 'T2S_MOVIE'}
+            #arrprocessscope = {5: 'T2S_SERIE'}
             arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 30: 'TMDB_MOVIE_LANG_META'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
@@ -890,7 +890,7 @@ ORDER BY COMPTE DESC """
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strtopic,"Current sub process in the TMDb database movie preprocess",0)
                         if inttopic == 1:
                             strcurrentprocess = f"{inttopic}: Copying from TMDB_LIST to T2S_TOPIC"
-                            strsql += "SELECT 'list' AS TOPIC_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST.NAME, T_WC_TMDB_LIST.DESCRIPTION AS OVERVIEW, 'en' AS LANG, POSTER_PATH "
+                            strsql += "SELECT 'list' AS TOPIC_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST.NAME, T_WC_TMDB_LIST.DESCRIPTION AS OVERVIEW, 'en' AS LANG, T_WC_TMDB_LIST.POSTER_PATH "
                             strsql += "FROM T_WC_TMDB_LIST WHERE USE_FOR_TAGGING > 0 "
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
@@ -906,14 +906,14 @@ ORDER BY COMPTE DESC """
                             #strsql += "LIMIT 1000 "
                         elif inttopic == 3:
                             strcurrentprocess = f"{inttopic}: Copying from TMDB_COLLECTION to T2S_TOPIC"
-                            strsql += "SELECT 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION.NAME, T_WC_TMDB_COLLECTION.OVERVIEW, 'en' AS LANG, POSTER_PATH "
+                            strsql += "SELECT 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION.NAME, T_WC_TMDB_COLLECTION.OVERVIEW, 'en' AS LANG, T_WC_TMDB_COLLECTION.POSTER_PATH "
                             strsql += "FROM T_WC_TMDB_COLLECTION "
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
                         elif inttopic == 4:
                             strcurrentprocess = f"{inttopic}: Copying from T_WC_TMDB_COLLECTION_LANG to T2S_TOPIC"
-                            strsql += "SELECT 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION_LANG.NAME, T_WC_TMDB_COLLECTION_LANG.OVERVIEW, T_WC_TMDB_COLLECTION_LANG.LANG, POSTER_PATH "
+                            strsql += "SELECT 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION_LANG.NAME, T_WC_TMDB_COLLECTION_LANG.OVERVIEW, T_WC_TMDB_COLLECTION_LANG.LANG, T_WC_TMDB_COLLECTION_LANG.POSTER_PATH "
                             strsql += "FROM T_WC_TMDB_COLLECTION "
                             strsql += "INNER JOIN T_WC_TMDB_COLLECTION_LANG ON T_WC_TMDB_COLLECTION.ID_COLLECTION = T_WC_TMDB_COLLECTION_LANG.ID_COLLECTION "
                             strsql += "ORDER BY ID_RECORD ASC "
