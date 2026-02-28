@@ -576,7 +576,7 @@ try:
             #arrprocessscope = {6: 'T2S_PERSON'}
             #arrprocessscope = {4: 'T2S_MOVIE'}
             #arrprocessscope = {5: 'T2S_SERIE'}
-            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 30: 'TMDB_MOVIE_LANG_META'}
+            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
@@ -585,7 +585,7 @@ try:
             #arrprocessscope = {8: 'T2S_NETWORK'}
             #arrprocessscope = {3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE'}
-            #arrprocessscope = {3: 'T2S_TOPIC'}
+            arrprocessscope = {3: 'T2S_TOPIC'}
             #arrprocessscope = {30: 'TMDB_MOVIE_LANG_META'}
             for intindex, strdesc in arrprocessscope.items():
                 strprocessesexecuted += str(intindex) + ", "
@@ -793,6 +793,11 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                     #----------------------------------------------------
                     print("T2S_TOPIC processing")
                     if 1:
+                        # Delete all topic records for fr language to start from a clean base
+                        strsqldelete = "DELETE FROM " + cp.strsqlns + "T2S_TOPIC WHERE LANG <> 'en' "
+                        cursor2.execute(strsqldelete)
+                        cp.connectioncp.commit()
+                    if 1:
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Compute MOVIE_COUNT for KEYWORD","Current sub process in the TMDb database movie preprocess",0)
                         # Compute MOVIE_COUNT for KEYWORD
                         strsqlcompanies = """
@@ -808,7 +813,7 @@ ORDER BY COMPTE DESC """
                         results = cursor2.fetchall()
                         for row in results:
                             cp.f_setservervariable("strtmdbmoviepreprocesscurrentkeywordid",str(row['ID_KEYWORD']),"Current keyword ID in the TMDb database movie preprocess",0)
-                            print(row)
+                            #print(row)
                             arrcompanycouples = {}
                             arrcompanycouples["MOVIE_COUNT"] = row['COMPTE']
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrcompanycouples,"ID_KEYWORD = " + str(row['ID_KEYWORD']),0)
@@ -828,7 +833,7 @@ ORDER BY COMPTE DESC """
                         results = cursor2.fetchall()
                         for row in results:
                             cp.f_setservervariable("strtmdbmoviepreprocesscurrentkeywordid",str(row['ID_KEYWORD']),"Current keyword ID in the TMDb database movie preprocess",0)
-                            print(row)
+                            #print(row)
                             arrcompanycouples = {}
                             arrcompanycouples["SERIE_COUNT"] = row['COMPTE']
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrcompanycouples,"ID_KEYWORD = " + str(row['ID_KEYWORD']),0)
@@ -895,6 +900,7 @@ ORDER BY COMPTE DESC """
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
+                            target_field_name = "TOPIC_NAME"
                         elif inttopic == 2:
                             strcurrentprocess = f"{inttopic}: Copying from T_WC_TMDB_LIST_LANG to T2S_TOPIC"
                             strsql += "SELECT 'list' AS TOPIC_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST_LANG.SHORT_NAME AS NAME, '' AS OVERVIEW, T_WC_TMDB_LIST_LANG.LANG, '' AS POSTER_PATH "
@@ -904,6 +910,7 @@ ORDER BY COMPTE DESC """
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
+                            target_field_name = "TOPIC_NAME_FR"
                         elif inttopic == 3:
                             strcurrentprocess = f"{inttopic}: Copying from TMDB_COLLECTION to T2S_TOPIC"
                             strsql += "SELECT 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION.NAME, T_WC_TMDB_COLLECTION.OVERVIEW, 'en' AS LANG, T_WC_TMDB_COLLECTION.POSTER_PATH "
@@ -911,6 +918,7 @@ ORDER BY COMPTE DESC """
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
+                            target_field_name = "TOPIC_NAME"
                         elif inttopic == 4:
                             strcurrentprocess = f"{inttopic}: Copying from T_WC_TMDB_COLLECTION_LANG to T2S_TOPIC"
                             strsql += "SELECT 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION_LANG.NAME, T_WC_TMDB_COLLECTION_LANG.OVERVIEW, T_WC_TMDB_COLLECTION_LANG.LANG, T_WC_TMDB_COLLECTION_LANG.POSTER_PATH "
@@ -919,6 +927,7 @@ ORDER BY COMPTE DESC """
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
+                            target_field_name = "TOPIC_NAME_FR"
                         elif inttopic == 5:
                             strcurrentprocess = f"{inttopic}: Copying from TMDB_KEYWORD to T2S_TOPIC"
                             strsql += "SELECT 'keyword' AS TOPIC_TYPE, T_WC_TMDB_KEYWORD.ID_KEYWORD AS ID_RECORD, T_WC_TMDB_KEYWORD.NAME, '' AS OVERVIEW, 'en' AS LANG, '' AS POSTER_PATH "
@@ -927,6 +936,7 @@ ORDER BY COMPTE DESC """
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
+                            target_field_name = "TOPIC_NAME"
                         if strsql != "":
                             # Now we process the SELECT query
                             print(strsql)
@@ -946,18 +956,24 @@ ORDER BY COMPTE DESC """
                                 strrecordlang = row['LANG']
                                 strrecordtype = row['TOPIC_TYPE']
                                 strrecordposterpath = row['POSTER_PATH']
-                                print("Processing record: " + str(lngrecordid) + " (" + strrecordtype + ")")
-                                arrtopiccouples = {
-                                    'ID_RECORD': lngrecordid,
-                                    'TOPIC_NAME': strrecordname,
-                                    'OVERVIEW': strrecordoverview,
-                                    'LANG': strrecordlang,
-                                    'TOPIC_TYPE': strrecordtype,
-                                    'POSTER_PATH': strrecordposterpath
-                                }
-                                cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(lngrecordid),"Current record in the TMDb database movie preprocess",0)
+                                print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordtype + ")")
+                                if target_field_name == "TOPIC_NAME":
+                                    arrtopiccouples = {
+                                        'ID_RECORD': lngrecordid,
+                                        'TOPIC_NAME': strrecordname,
+                                        'OVERVIEW': strrecordoverview,
+                                        'TOPIC_TYPE': strrecordtype,
+                                        'POSTER_PATH': strrecordposterpath
+                                    }
+                                elif target_field_name == "TOPIC_NAME_FR":
+                                    arrtopiccouples = {
+                                        'ID_RECORD': lngrecordid,
+                                        'TOPIC_NAME_FR': strrecordname,
+                                        'TOPIC_TYPE': strrecordtype
+                                    }
                                 strsqltablename = "T_WC_T2S_TOPIC"
-                                strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND TOPIC_TYPE = '{strrecordtype}' AND LANG = '{strrecordlang}'"
+                                strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND TOPIC_TYPE = '{strrecordtype}'"
+                                cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(lngrecordid),"Current record in the TMDb database movie preprocess",0)
                                 
                                 strsqlmovies = ""
                                 strsqlseries = ""
@@ -1022,48 +1038,50 @@ ORDER BY COMPTE DESC """
                                                 print("Error: Failed to create/update topic - lngtopicid is None")
                                                 continue
                                             lngtopicid = cursor3.fetchone()["ID_TOPIC"]
-                                        # Retrieve all movies for this topic
-                                        results = cursor2.fetchall()
-                                        lngdisplayorderprev = 0
-                                        for row in results:
-                                            lngmovieid = row["ID_MOVIE"]
-                                            lngdisplayorder = row["DISPLAY_ORDER"]
-                                            if lngdisplayorder is None:
-                                                lngdisplayorder = lngdisplayorderprev
-                                            else:
-                                                lngdisplayorderprev = lngdisplayorder
-                                            arrmovietopiccouples = {
-                                                'ID_MOVIE': lngmovieid,
-                                                'ID_TOPIC': lngtopicid,
-                                                'DISPLAY_ORDER': lngdisplayorder
-                                            }
-                                            strsqlupdatecondition2 = "ID_MOVIE = " + str(lngmovieid) + " AND ID_TOPIC = " + str(lngtopicid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
-                                            #print(strsqlupdatecondition2)
-                                            cp.f_sqlupdatearray("T_WC_T2S_MOVIE_TOPIC", arrmovietopiccouples, strsqlupdatecondition2, 1)
-                                        if strsqlseries != "":
-                                            # Retrieve all series for this topic
-                                            results = cursor4.fetchall()
+                                        if inttopic == 1 or inttopic == 3 or inttopic == 5:
+                                            # Retrieve all movies for this topic
+                                            # Only processing when handling original English (records from T_WC_TMDB_LIST or T_WC_TMDB_COLLECTION or T_WC_TMDB_KEYWORD) to avoid duplicates with the translated versions
+                                            results = cursor2.fetchall()
                                             lngdisplayorderprev = 0
                                             for row in results:
-                                                lngseriesid = row["ID_SERIE"]
+                                                lngmovieid = row["ID_MOVIE"]
                                                 lngdisplayorder = row["DISPLAY_ORDER"]
                                                 if lngdisplayorder is None:
                                                     lngdisplayorder = lngdisplayorderprev
                                                 else:
                                                     lngdisplayorderprev = lngdisplayorder
-                                                arrserietopiccouples = {
-                                                    'ID_SERIE': lngseriesid,
+                                                arrmovietopiccouples = {
+                                                    'ID_MOVIE': lngmovieid,
                                                     'ID_TOPIC': lngtopicid,
                                                     'DISPLAY_ORDER': lngdisplayorder
                                                 }
-                                                strsqlupdatecondition2 = "ID_SERIE = " + str(lngseriesid) + " AND ID_TOPIC = " + str(lngtopicid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                strsqlupdatecondition2 = "ID_MOVIE = " + str(lngmovieid) + " AND ID_TOPIC = " + str(lngtopicid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
                                                 #print(strsqlupdatecondition2)
-                                                cp.f_sqlupdatearray("T_WC_T2S_SERIE_TOPIC", arrserietopiccouples, strsqlupdatecondition2, 1)
-                                        arrtopiccouples = {
-                                            'MOVIE_COUNT': lngmoviecount,
-                                            'SERIE_COUNT': lngseriescount
-                                        }
-                                        cp.f_sqlupdatearray(strsqltablename, arrtopiccouples, strsqlupdatecondition, 1)
+                                                cp.f_sqlupdatearray("T_WC_T2S_MOVIE_TOPIC", arrmovietopiccouples, strsqlupdatecondition2, 1)
+                                            if strsqlseries != "":
+                                                # Retrieve all series for this topic
+                                                results = cursor4.fetchall()
+                                                lngdisplayorderprev = 0
+                                                for row in results:
+                                                    lngseriesid = row["ID_SERIE"]
+                                                    lngdisplayorder = row["DISPLAY_ORDER"]
+                                                    if lngdisplayorder is None:
+                                                        lngdisplayorder = lngdisplayorderprev
+                                                    else:
+                                                        lngdisplayorderprev = lngdisplayorder
+                                                    arrserietopiccouples = {
+                                                        'ID_SERIE': lngseriesid,
+                                                        'ID_TOPIC': lngtopicid,
+                                                        'DISPLAY_ORDER': lngdisplayorder
+                                                    }
+                                                    strsqlupdatecondition2 = "ID_SERIE = " + str(lngseriesid) + " AND ID_TOPIC = " + str(lngtopicid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                    #print(strsqlupdatecondition2)
+                                                    cp.f_sqlupdatearray("T_WC_T2S_SERIE_TOPIC", arrserietopiccouples, strsqlupdatecondition2, 1)
+                                            arrtopiccouples = {
+                                                'MOVIE_COUNT': lngmoviecount,
+                                                'SERIE_COUNT': lngseriescount
+                                            }
+                                            cp.f_sqlupdatearray(strsqltablename, arrtopiccouples, strsqlupdatecondition, 1)
                                     else:
                                         # This topic has only one element or none
                                         # So we delete this topic if it already exists
