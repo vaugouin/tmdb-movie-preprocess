@@ -576,7 +576,7 @@ try:
             #arrprocessscope = {6: 'T2S_PERSON'}
             #arrprocessscope = {4: 'T2S_MOVIE'}
             #arrprocessscope = {5: 'T2S_SERIE'}
-            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
+            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 40: 'T2S_ITEM'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
@@ -585,8 +585,9 @@ try:
             #arrprocessscope = {8: 'T2S_NETWORK'}
             #arrprocessscope = {3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE'}
-            arrprocessscope = {3: 'T2S_TOPIC'}
+            #arrprocessscope = {3: 'T2S_TOPIC'}
             #arrprocessscope = {30: 'TMDB_MOVIE_LANG_META'}
+            #arrprocessscope = {40: 'T2S_ITEM'}
             for intindex, strdesc in arrprocessscope.items():
                 strprocessesexecuted += str(intindex) + ", "
                 cp.f_setservervariable("strtmdbmoviepreprocessprocessesexecuted",strprocessesexecuted,strprocessesexecuteddesc,0)
@@ -963,6 +964,7 @@ ORDER BY COMPTE DESC """
                                         'TOPIC_NAME': strrecordname,
                                         'OVERVIEW': strrecordoverview,
                                         'TOPIC_TYPE': strrecordtype,
+                                        'LANG': strrecordlang,
                                         'POSTER_PATH': strrecordposterpath
                                     }
                                 elif target_field_name == "TOPIC_NAME_FR":
@@ -1928,6 +1930,78 @@ ORDER BY COMPTE DESC """
                     #----------------------------------------------------
                     print("TMDB_KEYWORD processing")
 
+
+                elif intindex == 40:
+                    #----------------------------------------------------
+                    print("T2S_ITEM processing")
+                    if 1:
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from WIKIDATA_ITEM to T2S_ITEM","Current sub process in the TMDb database movie preprocess",0)
+                        # Get the maximum ID_ROW value from the database
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_WIKIDATA_ITEM")
+                        result = cursor.fetchone()
+                        lngitemrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngitemrangemax}")
+                        
+                        # Process database in chunks of 1000 records
+                        lngchunksize = 1000
+                        lngtotalprocessed = 0
+                        
+                        for lngitemrangestart in range(1, lngitemrangemax + 1, lngchunksize):
+                            lngitemrangeend = min(lngitemrangestart + lngchunksize - 1, lngitemrangemax)
+                            print(f"Processing items from ID {lngitemrangestart} to {lngitemrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentitemid",str(lngitemrangestart),"Current row ID in the TMDb database preprocess",0)
+                            
+                            strsqlitems = f"""
+INSERT INTO T_WC_T2S_ITEM (
+    ID_ROW, ID_WIKIDATA, ITEM_LABEL, ALIASES, DESCRIPTION,
+    WIKIPEDIA_IMAGE_PATH, INSTANCE_OF,
+    DAT_CREAT, TIM_UPDATED, 
+    DELETED
+)
+SELECT 
+    ID_ROW, ID_WIKIDATA, LABEL, ALIASES, DESCRIPTION,
+    WIKIPEDIA_IMAGE_PATH, INSTANCE_OF,
+    DAT_CREAT, TIM_UPDATED, 
+    DELETED
+FROM T_WC_WIKIDATA_ITEM
+WHERE LANG = 'en' 
+AND ID_ROW >= {lngitemrangestart} AND ID_ROW <= {lngitemrangeend}
+ON DUPLICATE KEY UPDATE
+    ID_WIKIDATA = VALUES(ID_WIKIDATA),
+    ITEM_LABEL = VALUES(ITEM_LABEL),
+    ALIASES = VALUES(ALIASES),
+    DESCRIPTION = VALUES(DESCRIPTION),
+    WIKIPEDIA_IMAGE_PATH = VALUES(WIKIPEDIA_IMAGE_PATH),
+    INSTANCE_OF = VALUES(INSTANCE_OF),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    DELETED = VALUES(DELETED) """
+                            cursor2.execute(strsqlitems)
+                            cp.connectioncp.commit()
+                            
+                            strsqlitemsdelete = f"""
+DELETE FROM T_WC_T2S_ITEM 
+WHERE ID_ROW >= {lngitemrangestart} AND ID_ROW <= {lngitemrangeend}
+AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_WIKIDATA_ITEM 
+    WHERE LANG = 'en'
+        AND ID_ROW >= {lngitemrangestart} AND ID_ROW <= {lngitemrangeend}
+) """
+                            cursor2.execute(strsqlitemsdelete)
+                            cp.connectioncp.commit()
+
+                            strsqlitems = f"""
+UPDATE T_WC_T2S_ITEM t2s
+INNER JOIN T_WC_WIKIDATA_ITEM t 
+    ON t2s.ID_WIKIDATA = t.ID_WIKIDATA
+SET t2s.ITEM_LABEL_FR = t.LABEL
+WHERE t2s.ID_ROW >= {lngitemrangestart} 
+    AND t2s.ID_ROW <= {lngitemrangeend}
+    AND t.LANG = 'fr' """
+                            cursor2.execute(strsqlitems)
+                            cp.connectioncp.commit()
+
+                    print(f"T2S_ITEM processing completed. ")
 
                 elif intindex == 30:
                     #----------------------------------------------------
