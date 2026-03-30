@@ -66,11 +66,11 @@ def f_tmdbpersonsetusedfortags(lngpersonid):
 
 def f_wikidataitemproperties(strlang,stritemidwikidata,strpropertyid,strsep):
     strsql = ""
-    strsql += "SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM, T_WC_WIKIDATA_ITEM.LABEL, T_WC_WIKIDATA_ITEM.ALIASES, T_WC_WIKIDATA_ITEM.DESCRIPTION, T_WC_WIKIDATA_ITEM.LANG "
+    strsql += "SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM, T_WC_WIKIDATA_ITEM_V1.LABEL, T_WC_WIKIDATA_ITEM_V1.ALIASES, T_WC_WIKIDATA_ITEM_V1.DESCRIPTION, T_WC_WIKIDATA_ITEM_V1.LANG "
     strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
-    strsql += "LEFT JOIN T_WC_WIKIDATA_ITEM ON T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = T_WC_WIKIDATA_ITEM.ID_WIKIDATA "
+    strsql += "LEFT JOIN T_WC_WIKIDATA_ITEM_V1 ON T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = T_WC_WIKIDATA_ITEM_V1.ID_WIKIDATA "
     strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA = '" + stritemidwikidata + "' "
-    #strsql += "AND T_WC_WIKIDATA_ITEM.LANG = '" + strlang + "' "
+    #strsql += "AND T_WC_WIKIDATA_ITEM_V1.LANG = '" + strlang + "' "
     strsql += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strpropertyid + "' "
     strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.DISPLAY_ORDER "
     #print(strsql)
@@ -556,6 +556,7 @@ try:
             cursor2 = cp.connectioncp.cursor()
             cursor3 = cp.connectioncp.cursor()
             cursor4 = cp.connectioncp.cursor()
+            cursor5 = cp.connectioncp.cursor()
             start_time = time.time()
             strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
             cp.f_setservervariable("strtmdbmoviepreprocessstartdatetime",strnow,"Date and time of the last start of the TMDb database preprocess",0)
@@ -567,7 +568,7 @@ try:
             strtotalruntimedesc = "Total runtime of the TMDb movie preprocess"
             strtotalruntimeprevious = cp.f_getservervariable("strtmdbmoviepreprocesstotalruntime",0)
             cp.f_setservervariable("strtmdbmoviepreprocesstotalruntimeprevious",strtotalruntimeprevious,strtotalruntimedesc + " (previous execution)",0)
-            strtotalruntime = ""
+            strtotalruntime = "RUNNING"
             cp.f_setservervariable("strtmdbmoviepreprocesstotalruntime",strtotalruntime,strtotalruntimedesc,0)
 
             #arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 20: 'TMDB_KEYWORD', 30: 'TMDB_MOVIE_LANG_META'}
@@ -576,7 +577,7 @@ try:
             #arrprocessscope = {6: 'T2S_PERSON'}
             #arrprocessscope = {4: 'T2S_MOVIE'}
             #arrprocessscope = {5: 'T2S_SERIE'}
-            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 40: 'T2S_ITEM'}
+            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 40: 'T2S_ITEM'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
@@ -585,9 +586,16 @@ try:
             #arrprocessscope = {8: 'T2S_NETWORK'}
             #arrprocessscope = {3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE'}
-            #arrprocessscope = {3: 'T2S_TOPIC'}
+            #if strnow.startswith("2026-03-03"):
+            #    arrprocessscope = {3: 'T2S_TOPIC'}
             #arrprocessscope = {30: 'TMDB_MOVIE_LANG_META'}
             #arrprocessscope = {40: 'T2S_ITEM'}
+            #arrprocessscope = {41: 'T2S_COLLECTION'}
+            #arrprocessscope = {41: 'T2S_COLLECTION', 42: 'T2S_LIST'}
+            #arrprocessscope = {3: 'T2S_TOPIC'}
+            #arrprocessscope = {43: 'T2S_GROUP'}
+            if strnow.startswith("2026-03-29"):
+                arrprocessscope = {47: 'T2S_NOMINATION'}
             for intindex, strdesc in arrprocessscope.items():
                 strprocessesexecuted += str(intindex) + ", "
                 cp.f_setservervariable("strtmdbmoviepreprocessprocessesexecuted",strprocessesexecuted,strprocessesexecuteddesc,0)
@@ -794,13 +802,9 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                     #----------------------------------------------------
                     print("T2S_TOPIC processing")
                     if 1:
-                        # Delete all topic records for fr language to start from a clean base
-                        strsqldelete = "DELETE FROM " + cp.strsqlns + "T2S_TOPIC WHERE LANG <> 'en' "
-                        cursor2.execute(strsqldelete)
-                        cp.connectioncp.commit()
-                    if 1:
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Compute MOVIE_COUNT for KEYWORD","Current sub process in the TMDb database movie preprocess",0)
                         # Compute MOVIE_COUNT for KEYWORD
+                        print("Compute MOVIE_COUNT for KEYWORD")
                         strsqlcompanies = """
 SELECT COUNT(DISTINCT T_WC_T2S_MOVIE.ID_MOVIE) AS COMPTE, T_WC_TMDB_KEYWORD.NAME, T_WC_TMDB_KEYWORD.ID_KEYWORD 
 FROM T_WC_T2S_MOVIE 
@@ -821,6 +825,7 @@ ORDER BY COMPTE DESC """
                     if 1:
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Compute SERIE_COUNT for KEYWORD","Current sub process in the TMDb database movie preprocess",0)
                         # Compute SERIE_COUNT for KEYWORD
+                        print("Compute SERIE_COUNT for KEYWORD")
                         strsqlcompanies = """
 SELECT COUNT(DISTINCT T_WC_T2S_SERIE.ID_SERIE) AS COMPTE, T_WC_TMDB_KEYWORD.NAME, T_WC_TMDB_KEYWORD.ID_KEYWORD 
 FROM T_WC_T2S_SERIE 
@@ -840,6 +845,7 @@ ORDER BY COMPTE DESC """
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrcompanycouples,"ID_KEYWORD = " + str(row['ID_KEYWORD']),0)
                     if 1:
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Compute KPI for KEYWORD","Current sub process in the TMDb database movie preprocess",0)
+                        print("Compute KPI for KEYWORD")
                         strsqlkeywords = ""
                         strsqlkeywords += "SELECT * FROM T_WC_TMDB_KEYWORD "
                         strsqlkeywords += "ORDER BY ID_KEYWORD ASC "
@@ -889,14 +895,14 @@ ORDER BY COMPTE DESC """
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
 
                     arrtopics = {1: 'en-list', 2: 'fr-list', 3: 'en-collection', 4: 'fr-collection', 5: 'en-keyword'}    
-                    #arrtopics = {5: 'en-keyword'}    
-                    #arrtopics = {1: 'en-list', 2: 'fr-list'}    
+                    #arrtopics = {5: 'en-keyword'}
+                    #arrtopics = {1: 'en-list', 2: 'fr-list'}
                     for inttopic, strtopic in arrtopics.items():
                         strsql = ""
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strtopic,"Current sub process in the TMDb database movie preprocess",0)
                         if inttopic == 1:
                             strcurrentprocess = f"{inttopic}: Copying from TMDB_LIST to T2S_TOPIC"
-                            strsql += "SELECT 'list' AS TOPIC_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST.NAME, T_WC_TMDB_LIST.DESCRIPTION AS OVERVIEW, 'en' AS LANG, T_WC_TMDB_LIST.POSTER_PATH "
+                            strsql += "SELECT 'list' AS TOPIC_SOURCE, 'collection' AS TOPIC_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST.NAME, T_WC_TMDB_LIST.DESCRIPTION AS OVERVIEW, 'en' AS LANG, T_WC_TMDB_LIST.POSTER_PATH "
                             strsql += "FROM T_WC_TMDB_LIST WHERE USE_FOR_TAGGING > 0 "
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
@@ -904,7 +910,7 @@ ORDER BY COMPTE DESC """
                             target_field_name = "TOPIC_NAME"
                         elif inttopic == 2:
                             strcurrentprocess = f"{inttopic}: Copying from T_WC_TMDB_LIST_LANG to T2S_TOPIC"
-                            strsql += "SELECT 'list' AS TOPIC_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST_LANG.SHORT_NAME AS NAME, '' AS OVERVIEW, T_WC_TMDB_LIST_LANG.LANG, '' AS POSTER_PATH "
+                            strsql += "SELECT 'list' AS TOPIC_SOURCE, 'collection' AS TOPIC_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST_LANG.SHORT_NAME AS NAME, '' AS OVERVIEW, T_WC_TMDB_LIST_LANG.LANG, '' AS POSTER_PATH "
                             strsql += "FROM T_WC_TMDB_LIST "
                             strsql += "INNER JOIN T_WC_TMDB_LIST_LANG ON T_WC_TMDB_LIST.ID_LIST = T_WC_TMDB_LIST_LANG.ID_LIST "
                             strsql += "WHERE T_WC_TMDB_LIST.USE_FOR_TAGGING > 0 "
@@ -914,7 +920,7 @@ ORDER BY COMPTE DESC """
                             target_field_name = "TOPIC_NAME_FR"
                         elif inttopic == 3:
                             strcurrentprocess = f"{inttopic}: Copying from TMDB_COLLECTION to T2S_TOPIC"
-                            strsql += "SELECT 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION.NAME, T_WC_TMDB_COLLECTION.OVERVIEW, 'en' AS LANG, T_WC_TMDB_COLLECTION.POSTER_PATH "
+                            strsql += "SELECT 'collection' AS TOPIC_SOURCE, 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION.NAME, T_WC_TMDB_COLLECTION.OVERVIEW, 'en' AS LANG, T_WC_TMDB_COLLECTION.POSTER_PATH "
                             strsql += "FROM T_WC_TMDB_COLLECTION "
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
@@ -922,7 +928,7 @@ ORDER BY COMPTE DESC """
                             target_field_name = "TOPIC_NAME"
                         elif inttopic == 4:
                             strcurrentprocess = f"{inttopic}: Copying from T_WC_TMDB_COLLECTION_LANG to T2S_TOPIC"
-                            strsql += "SELECT 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION_LANG.NAME, T_WC_TMDB_COLLECTION_LANG.OVERVIEW, T_WC_TMDB_COLLECTION_LANG.LANG, T_WC_TMDB_COLLECTION_LANG.POSTER_PATH "
+                            strsql += "SELECT 'collection' AS TOPIC_SOURCE, 'collection' AS TOPIC_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION_LANG.NAME, T_WC_TMDB_COLLECTION_LANG.OVERVIEW, T_WC_TMDB_COLLECTION_LANG.LANG, T_WC_TMDB_COLLECTION_LANG.POSTER_PATH "
                             strsql += "FROM T_WC_TMDB_COLLECTION "
                             strsql += "INNER JOIN T_WC_TMDB_COLLECTION_LANG ON T_WC_TMDB_COLLECTION.ID_COLLECTION = T_WC_TMDB_COLLECTION_LANG.ID_COLLECTION "
                             strsql += "ORDER BY ID_RECORD ASC "
@@ -931,9 +937,10 @@ ORDER BY COMPTE DESC """
                             target_field_name = "TOPIC_NAME_FR"
                         elif inttopic == 5:
                             strcurrentprocess = f"{inttopic}: Copying from TMDB_KEYWORD to T2S_TOPIC"
-                            strsql += "SELECT 'keyword' AS TOPIC_TYPE, T_WC_TMDB_KEYWORD.ID_KEYWORD AS ID_RECORD, T_WC_TMDB_KEYWORD.NAME, '' AS OVERVIEW, 'en' AS LANG, '' AS POSTER_PATH "
+                            strsql += "SELECT 'keyword' AS TOPIC_SOURCE, 'keyword' AS TOPIC_TYPE, T_WC_TMDB_KEYWORD.ID_KEYWORD AS ID_RECORD, T_WC_TMDB_KEYWORD.NAME, '' AS OVERVIEW, 'en' AS LANG, '' AS POSTER_PATH "
                             strsql += "FROM T_WC_TMDB_KEYWORD "
-                            strsql += "WHERE T_WC_TMDB_KEYWORD.USE_FOR_TAGGING > 0 "
+                            strsql += "WHERE T_WC_TMDB_KEYWORD.USED_FOR_T2S_TOPIC > 0 "
+                            strsql += "OR T_WC_TMDB_KEYWORD.USE_FOR_TAGGING > 0 "
                             strsql += "ORDER BY ID_RECORD ASC "
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
@@ -955,15 +962,17 @@ ORDER BY COMPTE DESC """
                                 strrecordname = row['NAME']
                                 strrecordoverview = row['OVERVIEW']
                                 strrecordlang = row['LANG']
-                                strrecordtype = row['TOPIC_TYPE']
+                                strrecordtopicsource = row['TOPIC_SOURCE']
+                                strrecordtopictype = row['TOPIC_TYPE']
                                 strrecordposterpath = row['POSTER_PATH']
-                                print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordtype + ")")
+                                print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordtopicsource + ")")
                                 if target_field_name == "TOPIC_NAME":
                                     arrtopiccouples = {
                                         'ID_RECORD': lngrecordid,
                                         'TOPIC_NAME': strrecordname,
                                         'OVERVIEW': strrecordoverview,
-                                        'TOPIC_TYPE': strrecordtype,
+                                        'TOPIC_SOURCE': strrecordtopicsource,
+                                        'TOPIC_TYPE': strrecordtopictype,
                                         'LANG': strrecordlang,
                                         'POSTER_PATH': strrecordposterpath
                                     }
@@ -971,10 +980,11 @@ ORDER BY COMPTE DESC """
                                     arrtopiccouples = {
                                         'ID_RECORD': lngrecordid,
                                         'TOPIC_NAME_FR': strrecordname,
-                                        'TOPIC_TYPE': strrecordtype
+                                        'TOPIC_SOURCE': strrecordtopicsource,
+                                        'TOPIC_TYPE': strrecordtopictype
                                     }
                                 strsqltablename = "T_WC_T2S_TOPIC"
-                                strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND TOPIC_TYPE = '{strrecordtype}'"
+                                strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND TOPIC_SOURCE = '{strrecordtopicsource}'"
                                 cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(lngrecordid),"Current record in the TMDb database movie preprocess",0)
                                 
                                 strsqlmovies = ""
@@ -1093,6 +1103,55 @@ ORDER BY COMPTE DESC """
                                         cursor2.execute(strsqldelete)
                                         #cursor2.commit()
                     if 1:
+                        strsqltablename = "T_WC_T2S_TOPIC"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE TOPIC_TYPE IS NULL "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqldelete = ""
+                        strsqldelete += "DELETE FROM T_WC_T2S_TOPIC "
+                        strsqldelete += "WHERE TOPIC_SOURCE = 'list' "
+                        strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_LIST FROM T_WC_TMDB_LIST WHERE USE_FOR_TAGGING > 0) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqldelete = ""
+                        strsqldelete += "DELETE FROM T_WC_T2S_TOPIC "
+                        strsqldelete += "WHERE TOPIC_SOURCE = 'collection' "
+                        strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_COLLECTION FROM T_WC_TMDB_COLLECTION) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqldelete = ""
+                        strsqldelete += "DELETE FROM T_WC_T2S_TOPIC "
+                        strsqldelete += "WHERE TOPIC_SOURCE = 'keyword' "
+                        strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_KEYWORD FROM T_WC_TMDB_KEYWORD WHERE USED_FOR_T2S_TOPIC > 0 OR USE_FOR_TAGGING > 0) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+                        
+                        # Update T_WC_T2S_TOPIC.IMDB_RATING and T_WC_T2S_TOPIC.IMDB_RATING_ADJUSTED 
+                        strsql = """UPDATE T_WC_T2S_TOPIC t
+JOIN (
+    SELECT
+        mt.ID_TOPIC,
+        AVG(m.IMDB_RATING) AS AVG_IMDB_RATING,
+        AVG(m.IMDB_RATING_ADJUSTED) AS AVG_IMDB_RATING_ADJUSTED
+    FROM T_WC_T2S_MOVIE_TOPIC mt
+    INNER JOIN T_WC_T2S_MOVIE m
+        ON m.ID_MOVIE = mt.ID_MOVIE
+    INNER JOIN T_WC_T2S_TOPIC t2
+        ON t2.ID_TOPIC = mt.ID_TOPIC
+       AND t2.TOPIC_TYPE = 'collection'
+    GROUP BY mt.ID_TOPIC
+) x
+    ON x.ID_TOPIC = t.ID_TOPIC
+SET
+    t.IMDB_RATING = x.AVG_IMDB_RATING,
+    t.IMDB_RATING_ADJUSTED = x.AVG_IMDB_RATING_ADJUSTED;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
                         strsqltablename = "T_WC_T2S_MOVIE_TOPIC"
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_TOPIC NOT IN (SELECT ID_TOPIC FROM T_WC_T2S_TOPIC) "
                         print(strsqldelete)
@@ -1103,6 +1162,1564 @@ ORDER BY COMPTE DESC """
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
                         #cursor2.commit()
+
+                elif intindex == 41:
+                    #----------------------------------------------------
+                    print("T2S_COLLECTION processing")
+
+                    arrcollections = {1: 'en-list', 2: 'fr-list', 3: 'en-collection', 4: 'fr-collection'}    
+                    #arrcollections = {1: 'en-list', 2: 'fr-list'}    
+                    for intcollection, strcollection in arrcollections.items():
+                        strsql = ""
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strcollection,"Current sub process in the TMDb database movie preprocess",0)
+                        if intcollection == 1:
+                            strcurrentprocess = f"{intcollection}: Copying from TMDB_LIST to T2S_COLLECTION"
+                            strsql += "SELECT 'list' AS COLLECTION_SOURCE, 'collection' AS COLLECTION_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST.NAME, T_WC_TMDB_LIST.DESCRIPTION AS OVERVIEW, 'en' AS LANG, T_WC_TMDB_LIST.POSTER_PATH "
+                            strsql += "FROM T_WC_TMDB_LIST WHERE USED_FOR_T2S_COLLECTION > 0 "
+                            strsql += "ORDER BY ID_RECORD ASC "
+                            #strsql += "LIMIT 10 "
+                            #strsql += "LIMIT 1000 "
+                            target_field_name = "COLLECTION_NAME"
+                        elif intcollection == 2:
+                            strcurrentprocess = f"{intcollection}: Copying from T_WC_TMDB_LIST_LANG to T2S_COLLECTION"
+                            strsql += "SELECT 'list' AS COLLECTION_SOURCE, 'collection' AS COLLECTION_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST_LANG.SHORT_NAME AS NAME, '' AS OVERVIEW, T_WC_TMDB_LIST_LANG.LANG, '' AS POSTER_PATH "
+                            strsql += "FROM T_WC_TMDB_LIST "
+                            strsql += "INNER JOIN T_WC_TMDB_LIST_LANG ON T_WC_TMDB_LIST.ID_LIST = T_WC_TMDB_LIST_LANG.ID_LIST "
+                            strsql += "WHERE T_WC_TMDB_LIST.USED_FOR_T2S_COLLECTION > 0 "
+                            strsql += "ORDER BY ID_RECORD ASC "
+                            #strsql += "LIMIT 10 "
+                            #strsql += "LIMIT 1000 "
+                            target_field_name = "COLLECTION_NAME_FR"
+                        elif intcollection == 3:
+                            strcurrentprocess = f"{intcollection}: Copying from TMDB_COLLECTION to T2S_COLLECTION"
+                            strsql += "SELECT 'collection' AS COLLECTION_SOURCE, 'collection' AS COLLECTION_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION.NAME, T_WC_TMDB_COLLECTION.OVERVIEW, 'en' AS LANG, T_WC_TMDB_COLLECTION.POSTER_PATH "
+                            strsql += "FROM T_WC_TMDB_COLLECTION "
+                            strsql += "ORDER BY ID_RECORD ASC "
+                            #strsql += "LIMIT 10 "
+                            #strsql += "LIMIT 1000 "
+                            target_field_name = "COLLECTION_NAME"
+                        elif intcollection == 4:
+                            strcurrentprocess = f"{intcollection}: Copying from T_WC_TMDB_COLLECTION_LANG to T2S_COLLECTION"
+                            strsql += "SELECT 'collection' AS COLLECTION_SOURCE, 'collection' AS COLLECTION_TYPE, T_WC_TMDB_COLLECTION.ID_COLLECTION AS ID_RECORD, T_WC_TMDB_COLLECTION_LANG.NAME, T_WC_TMDB_COLLECTION_LANG.OVERVIEW, T_WC_TMDB_COLLECTION_LANG.LANG, T_WC_TMDB_COLLECTION_LANG.POSTER_PATH "
+                            strsql += "FROM T_WC_TMDB_COLLECTION "
+                            strsql += "INNER JOIN T_WC_TMDB_COLLECTION_LANG ON T_WC_TMDB_COLLECTION.ID_COLLECTION = T_WC_TMDB_COLLECTION_LANG.ID_COLLECTION "
+                            strsql += "ORDER BY ID_RECORD ASC "
+                            #strsql += "LIMIT 10 "
+                            #strsql += "LIMIT 1000 "
+                            target_field_name = "COLLECTION_NAME_FR"
+                        if strsql != "":
+                            # Now we process the SELECT query
+                            print(strsql)
+                            cursor.execute(strsql)
+                            lngrowcount = cursor.rowcount
+                            print(f"{lngrowcount} lines")
+                            lnglinesprocessed = 0
+                            # Fetching all rows from the last executed statement
+                            results = cursor.fetchall()
+                            # Iterating through the results and printing
+                            for row in results:
+                                # print("------------------------------------------")
+                                lnglinesprocessed += 1
+                                lngrecordid = row['ID_RECORD']
+                                strrecordname = row['NAME']
+                                strrecordoverview = row['OVERVIEW']
+                                strrecordcollectionsource = row['COLLECTION_SOURCE']
+                                strrecordcollectiontype = row['COLLECTION_TYPE']
+                                strrecordposterpath = row['POSTER_PATH']
+                                print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordcollectionsource + ")")
+                                if target_field_name == "COLLECTION_NAME":
+                                    arrcollectioncouples = {
+                                        'ID_RECORD': lngrecordid,
+                                        'COLLECTION_NAME': strrecordname,
+                                        'OVERVIEW': strrecordoverview,
+                                        'COLLECTION_SOURCE': strrecordcollectionsource,
+                                        'COLLECTION_TYPE': strrecordcollectiontype,
+                                        'POSTER_PATH': strrecordposterpath
+                                    }
+                                elif target_field_name == "COLLECTION_NAME_FR":
+                                    arrcollectioncouples = {
+                                        'ID_RECORD': lngrecordid,
+                                        'COLLECTION_NAME_FR': strrecordname,
+                                        'COLLECTION_SOURCE': strrecordcollectionsource,
+                                        'COLLECTION_TYPE': strrecordcollectiontype
+                                    }
+                                strsqltablename = "T_WC_T2S_COLLECTION"
+                                strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND COLLECTION_SOURCE = '{strrecordcollectionsource}'"
+                                cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(lngrecordid),"Current record in the TMDb database movie preprocess",0)
+                                
+                                strsqlmovies = ""
+                                strsqlseries = ""
+                                if intcollection == 1 or intcollection == 2:
+                                    # Retrieving movies for this list by excluding adult movies and movies without Wikidata ID
+                                    strsqlmovies += "SELECT ID_MOVIE, DISPLAY_ORDER "
+                                    strsqlmovies += "FROM T_WC_TMDB_MOVIE_LIST "
+                                    strsqlmovies += "WHERE ID_LIST = " + str(lngrecordid) + " "
+                                    strsqlmovies += "AND DELETED = 0 "
+                                    strsqlmovies += "AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_TMDB_MOVIE WHERE ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '') "
+                                    strsqlmovies += "ORDER BY DISPLAY_ORDER "
+                                    # Retrieving series for this list by excluding adult series and series without Wikidata ID
+                                    strsqlseries += "SELECT ID_SERIE, DISPLAY_ORDER "
+                                    strsqlseries += "FROM T_WC_TMDB_SERIE_LIST "
+                                    strsqlseries += "WHERE ID_LIST = " + str(lngrecordid) + " "
+                                    strsqlseries += "AND DELETED = 0 "
+                                    strsqlseries += "AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_TMDB_SERIE WHERE ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '') "
+                                    strsqlseries += "ORDER BY DISPLAY_ORDER "
+                                elif intcollection == 3 or intcollection == 4:
+                                    # Retrieving movies for this collection by excluding adult movies and movies without Wikidata ID
+                                    strsqlmovies += "SELECT ID_MOVIE, 0 AS DISPLAY_ORDER "
+                                    strsqlmovies += "FROM T_WC_TMDB_MOVIE "
+                                    strsqlmovies += "WHERE ID_COLLECTION = " + str(lngrecordid) + " "
+                                    strsqlmovies += "AND DELETED = 0 "
+                                    strsqlmovies += "AND ADULT = 0 "
+                                    strsqlmovies += "AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '' "
+                                    strsqlmovies += "ORDER BY ID_MOVIE "
+                                if strsqlmovies != "":
+                                    # Retrieving elements for this collection (list/collection)
+                                    cursor2.execute(strsqlmovies)
+                                    lngmoviecount = cursor2.rowcount
+                                    lngseriescount = 0
+                                    #print(f"{lngmoviecount} lines")
+                                    if strsqlseries != "":
+                                        cursor4.execute(strsqlseries)
+                                        lngseriescount = cursor4.rowcount
+                                        #print(f"{lngseriescount} lines")
+                                    if lngmoviecount + lngseriescount > 1:
+                                        # This collection has more than one element (movie or serie)
+                                        # So we create/update this collection
+                                        lngcollectionid = cp.f_sqlupdatearray(strsqltablename, arrcollectioncouples, strsqlupdatecondition, 1)
+                                        if lngcollectionid is None:
+                                            strsqlcollection = "SELECT ID_T2S_COLLECTION FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                            cursor3.execute(strsqlcollection)
+                                            lngrowcount = cursor3.rowcount
+                                            if lngrowcount == 0:
+                                                print("Error: Failed to create/update collection - lngcollectionid is None")
+                                                continue
+                                            lngcollectionid = cursor3.fetchone()["ID_T2S_COLLECTION"]
+                                        if intcollection == 1 or intcollection == 3:
+                                            # Retrieve all movies for this collection
+                                            # Only processing when handling original English (records from T_WC_TMDB_LIST or T_WC_TMDB_COLLECTION) to avoid duplicates with the translated versions
+                                            results = cursor2.fetchall()
+                                            lngdisplayorderprev = 0
+                                            for row in results:
+                                                lngmovieid = row["ID_MOVIE"]
+                                                lngdisplayorder = row["DISPLAY_ORDER"]
+                                                if lngdisplayorder is None:
+                                                    lngdisplayorder = lngdisplayorderprev
+                                                else:
+                                                    lngdisplayorderprev = lngdisplayorder
+                                                arrmoviecollectioncouples = {
+                                                    'ID_MOVIE': lngmovieid,
+                                                    'ID_T2S_COLLECTION': lngcollectionid,
+                                                    'DISPLAY_ORDER': lngdisplayorder
+                                                }
+                                                strsqlupdatecondition2 = "ID_MOVIE = " + str(lngmovieid) + " AND ID_T2S_COLLECTION = " + str(lngcollectionid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                #print(strsqlupdatecondition2)
+                                                cp.f_sqlupdatearray("T_WC_T2S_MOVIE_COLLECTION", arrmoviecollectioncouples, strsqlupdatecondition2, 1)
+                                            if strsqlseries != "":
+                                                # Retrieve all series for this collection
+                                                results = cursor4.fetchall()
+                                                lngdisplayorderprev = 0
+                                                for row in results:
+                                                    lngseriesid = row["ID_SERIE"]
+                                                    lngdisplayorder = row["DISPLAY_ORDER"]
+                                                    if lngdisplayorder is None:
+                                                        lngdisplayorder = lngdisplayorderprev
+                                                    else:
+                                                        lngdisplayorderprev = lngdisplayorder
+                                                    arrseriecollectioncouples = {
+                                                        'ID_SERIE': lngseriesid,
+                                                        'ID_T2S_COLLECTION': lngcollectionid,
+                                                        'DISPLAY_ORDER': lngdisplayorder
+                                                    }
+                                                    strsqlupdatecondition2 = "ID_SERIE = " + str(lngseriesid) + " AND ID_T2S_COLLECTION = " + str(lngcollectionid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                    #print(strsqlupdatecondition2)
+                                                    cp.f_sqlupdatearray("T_WC_T2S_SERIE_COLLECTION", arrseriecollectioncouples, strsqlupdatecondition2, 1)
+                                            arrcollectioncouples = {
+                                                'MOVIE_COUNT': lngmoviecount,
+                                                'SERIE_COUNT': lngseriescount
+                                            }
+                                            cp.f_sqlupdatearray(strsqltablename, arrcollectioncouples, strsqlupdatecondition, 1)
+                                    else:
+                                        # This collection has only one element or none
+                                        # So we delete this collection if it already exists
+                                        strsqltablename = "T_WC_T2S_COLLECTION"
+                                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                        print(strsqldelete)
+                                        cursor2.execute(strsqldelete)
+                                        #cursor2.commit()
+                    if 1:
+                        strsqltablename = "T_WC_T2S_COLLECTION"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE COLLECTION_TYPE IS NULL "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqldelete = ""
+                        strsqldelete += "DELETE FROM T_WC_T2S_COLLECTION "
+                        strsqldelete += "WHERE COLLECTION_SOURCE = 'list' "
+                        strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_LIST FROM T_WC_TMDB_LIST WHERE USED_FOR_T2S_COLLECTION > 0) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqldelete = ""
+                        strsqldelete += "DELETE FROM T_WC_T2S_COLLECTION "
+                        strsqldelete += "WHERE COLLECTION_SOURCE = 'collection' "
+                        strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_COLLECTION FROM T_WC_TMDB_COLLECTION) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+                        
+                        # Update T_WC_T2S_COLLECTION.IMDB_RATING and T_WC_T2S_COLLECTION.IMDB_RATING_ADJUSTED 
+                        strsql = """UPDATE T_WC_T2S_COLLECTION t
+JOIN (
+    SELECT
+        mt.ID_T2S_COLLECTION,
+        AVG(m.IMDB_RATING) AS AVG_IMDB_RATING,
+        AVG(m.IMDB_RATING_ADJUSTED) AS AVG_IMDB_RATING_ADJUSTED
+    FROM T_WC_T2S_MOVIE_COLLECTION mt
+    INNER JOIN T_WC_T2S_MOVIE m
+        ON m.ID_MOVIE = mt.ID_MOVIE
+    INNER JOIN T_WC_T2S_COLLECTION t2
+        ON t2.ID_T2S_COLLECTION = mt.ID_T2S_COLLECTION
+       AND t2.COLLECTION_TYPE = 'collection'
+    GROUP BY mt.ID_T2S_COLLECTION
+) x
+    ON x.ID_T2S_COLLECTION = t.ID_T2S_COLLECTION
+SET
+    t.IMDB_RATING = x.AVG_IMDB_RATING,
+    t.IMDB_RATING_ADJUSTED = x.AVG_IMDB_RATING_ADJUSTED;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        strsqltablename = "T_WC_T2S_MOVIE_COLLECTION"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_T2S_COLLECTION NOT IN (SELECT ID_T2S_COLLECTION FROM T_WC_T2S_COLLECTION) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+                        #cursor2.commit()
+                        strsqltablename = "T_WC_T2S_SERIE_COLLECTION"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_T2S_COLLECTION NOT IN (SELECT ID_T2S_COLLECTION FROM T_WC_T2S_COLLECTION) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+                        #cursor2.commit()
+
+                elif intindex == 42:
+                    #----------------------------------------------------
+                    print("T2S_LIST processing")
+
+                    arrlists = {1: 'en-list', 2: 'fr-list', 3: 'custom-list', 4: 'list-delete'}    
+                    for intlist, strlist in arrlists.items():
+                        strsql = ""
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strlist,"Current sub process in the TMDb database movie preprocess",0)
+                        if intlist == 1:
+                            strcurrentprocess = f"{intlist}: Copying from TMDB_LIST to T2S_LIST"
+                            strsql += "SELECT 'list' AS LIST_SOURCE, 'list' AS LIST_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST.NAME, T_WC_TMDB_LIST.DESCRIPTION AS OVERVIEW, 'en' AS LANG, T_WC_TMDB_LIST.POSTER_PATH "
+                            strsql += "FROM T_WC_TMDB_LIST WHERE USED_FOR_T2S_LIST > 0 "
+                            strsql += "ORDER BY ID_RECORD ASC "
+                            #strsql += "LIMIT 10 "
+                            #strsql += "LIMIT 1000 "
+                            target_field_name = "LIST_NAME"
+                        elif intlist == 2:
+                            strcurrentprocess = f"{intlist}: Copying from T_WC_TMDB_LIST_LANG to T2S_LIST"
+                            strsql += "SELECT 'list' AS LIST_SOURCE, 'list' AS LIST_TYPE, T_WC_TMDB_LIST.ID_LIST AS ID_RECORD, T_WC_TMDB_LIST_LANG.SHORT_NAME AS NAME, '' AS OVERVIEW, T_WC_TMDB_LIST_LANG.LANG, '' AS POSTER_PATH "
+                            strsql += "FROM T_WC_TMDB_LIST "
+                            strsql += "INNER JOIN T_WC_TMDB_LIST_LANG ON T_WC_TMDB_LIST.ID_LIST = T_WC_TMDB_LIST_LANG.ID_LIST "
+                            strsql += "WHERE T_WC_TMDB_LIST.USED_FOR_T2S_LIST > 0 "
+                            strsql += "ORDER BY ID_RECORD ASC "
+                            #strsql += "LIMIT 10 "
+                            #strsql += "LIMIT 1000 "
+                            target_field_name = "LIST_NAME_FR"
+                        elif intlist == 3:
+                            strcurrentprocess = f"{intlist}: Copying from T_WC_CUSTOM_LIST to T2S_LIST"
+                            strsql += "SELECT 'custom' AS LIST_SOURCE, 'list' AS LIST_TYPE, T_WC_CUSTOM_LIST.ID_CUSTOM_LIST AS ID_RECORD, T_WC_CUSTOM_LIST.LIST_NAME AS NAME, T_WC_CUSTOM_LIST.LIST_NAME_FR AS NAME_FR, T_WC_CUSTOM_LIST.OVERVIEW AS OVERVIEW, 'en' AS LANG, T_WC_CUSTOM_LIST.POSTER_PATH, T_WC_CUSTOM_LIST.ID_IMDB_LIST, T_WC_CUSTOM_LIST.WIKIDATA_PROPERTIES, T_WC_CUSTOM_LIST.TMDB_ELEMENTS "
+                            strsql += "FROM T_WC_CUSTOM_LIST WHERE DELETED = 0 "
+                            # Only processing custom lists targeting the T_WC_T2S_LIST table
+                            strsql += "AND TARGET_TABLE = 1 "
+                            strsql += "ORDER BY ID_RECORD ASC "
+                            #strsql += "LIMIT 10 "
+                            #strsql += "LIMIT 1000 "
+                            target_field_name = "LIST_NAME"
+                        elif intlist == 4:
+                            strcurrentprocess = f"{intlist}: Deleting from T2S_LIST"
+                            strsqldelete = ""
+                            strsqldelete += "DELETE FROM T_WC_T2S_LIST WHERE LIST_SOURCE = 'list' AND ID_RECORD NOT IN (SELECT ID_LIST FROM T_WC_TMDB_LIST WHERE T_WC_TMDB_LIST.USED_FOR_T2S_LIST > 0) "
+                            print(strsqldelete)
+                            cursor.execute(strsqldelete)
+                            #cursor.commit()
+                            strsqldelete = ""
+                            strsqldelete += "DELETE FROM T_WC_T2S_LIST WHERE LIST_SOURCE = 'custom' AND ID_RECORD NOT IN (SELECT ID_CUSTOM_LIST FROM T_WC_CUSTOM_LIST WHERE TARGET_TABLE = 1) "
+                            print(strsqldelete)
+                            cursor.execute(strsqldelete)
+                            #cursor.commit()
+                            continue
+                        if strsql != "":
+                            # Now we process the SELECT query
+                            print(strsql)
+                            cursor.execute(strsql)
+                            lngrowcount = cursor.rowcount
+                            print(f"{lngrowcount} lines")
+                            lnglinesprocessed = 0
+                            # Fetching all rows from the last executed statement
+                            results = cursor.fetchall()
+                            # Iterating through the results and printing
+                            for row in results:
+                                # print("------------------------------------------")
+                                lnglinesprocessed += 1
+                                lngrecordid = row['ID_RECORD']
+                                strrecordname = row['NAME']
+                                strrecordoverview = row['OVERVIEW']
+                                strrecordlistsource = row['LIST_SOURCE']
+                                strrecordlisttype = row['LIST_TYPE']
+                                strrecordposterpath = row['POSTER_PATH']
+                                print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordlistsource + ")")
+                                if target_field_name == "LIST_NAME":
+                                    arrlistcouples = {
+                                        'ID_RECORD': lngrecordid,
+                                        'LIST_NAME': strrecordname,
+                                        'OVERVIEW': strrecordoverview,
+                                        'LIST_SOURCE': strrecordlistsource,
+                                        'LIST_TYPE': strrecordlisttype,
+                                        'POSTER_PATH': strrecordposterpath
+                                    }
+                                    if intlist == 3:
+                                        arrlistcouples['LIST_NAME_FR'] = row['NAME_FR'] or ''
+                                elif target_field_name == "LIST_NAME_FR":
+                                    arrlistcouples = {
+                                        'ID_RECORD': lngrecordid,
+                                        'LIST_NAME_FR': strrecordname,
+                                        'LIST_SOURCE': strrecordlistsource,
+                                        'LIST_TYPE': strrecordlisttype
+                                    }
+                                strsqltablename = "T_WC_T2S_LIST"
+                                strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND LIST_SOURCE = '{strrecordlistsource}'"
+                                cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(lngrecordid),"Current record in the TMDb database movie preprocess",0)
+                                
+                                strsqlmovies = ""
+                                strsqlseries = ""
+                                if intlist == 1 or intlist == 2:
+                                    # Retrieving movies for this list by excluding adult movies and movies without Wikidata ID
+                                    strsqlmovies += "SELECT ID_MOVIE, DISPLAY_ORDER "
+                                    strsqlmovies += "FROM T_WC_TMDB_MOVIE_LIST "
+                                    strsqlmovies += "WHERE ID_LIST = " + str(lngrecordid) + " "
+                                    strsqlmovies += "AND DELETED = 0 "
+                                    strsqlmovies += "AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_TMDB_MOVIE WHERE ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '') "
+                                    strsqlmovies += "ORDER BY DISPLAY_ORDER "
+                                    # Retrieving series for this list by excluding adult series and series without Wikidata ID
+                                    strsqlseries += "SELECT ID_SERIE, DISPLAY_ORDER "
+                                    strsqlseries += "FROM T_WC_TMDB_SERIE_LIST "
+                                    strsqlseries += "WHERE ID_LIST = " + str(lngrecordid) + " "
+                                    strsqlseries += "AND DELETED = 0 "
+                                    strsqlseries += "AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_TMDB_SERIE WHERE ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '') "
+                                    strsqlseries += "ORDER BY DISPLAY_ORDER "
+                                elif intlist == 3:
+                                    # Retrieving elements for this custom list (movies/series)
+                                    # Mechanism 1: parse IMDb IDs/URLs from ID_IMDB_LIST (newline-separated)
+                                    strimdblist = row['ID_IMDB_LIST'] or ''
+                                    arrimdbids = re.findall(r'(tt\d+)', strimdblist)
+                                    strsqlmovies_imdb = ""
+                                    strsqlseries_imdb = ""
+                                    if arrimdbids:
+                                        strimdbidlist = "'" + "','".join(arrimdbids) + "'"
+                                        strfieldorder = "'" + "','".join(arrimdbids) + "'"
+                                        strsqlmovies_imdb = "SELECT ID_MOVIE, FIELD(ID_IMDB, " + strfieldorder + ") AS DISPLAY_ORDER FROM T_WC_TMDB_MOVIE WHERE ID_IMDB IN (" + strimdbidlist + ") AND ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '' "
+                                        strsqlseries_imdb = "SELECT ID_SERIE, FIELD(ID_IMDB, " + strfieldorder + ") AS DISPLAY_ORDER FROM T_WC_TMDB_SERIE WHERE ID_IMDB IN (" + strimdbidlist + ") AND ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '' "
+                                    # Mechanism 2: Wikidata property/item filter from WIKIDATA_PROPERTIES
+                                    strwikidataproperties = row['WIKIDATA_PROPERTIES'] or ''
+                                    arrwdtokens = re.findall(r'[PQ]\d+', strwikidataproperties)
+                                    strwdpropertyid = next((t for t in arrwdtokens if t.startswith('P')), '')
+                                    strwditemid = next((t for t in arrwdtokens if t.startswith('Q')), '')
+                                    strsqlmovies_wikidata = ""
+                                    strsqlseries_wikidata = ""
+                                    if strwdpropertyid and strwditemid:
+                                        strsqlmovies_wikidata = "SELECT DISTINCT T_WC_TMDB_MOVIE.ID_MOVIE, 0 AS DISPLAY_ORDER FROM T_WC_TMDB_MOVIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_MOVIE.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strwdpropertyid + "' AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = '" + strwditemid + "' AND T_WC_TMDB_MOVIE.ADULT = 0 AND T_WC_TMDB_MOVIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_MOVIE.ID_WIKIDATA <> '' "
+                                        strsqlseries_wikidata = "SELECT DISTINCT T_WC_TMDB_SERIE.ID_SERIE, 0 AS DISPLAY_ORDER FROM T_WC_TMDB_SERIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_SERIE.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strwdpropertyid + "' AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = '" + strwditemid + "' AND T_WC_TMDB_SERIE.ADULT = 0 AND T_WC_TMDB_SERIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_SERIE.ID_WIKIDATA <> '' "
+                                    # Mechanism 3: TMDb keyword filter from TMDB_ELEMENTS
+                                    strtmdbelements = row['TMDB_ELEMENTS'] or ''
+                                    strsqlmovies_keyword = ""
+                                    strsqlseries_keyword = ""
+                                    strkeywordmatch = re.search(r"T_WC_TMDB_KEYWORD\.NAME\s*=\s*'([^']+)'", strtmdbelements.replace('&#039;', "'"))
+                                    if strkeywordmatch:
+                                        strkeywordname = strkeywordmatch.group(1).strip().replace("'", "''")
+                                        strsqlmovies_keyword = "SELECT T_WC_TMDB_MOVIE_KEYWORD.ID_MOVIE, 0 AS DISPLAY_ORDER FROM T_WC_TMDB_MOVIE_KEYWORD INNER JOIN T_WC_TMDB_KEYWORD ON T_WC_TMDB_MOVIE_KEYWORD.ID_KEYWORD = T_WC_TMDB_KEYWORD.ID_KEYWORD INNER JOIN T_WC_TMDB_MOVIE ON T_WC_TMDB_MOVIE.ID_MOVIE = T_WC_TMDB_MOVIE_KEYWORD.ID_MOVIE WHERE T_WC_TMDB_KEYWORD.NAME = '" + strkeywordname + "' AND T_WC_TMDB_MOVIE.ADULT = 0 AND T_WC_TMDB_MOVIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_MOVIE.ID_WIKIDATA <> '' "
+                                        strsqlseries_keyword = "SELECT T_WC_TMDB_SERIE_KEYWORD.ID_SERIE, 0 AS DISPLAY_ORDER FROM T_WC_TMDB_SERIE_KEYWORD INNER JOIN T_WC_TMDB_KEYWORD ON T_WC_TMDB_SERIE_KEYWORD.ID_KEYWORD = T_WC_TMDB_KEYWORD.ID_KEYWORD INNER JOIN T_WC_TMDB_SERIE ON T_WC_TMDB_SERIE.ID_SERIE = T_WC_TMDB_SERIE_KEYWORD.ID_SERIE WHERE T_WC_TMDB_KEYWORD.NAME = '" + strkeywordname + "' AND T_WC_TMDB_SERIE.ADULT = 0 AND T_WC_TMDB_SERIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_SERIE.ID_WIKIDATA <> '' "
+                                    # Combine mechanisms cumulatively
+                                    arrsqlmovies_sources = [s for s in [strsqlmovies_imdb, strsqlmovies_wikidata, strsqlmovies_keyword] if s]
+                                    arrsqlseries_sources = [s for s in [strsqlseries_imdb, strsqlseries_wikidata, strsqlseries_keyword] if s]
+                                    if len(arrsqlmovies_sources) > 1:
+                                        strsqlmovies = "SELECT ID_MOVIE, MAX(DISPLAY_ORDER) AS DISPLAY_ORDER FROM (" + "UNION ALL ".join(arrsqlmovies_sources) + ") combined GROUP BY ID_MOVIE ORDER BY DISPLAY_ORDER "
+                                    elif arrsqlmovies_sources:
+                                        strsqlmovies = arrsqlmovies_sources[0] + ("ORDER BY DISPLAY_ORDER " if strsqlmovies_imdb else "ORDER BY ID_MOVIE ")
+                                    if len(arrsqlseries_sources) > 1:
+                                        strsqlseries = "SELECT ID_SERIE, MAX(DISPLAY_ORDER) AS DISPLAY_ORDER FROM (" + "UNION ALL ".join(arrsqlseries_sources) + ") combined GROUP BY ID_SERIE ORDER BY DISPLAY_ORDER "
+                                    elif arrsqlseries_sources:
+                                        strsqlseries = arrsqlseries_sources[0] + ("ORDER BY DISPLAY_ORDER " if strsqlseries_imdb else "ORDER BY ID_SERIE ")
+
+                                if strsqlmovies != "":
+                                    # Retrieving elements for this list (list/list)
+                                    cursor2.execute(strsqlmovies)
+                                    lngmoviecount = cursor2.rowcount
+                                    lngseriescount = 0
+                                    #print(f"{lngmoviecount} lines")
+                                    if strsqlseries != "":
+                                        cursor4.execute(strsqlseries)
+                                        lngseriescount = cursor4.rowcount
+                                        #print(f"{lngseriescount} lines")
+                                    if lngmoviecount + lngseriescount > 1:
+                                        # This list has more than one element (movie or serie)
+                                        # So we create/update this list
+                                        lnglistid = cp.f_sqlupdatearray(strsqltablename, arrlistcouples, strsqlupdatecondition, 1)
+                                        if lnglistid is None:
+                                            strsqllist = "SELECT ID_T2S_LIST FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                            cursor3.execute(strsqllist)
+                                            lngrowcount = cursor3.rowcount
+                                            if lngrowcount == 0:
+                                                print("Error: Failed to create/update list - lnglistid is None")
+                                                continue
+                                            lnglistid = cursor3.fetchone()["ID_T2S_LIST"]
+                                        if intlist == 1 or intlist == 3:
+                                            # Retrieve all movies for this list
+                                            # Only processing when handling original English (records from T_WC_TMDB_LIST or T_WC_TMDB_LIST) to avoid duplicates with the translated versions
+                                            results = cursor2.fetchall()
+                                            lngdisplayorderprev = 0
+                                            for row in results:
+                                                lngmovieid = row["ID_MOVIE"]
+                                                lngdisplayorder = row["DISPLAY_ORDER"]
+                                                if lngdisplayorder is None:
+                                                    lngdisplayorder = lngdisplayorderprev
+                                                else:
+                                                    lngdisplayorderprev = lngdisplayorder
+                                                arrmovielistcouples = {
+                                                    'ID_MOVIE': lngmovieid,
+                                                    'ID_T2S_LIST': lnglistid,
+                                                    'DISPLAY_ORDER': lngdisplayorder
+                                                }
+                                                strsqlupdatecondition2 = "ID_MOVIE = " + str(lngmovieid) + " AND ID_T2S_LIST = " + str(lnglistid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                #print(strsqlupdatecondition2)
+                                                cp.f_sqlupdatearray("T_WC_T2S_MOVIE_LIST", arrmovielistcouples, strsqlupdatecondition2, 1)
+                                            if strsqlseries != "":
+                                                # Retrieve all series for this list
+                                                results = cursor4.fetchall()
+                                                lngdisplayorderprev = 0
+                                                for row in results:
+                                                    lngseriesid = row["ID_SERIE"]
+                                                    lngdisplayorder = row["DISPLAY_ORDER"]
+                                                    if lngdisplayorder is None:
+                                                        lngdisplayorder = lngdisplayorderprev
+                                                    else:
+                                                        lngdisplayorderprev = lngdisplayorder
+                                                    arrserielistcouples = {
+                                                        'ID_SERIE': lngseriesid,
+                                                        'ID_T2S_LIST': lnglistid,
+                                                        'DISPLAY_ORDER': lngdisplayorder
+                                                    }
+                                                    strsqlupdatecondition2 = "ID_SERIE = " + str(lngseriesid) + " AND ID_T2S_LIST = " + str(lnglistid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                    #print(strsqlupdatecondition2)
+                                                    cp.f_sqlupdatearray("T_WC_T2S_SERIE_LIST", arrserielistcouples, strsqlupdatecondition2, 1)
+                                            arrlistcouples = {
+                                                'MOVIE_COUNT': lngmoviecount,
+                                                'SERIE_COUNT': lngseriescount
+                                            }
+                                            cp.f_sqlupdatearray(strsqltablename, arrlistcouples, strsqlupdatecondition, 1)
+                                    else:
+                                        # This list has only one element or none
+                                        # So we delete this list if it already exists
+                                        strsqltablename = "T_WC_T2S_LIST"
+                                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                        print(strsqldelete)
+                                        cursor2.execute(strsqldelete)
+                                        #cursor2.commit()
+                    if 1:
+                        strsqltablename = "T_WC_T2S_LIST"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE LIST_TYPE IS NULL "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+                        
+                        # Update T_WC_T2S_LIST.IMDB_RATING and T_WC_T2S_LIST.IMDB_RATING_ADJUSTED 
+                        strsql = """UPDATE T_WC_T2S_LIST t
+JOIN (
+    SELECT
+        mt.ID_T2S_LIST,
+        AVG(m.IMDB_RATING) AS AVG_IMDB_RATING,
+        AVG(m.IMDB_RATING_ADJUSTED) AS AVG_IMDB_RATING_ADJUSTED
+    FROM T_WC_T2S_MOVIE_LIST mt
+    INNER JOIN T_WC_T2S_MOVIE m
+        ON m.ID_MOVIE = mt.ID_MOVIE
+    INNER JOIN T_WC_T2S_LIST t2
+        ON t2.ID_T2S_LIST = mt.ID_T2S_LIST
+       AND t2.LIST_TYPE = 'list'
+    GROUP BY mt.ID_T2S_LIST
+) x
+    ON x.ID_T2S_LIST = t.ID_T2S_LIST
+SET
+    t.IMDB_RATING = x.AVG_IMDB_RATING,
+    t.IMDB_RATING_ADJUSTED = x.AVG_IMDB_RATING_ADJUSTED;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        strsqltablename = "T_WC_T2S_MOVIE_LIST"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_T2S_LIST NOT IN (SELECT ID_T2S_LIST FROM T_WC_T2S_LIST) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+                        #cursor2.commit()
+                        strsqltablename = "T_WC_T2S_SERIE_LIST"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_T2S_LIST NOT IN (SELECT ID_T2S_LIST FROM T_WC_T2S_LIST) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+                        #cursor2.commit()
+
+                elif intindex == 43:
+                    #----------------------------------------------------
+                    print("T2S_GROUP processing")
+
+                    arrgroups = {1: 'en-group', 2: 'en-employer'}    
+                    for intgroup, strgroup in arrgroups.items():
+                        strsql = ""
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strgroup,"Current sub process in the TMDb database person preprocess",0)
+                        if intgroup == 1:
+                            strpropertyid = "P463"
+                        elif intgroup == 2:
+                            strpropertyid = "P108"
+                        else:
+                            strpropertyid = ""
+                        if strpropertyid != "":
+                            strcurrentprocess = f"{intgroup}: Copying from WIKIDATA {strpropertyid} to T2S_GROUP"
+                            strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                            strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                            strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strpropertyid + "' "
+                            strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
+                            #strsql += "LIMIT 10 "
+                            #strsql += "LIMIT 1000 "
+                            target_field_name = "GROUP_NAME"
+                        strrecordgroupsource = strpropertyid
+                        if strsql != "":
+                            # Now we process the SELECT query
+                            print(strsql)
+                            cursor.execute(strsql)
+                            lngrowcount = cursor.rowcount
+                            print(f"{lngrowcount} lines")
+                            lnglinesprocessed = 0
+                            # Fetching all rows from the last executed statement
+                            results = cursor.fetchall()
+                            # Iterating through the results and printing
+                            for row in results:
+                                # print("------------------------------------------")
+                                lnglinesprocessed += 1
+                                strrecordid = row['ID_ITEM']
+                                strrecordname = ""
+                                strrecordoverview = ""
+                                strrecordposterpath = ""
+                                strsqlitem = ""
+                                strsqlitem += "SELECT LABEL, DESCRIPTION, WIKIPEDIA_IMAGE_PATH "
+                                strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
+                                strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'en'"
+                                arrvalues = cp.f_fieldsfromquery(
+                                    strsqlitem,
+                                    "strrecordname|strrecordoverview|strrecordposterpath",
+                                    "LABEL|DESCRIPTION|WIKIPEDIA_IMAGE_PATH",
+                                    params=(strrecordid,),
+                                    target_dict=None,
+                                )
+                                strrecordname = arrvalues.get("strrecordname", "")
+                                strrecordoverview = arrvalues.get("strrecordoverview", "")
+                                strrecordposterpath = arrvalues.get("strrecordposterpath", "")
+                                strsqlitem = ""
+                                strsqlitem += "SELECT LABEL "
+                                strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
+                                strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'fr'"
+                                arrvalues = cp.f_fieldsfromquery(
+                                    strsqlitem,
+                                    "strrecordname",
+                                    "LABEL",
+                                    params=(strrecordid,),
+                                    target_dict=None,
+                                )
+                                strrecordnamefr = arrvalues.get("strrecordname", "")
+                                strrecordgrouptype = "group"
+                                print("Processing record: " + str(strrecordid) + ": " + strrecordname + " (" + strrecordgroupsource + ")")
+                                if target_field_name == "GROUP_NAME":
+                                    arrgroupcouples = {
+                                        'ID_WIKIDATA': strrecordid,
+                                        'GROUP_NAME': strrecordname,
+                                        'GROUP_NAME_FR': strrecordnamefr,
+                                        'OVERVIEW': strrecordoverview,
+                                        'GROUP_SOURCE': strrecordgroupsource,
+                                        'GROUP_TYPE': strrecordgrouptype,
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordposterpath
+                                    }
+                                strsqltablename = "T_WC_T2S_GROUP"
+                                strsqlupdatecondition = f"ID_WIKIDATA = '{strrecordid}' AND GROUP_SOURCE = '{strrecordgroupsource}'"
+                                cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(strrecordid),"Current record in the TMDb database movie preprocess",0)
+                                
+                                strsqlpersons = ""
+                                if intgroup == 1 or intgroup == 2:
+                                    strsqlpersons += "SELECT DISTINCT T_WC_TMDB_PERSON.ID_PERSON, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.NAME, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.BIRTHDAY, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.DEATHDAY, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.ID_IMDB, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.BIOGRAPHY, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.PROFILE_PATH, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.ID_WIKIDATA "
+                                    strsqlpersons += "FROM T_WC_TMDB_PERSON "
+                                    strsqlpersons += "INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
+                                    strsqlpersons += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
+                                    strsqlpersons += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
+                                    strsqlpersons += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = %s "
+                                    strsqlpersons += "ORDER BY T_WC_TMDB_PERSON.POPULARITY DESC "
+                                if strsqlpersons != "":
+                                    # Retrieving elements for this group (group/group)
+                                    cursor2.execute(strsqlpersons, (strpropertyid, strrecordid))
+                                    results = cursor2.fetchall()
+                                    lngpersoncount = len(results)
+                                    #print(f"{lngpersoncount} lines")
+                                    if lngpersoncount > 1:
+                                        # This group has more than one element (person)
+                                        # So we create/update this group
+                                        lnggroupid = cp.f_sqlupdatearray(strsqltablename, arrgroupcouples, strsqlupdatecondition, 1)
+                                        if lnggroupid is None:
+                                            strsqlgroup = "SELECT ID_GROUP FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                            cursor3.execute(strsqlgroup)
+                                            lngrowcount = cursor3.rowcount
+                                            if lngrowcount == 0:
+                                                print("Error: Failed to create/update group - lnggroupid is None")
+                                                continue
+                                            lnggroupid = cursor3.fetchone()["ID_GROUP"]
+                                        if intgroup == 1 or intgroup == 2:
+                                            # Retrieve all persons for this group
+                                            # Only processing when handling original English (records from T_WC_TMDB_GROUP or T_WC_TMDB_GROUP) to avoid duplicates with the translated versions
+                                            lngdisplayorder = 0
+                                            for row in results:
+                                                lngpersonid = row["ID_PERSON"]
+                                                lngdisplayorder += 1
+                                                arrpersongroupcouples = {
+                                                    'ID_PERSON': lngpersonid,
+                                                    'ID_GROUP': lnggroupid,
+                                                    'DISPLAY_ORDER': lngdisplayorder
+                                                }
+                                                strsqlupdatecondition2 = "ID_PERSON = " + str(lngpersonid) + " AND ID_GROUP = " + str(lnggroupid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                #print(strsqlupdatecondition2)
+                                                cp.f_sqlupdatearray("T_WC_T2S_PERSON_GROUP", arrpersongroupcouples, strsqlupdatecondition2, 1)
+                                            arrgroupcouples = {
+                                                'PERSON_COUNT': lngpersoncount
+                                            }
+                                            cp.f_sqlupdatearray(strsqltablename, arrgroupcouples, strsqlupdatecondition, 1)
+                                    else:
+                                        # This group has only one element or none
+                                        # So we delete this group if it already exists
+                                        strsqltablename = "T_WC_T2S_GROUP"
+                                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                        print(strsqldelete)
+                                        cursor2.execute(strsqldelete)
+                                        #cursor2.commit()
+                    if 1:
+                        strsqltablename = "T_WC_T2S_GROUP"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE GROUP_TYPE IS NULL "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_GROUP"
+                        strsqldelete = """DELETE FROM T_WC_T2S_GROUP
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM T_WC_WIKIDATA_ITEM_PROPERTY w
+    WHERE w.ID_PROPERTY = T_WC_T2S_GROUP.GROUP_SOURCE
+      AND w.ID_ITEM = T_WC_T2S_GROUP.ID_WIKIDATA
+);
+                        """
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+                        
+                        # Update T_WC_T2S_GROUP.POPULARITY 
+                        strsql = """UPDATE T_WC_T2S_GROUP t
+JOIN (
+    SELECT
+        mt.ID_GROUP,
+        AVG(m.POPULARITY) AS AVG_POPULARITY
+    FROM T_WC_T2S_PERSON_GROUP mt
+    INNER JOIN T_WC_T2S_PERSON m
+        ON m.ID_PERSON = mt.ID_PERSON
+    INNER JOIN T_WC_T2S_GROUP t2
+        ON t2.ID_GROUP = mt.ID_GROUP
+       AND t2.GROUP_TYPE = 'group'
+    GROUP BY mt.ID_GROUP
+) x
+    ON x.ID_GROUP = t.ID_GROUP
+SET
+    t.POPULARITY = x.AVG_POPULARITY;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        strsqltablename = "T_WC_T2S_PERSON_GROUP"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_GROUP NOT IN (SELECT ID_GROUP FROM T_WC_T2S_GROUP) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                elif intindex == 44:
+                    #----------------------------------------------------
+                    print("T2S_AWARD processing")
+
+                    strpropertyid = "P166"
+                    strawardsource = strpropertyid
+                    strawardtype = "award"
+                    target_field_name = "AWARD_NAME"
+
+                    strsql = ""
+                    strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                    strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                    strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
+                    strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
+
+                    print(strsql)
+                    cursor.execute(strsql, (strpropertyid,))
+                    lngrowcount = cursor.rowcount
+                    print(f"{lngrowcount} lines")
+                    results = cursor.fetchall()
+                    for row in results:
+                        strawardwikidataid = row['ID_ITEM']
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(strawardwikidataid),"Current record in the TMDb database movie preprocess",0)
+
+                        strawardname = ""
+                        strawardoverview = ""
+                        strawardimagepath = ""
+                        strsqlitem = ""
+                        strsqlitem += "SELECT LABEL, DESCRIPTION, WIKIPEDIA_IMAGE_PATH "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
+                        strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'en'"
+                        arrvalues = cp.f_fieldsfromquery(
+                            strsqlitem,
+                            "strawardname|strawardoverview|strawardimagepath",
+                            "LABEL|DESCRIPTION|WIKIPEDIA_IMAGE_PATH",
+                            params=(strawardwikidataid,),
+                            target_dict=None,
+                        )
+                        strawardname = arrvalues.get("strawardname", "")
+                        strawardoverview = arrvalues.get("strawardoverview", "")
+                        strawardimagepath = arrvalues.get("strawardimagepath", "")
+
+                        strsqlitem = ""
+                        strsqlitem += "SELECT LABEL "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
+                        strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'fr'"
+                        arrvalues = cp.f_fieldsfromquery(
+                            strsqlitem,
+                            "strawardnamefr",
+                            "LABEL",
+                            params=(strawardwikidataid,),
+                            target_dict=None,
+                        )
+                        strawardnamefr = arrvalues.get("strawardnamefr", "")
+
+                        print("Processing record: " + str(strawardwikidataid) + ": " + strawardname + " (" + strawardsource + ")")
+
+                        if target_field_name == "AWARD_NAME":
+                            arrawardcouples = {
+                                'ID_WIKIDATA': strawardwikidataid,
+                                'AWARD_NAME': strawardname,
+                                'AWARD_NAME_FR': strawardnamefr,
+                                'OVERVIEW': strawardoverview,
+                                'AWARD_SOURCE': strawardsource,
+                                'AWARD_TYPE': strawardtype,
+                                'WIKIPEDIA_IMAGE_PATH': strawardimagepath,
+                            }
+
+                        strsqltablename = "T_WC_T2S_AWARD"
+                        strsqlupdatecondition = f"ID_WIKIDATA = '{strawardwikidataid}' AND AWARD_SOURCE = '{strawardsource}'"
+                        lngawardid = cp.f_sqlupdatearray(strsqltablename, arrawardcouples, strsqlupdatecondition, 1)
+                        if lngawardid is None:
+                            strsqlaward = "SELECT ID_AWARD FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                            cursor3.execute(strsqlaward)
+                            lngrowcount = cursor3.rowcount
+                            if lngrowcount == 0:
+                                print("Error: Failed to create/update award - lngawardid is None")
+                                continue
+                            lngawardid = cursor3.fetchone()["ID_AWARD"]
+
+                        # Link to movies
+                        strsqlmovies = ""
+                        strsqlmovies += "SELECT DISTINCT m.ID_MOVIE "
+                        strsqlmovies += "FROM T_WC_T2S_MOVIE m "
+                        strsqlmovies += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = m.ID_WIKIDATA "
+                        strsqlmovies += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
+                        strsqlmovies += "AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
+                        cursor2.execute(strsqlmovies, (strpropertyid, strawardwikidataid))
+                        results_movies = cursor2.fetchall()
+                        lngmoviecount = len(results_movies)
+                        lngdisplayorder = 0
+                        for rowm in results_movies:
+                            lngdisplayorder += 1
+                            lngmovieid = rowm["ID_MOVIE"]
+                            arrmovieawardcouples = {
+                                'ID_MOVIE': lngmovieid,
+                                'ID_AWARD': lngawardid,
+                                'DISPLAY_ORDER': lngdisplayorder
+                            }
+                            strsqlupdatecondition2 = "ID_MOVIE = " + str(lngmovieid) + " AND ID_AWARD = " + str(lngawardid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                            cp.f_sqlupdatearray("T_WC_T2S_MOVIE_AWARD", arrmovieawardcouples, strsqlupdatecondition2, 1)
+
+                        # Link to series
+                        strsqlseries = ""
+                        strsqlseries += "SELECT DISTINCT s.ID_SERIE "
+                        strsqlseries += "FROM T_WC_T2S_SERIE s "
+                        strsqlseries += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = s.ID_WIKIDATA "
+                        strsqlseries += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
+                        strsqlseries += "AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                        cursor4.execute(strsqlseries, (strpropertyid, strawardwikidataid))
+                        results_series = cursor4.fetchall()
+                        lngseriecount = len(results_series)
+                        lngdisplayorder = 0
+                        for rows in results_series:
+                            lngdisplayorder += 1
+                            lngserieid = rows["ID_SERIE"]
+                            arrserieawardcouples = {
+                                'ID_SERIE': lngserieid,
+                                'ID_AWARD': lngawardid,
+                                'DISPLAY_ORDER': lngdisplayorder
+                            }
+                            strsqlupdatecondition2 = "ID_SERIE = " + str(lngserieid) + " AND ID_AWARD = " + str(lngawardid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                            cp.f_sqlupdatearray("T_WC_T2S_SERIE_AWARD", arrserieawardcouples, strsqlupdatecondition2, 1)
+
+                        # Link to persons
+                        strsqlpersons = ""
+                        strsqlpersons += "SELECT DISTINCT p2.ID_PERSON "
+                        strsqlpersons += "FROM T_WC_T2S_PERSON p2 "
+                        strsqlpersons += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = p2.ID_WIKIDATA "
+                        strsqlpersons += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
+                        strsqlpersons += "AND p2.ID_WIKIDATA IS NOT NULL AND p2.ID_WIKIDATA <> '' "
+                        cursor5.execute(strsqlpersons, (strpropertyid, strawardwikidataid))
+                        results_persons = cursor5.fetchall()
+                        lngpersoncount = len(results_persons)
+                        lngdisplayorder = 0
+                        for rowp in results_persons:
+                            lngdisplayorder += 1
+                            lngpersonid = rowp["ID_PERSON"]
+                            arrpersonawardcouples = {
+                                'ID_PERSON': lngpersonid,
+                                'ID_AWARD': lngawardid,
+                                'DISPLAY_ORDER': lngdisplayorder
+                            }
+                            strsqlupdatecondition2 = "ID_PERSON = " + str(lngpersonid) + " AND ID_AWARD = " + str(lngawardid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                            cp.f_sqlupdatearray("T_WC_T2S_PERSON_AWARD", arrpersonawardcouples, strsqlupdatecondition2, 1)
+
+                        arrawardcounts = {
+                            'MOVIE_COUNT': lngmoviecount,
+                            'SERIE_COUNT': lngseriecount,
+                            'PERSON_COUNT': lngpersoncount,
+                        }
+                        cp.f_sqlupdatearray(strsqltablename, arrawardcounts, strsqlupdatecondition, 1)
+
+                    if 1:
+                        strsqltablename = "T_WC_T2S_AWARD"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE AWARD_TYPE IS NULL "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_AWARD"
+                        strsqldelete = """DELETE FROM T_WC_T2S_AWARD
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM T_WC_WIKIDATA_ITEM_PROPERTY w
+    WHERE w.ID_PROPERTY = T_WC_T2S_AWARD.AWARD_SOURCE
+      AND w.ID_ITEM = T_WC_T2S_AWARD.ID_WIKIDATA
+);
+                        """
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        # Update T_WC_T2S_AWARD.POPULARITY from persons
+                        strsql = """UPDATE T_WC_T2S_AWARD t
+JOIN (
+    SELECT
+        mt.ID_AWARD,
+        AVG(p.POPULARITY) AS AVG_POPULARITY
+    FROM T_WC_T2S_PERSON_AWARD mt
+    INNER JOIN T_WC_T2S_PERSON p
+        ON p.ID_PERSON = mt.ID_PERSON
+    GROUP BY mt.ID_AWARD
+) x
+    ON x.ID_AWARD = t.ID_AWARD
+SET
+    t.POPULARITY = x.AVG_POPULARITY;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        # Update T_WC_T2S_AWARD ratings from movies
+                        strsql = """UPDATE T_WC_T2S_AWARD t
+JOIN (
+    SELECT
+        mt.ID_AWARD,
+        AVG(m.IMDB_RATING) AS AVG_IMDB_RATING,
+        AVG(m.IMDB_RATING_ADJUSTED) AS AVG_IMDB_RATING_ADJUSTED
+    FROM T_WC_T2S_MOVIE_AWARD mt
+    INNER JOIN T_WC_T2S_MOVIE m
+        ON m.ID_MOVIE = mt.ID_MOVIE
+    GROUP BY mt.ID_AWARD
+) x
+    ON x.ID_AWARD = t.ID_AWARD
+SET
+    t.IMDB_RATING = x.AVG_IMDB_RATING,
+    t.IMDB_RATING_ADJUSTED = x.AVG_IMDB_RATING_ADJUSTED;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        # Update T_WC_T2S_AWARD ratings from series
+                        strsql = """UPDATE T_WC_T2S_AWARD t
+JOIN (
+    SELECT
+        mt.ID_AWARD,
+        AVG(s.IMDB_RATING) AS AVG_IMDB_RATING,
+        AVG(s.IMDB_RATING_ADJUSTED) AS AVG_IMDB_RATING_ADJUSTED
+    FROM T_WC_T2S_SERIE_AWARD mt
+    INNER JOIN T_WC_T2S_SERIE s
+        ON s.ID_SERIE = mt.ID_SERIE
+    GROUP BY mt.ID_AWARD
+) x
+    ON x.ID_AWARD = t.ID_AWARD
+SET
+    t.IMDB_RATING = COALESCE(t.IMDB_RATING, x.AVG_IMDB_RATING),
+    t.IMDB_RATING_ADJUSTED = COALESCE(t.IMDB_RATING_ADJUSTED, x.AVG_IMDB_RATING_ADJUSTED);
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        strsqltablename = "T_WC_T2S_MOVIE_AWARD"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_AWARD NOT IN (SELECT ID_AWARD FROM T_WC_T2S_AWARD) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_SERIE_AWARD"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_AWARD NOT IN (SELECT ID_AWARD FROM T_WC_T2S_AWARD) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_PERSON_AWARD"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_AWARD NOT IN (SELECT ID_AWARD FROM T_WC_T2S_AWARD) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                elif intindex == 47:
+                    #----------------------------------------------------
+                    print("T2S_NOMINATION processing")
+
+                    strpropertyid = "P1411"
+                    strnominationsource = strpropertyid
+                    strnominationtype = "nomination"
+                    target_field_name = "NOMINATION_NAME"
+
+                    strsql = ""
+                    strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                    strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                    strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
+                    strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
+
+                    print(strsql)
+                    cursor.execute(strsql, (strpropertyid,))
+                    lngrowcount = cursor.rowcount
+                    print(f"{lngrowcount} lines")
+                    results = cursor.fetchall()
+                    for row in results:
+                        strnominationwikidataid = row['ID_ITEM']
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(strnominationwikidataid),"Current record in the TMDb database movie preprocess",0)
+
+                        strnominationname = ""
+                        strnominationoverview = ""
+                        strnominationimagepath = ""
+                        strsqlitem = ""
+                        strsqlitem += "SELECT LABEL, DESCRIPTION, WIKIPEDIA_IMAGE_PATH "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
+                        strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'en'"
+                        arrvalues = cp.f_fieldsfromquery(
+                            strsqlitem,
+                            "strnominationname|strnominationoverview|strnominationimagepath",
+                            "LABEL|DESCRIPTION|WIKIPEDIA_IMAGE_PATH",
+                            params=(strnominationwikidataid,),
+                            target_dict=None,
+                        )
+                        strnominationname = arrvalues.get("strnominationname", "")
+                        strnominationoverview = arrvalues.get("strnominationoverview", "")
+                        strnominationimagepath = arrvalues.get("strnominationimagepath", "")
+
+                        strsqlitem = ""
+                        strsqlitem += "SELECT LABEL "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
+                        strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'fr'"
+                        arrvalues = cp.f_fieldsfromquery(
+                            strsqlitem,
+                            "strnominationnamefr",
+                            "LABEL",
+                            params=(strnominationwikidataid,),
+                            target_dict=None,
+                        )
+                        strnominationnamefr = arrvalues.get("strnominationnamefr", "")
+
+                        print("Processing record: " + str(strnominationwikidataid) + ": " + strnominationname + " (" + strnominationsource + ")")
+
+                        if target_field_name == "NOMINATION_NAME":
+                            arrnominationcouples = {
+                                'ID_WIKIDATA': strnominationwikidataid,
+                                'NOMINATION_NAME': strnominationname,
+                                'NOMINATION_NAME_FR': strnominationnamefr,
+                                'OVERVIEW': strnominationoverview,
+                                'NOMINATION_SOURCE': strnominationsource,
+                                'NOMINATION_TYPE': strnominationtype,
+                                'WIKIPEDIA_IMAGE_PATH': strnominationimagepath,
+                            }
+
+                        strsqltablename = "T_WC_T2S_NOMINATION"
+                        strsqlupdatecondition = f"ID_WIKIDATA = '{strnominationwikidataid}' AND NOMINATION_SOURCE = '{strnominationsource}'"
+                        lngnominationid = cp.f_sqlupdatearray(strsqltablename, arrnominationcouples, strsqlupdatecondition, 1)
+                        if lngnominationid is None:
+                            strsqlnomination = "SELECT ID_NOMINATION FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                            cursor3.execute(strsqlnomination)
+                            lngrowcount2 = cursor3.rowcount
+                            if lngrowcount2 == 0:
+                                print("Error: Failed to create/update nomination - lngnominationid is None")
+                                continue
+                            lngnominationid = cursor3.fetchone()["ID_NOMINATION"]
+
+                        # Link to movies
+                        strsqlmovies = ""
+                        strsqlmovies += "SELECT DISTINCT m.ID_MOVIE "
+                        strsqlmovies += "FROM T_WC_T2S_MOVIE m "
+                        strsqlmovies += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = m.ID_WIKIDATA "
+                        strsqlmovies += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
+                        strsqlmovies += "AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
+                        cursor2.execute(strsqlmovies, (strpropertyid, strnominationwikidataid))
+                        results_movies = cursor2.fetchall()
+                        lngmoviecount = len(results_movies)
+                        lngdisplayorder = 0
+                        for rowm in results_movies:
+                            lngdisplayorder += 1
+                            lngmovieid = rowm["ID_MOVIE"]
+                            arrmovienominationcouples = {
+                                'ID_MOVIE': lngmovieid,
+                                'ID_NOMINATION': lngnominationid,
+                                'DISPLAY_ORDER': lngdisplayorder,
+                            }
+                            strsqlupdatecondition2 = "ID_MOVIE = " + str(lngmovieid) + " AND ID_NOMINATION = " + str(lngnominationid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                            cp.f_sqlupdatearray("T_WC_T2S_MOVIE_NOMINATION", arrmovienominationcouples, strsqlupdatecondition2, 1)
+
+                        # Link to series
+                        strsqlseries = ""
+                        strsqlseries += "SELECT DISTINCT s.ID_SERIE "
+                        strsqlseries += "FROM T_WC_T2S_SERIE s "
+                        strsqlseries += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = s.ID_WIKIDATA "
+                        strsqlseries += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
+                        strsqlseries += "AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                        cursor4.execute(strsqlseries, (strpropertyid, strnominationwikidataid))
+                        results_series = cursor4.fetchall()
+                        lngseriecount = len(results_series)
+                        lngdisplayorder = 0
+                        for rows in results_series:
+                            lngdisplayorder += 1
+                            lngserieid = rows["ID_SERIE"]
+                            arrserienominationcouples = {
+                                'ID_SERIE': lngserieid,
+                                'ID_NOMINATION': lngnominationid,
+                                'DISPLAY_ORDER': lngdisplayorder,
+                            }
+                            strsqlupdatecondition2 = "ID_SERIE = " + str(lngserieid) + " AND ID_NOMINATION = " + str(lngnominationid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                            cp.f_sqlupdatearray("T_WC_T2S_SERIE_NOMINATION", arrserienominationcouples, strsqlupdatecondition2, 1)
+
+                        # Link to persons
+                        strsqlpersons = ""
+                        strsqlpersons += "SELECT DISTINCT p2.ID_PERSON "
+                        strsqlpersons += "FROM T_WC_T2S_PERSON p2 "
+                        strsqlpersons += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = p2.ID_WIKIDATA "
+                        strsqlpersons += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
+                        strsqlpersons += "AND p2.ID_WIKIDATA IS NOT NULL AND p2.ID_WIKIDATA <> '' "
+                        cursor5.execute(strsqlpersons, (strpropertyid, strnominationwikidataid))
+                        results_persons = cursor5.fetchall()
+                        lngpersoncount = len(results_persons)
+                        lngdisplayorder = 0
+                        for rowp in results_persons:
+                            lngdisplayorder += 1
+                            lngpersonid = rowp["ID_PERSON"]
+                            arrpersonnominationcouples = {
+                                'ID_PERSON': lngpersonid,
+                                'ID_NOMINATION': lngnominationid,
+                                'DISPLAY_ORDER': lngdisplayorder,
+                            }
+                            strsqlupdatecondition2 = "ID_PERSON = " + str(lngpersonid) + " AND ID_NOMINATION = " + str(lngnominationid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                            cp.f_sqlupdatearray("T_WC_T2S_PERSON_NOMINATION", arrpersonnominationcouples, strsqlupdatecondition2, 1)
+
+                        arrnominationcounts = {
+                            'MOVIE_COUNT': lngmoviecount,
+                            'SERIE_COUNT': lngseriecount,
+                            'PERSON_COUNT': lngpersoncount,
+                        }
+                        cp.f_sqlupdatearray(strsqltablename, arrnominationcounts, strsqlupdatecondition, 1)
+
+                    if 1:
+                        strsqltablename = "T_WC_T2S_NOMINATION"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE NOMINATION_TYPE IS NULL "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_NOMINATION"
+                        strsqldelete = """DELETE FROM T_WC_T2S_NOMINATION
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM T_WC_WIKIDATA_ITEM_PROPERTY w
+    WHERE w.ID_PROPERTY = T_WC_T2S_NOMINATION.NOMINATION_SOURCE
+      AND w.ID_ITEM = T_WC_T2S_NOMINATION.ID_WIKIDATA
+);
+                        """
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        # Update T_WC_T2S_NOMINATION.POPULARITY from persons
+                        strsql = """UPDATE T_WC_T2S_NOMINATION t
+JOIN (
+    SELECT
+        mt.ID_NOMINATION,
+        AVG(p.POPULARITY) AS AVG_POPULARITY
+    FROM T_WC_T2S_PERSON_NOMINATION mt
+    INNER JOIN T_WC_T2S_PERSON p
+        ON p.ID_PERSON = mt.ID_PERSON
+    GROUP BY mt.ID_NOMINATION
+) x
+    ON x.ID_NOMINATION = t.ID_NOMINATION
+SET
+    t.POPULARITY = x.AVG_POPULARITY;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        # Update T_WC_T2S_NOMINATION ratings from movies
+                        strsql = """UPDATE T_WC_T2S_NOMINATION t
+JOIN (
+    SELECT
+        mt.ID_NOMINATION,
+        AVG(m.IMDB_RATING) AS AVG_IMDB_RATING,
+        AVG(m.IMDB_RATING_ADJUSTED) AS AVG_IMDB_RATING_ADJUSTED
+    FROM T_WC_T2S_MOVIE_NOMINATION mt
+    INNER JOIN T_WC_T2S_MOVIE m
+        ON m.ID_MOVIE = mt.ID_MOVIE
+    GROUP BY mt.ID_NOMINATION
+) x
+    ON x.ID_NOMINATION = t.ID_NOMINATION
+SET
+    t.IMDB_RATING = x.AVG_IMDB_RATING,
+    t.IMDB_RATING_ADJUSTED = x.AVG_IMDB_RATING_ADJUSTED;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        # Update T_WC_T2S_NOMINATION ratings from series
+                        strsql = """UPDATE T_WC_T2S_NOMINATION t
+JOIN (
+    SELECT
+        mt.ID_NOMINATION,
+        AVG(s.IMDB_RATING) AS AVG_IMDB_RATING,
+        AVG(s.IMDB_RATING_ADJUSTED) AS AVG_IMDB_RATING_ADJUSTED
+    FROM T_WC_T2S_SERIE_NOMINATION mt
+    INNER JOIN T_WC_T2S_SERIE s
+        ON s.ID_SERIE = mt.ID_SERIE
+    GROUP BY mt.ID_NOMINATION
+) x
+    ON x.ID_NOMINATION = t.ID_NOMINATION
+SET
+    t.IMDB_RATING = COALESCE(t.IMDB_RATING, x.AVG_IMDB_RATING),
+    t.IMDB_RATING_ADJUSTED = COALESCE(t.IMDB_RATING_ADJUSTED, x.AVG_IMDB_RATING_ADJUSTED);
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        strsqltablename = "T_WC_T2S_MOVIE_NOMINATION"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_NOMINATION NOT IN (SELECT ID_NOMINATION FROM T_WC_T2S_NOMINATION) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_SERIE_NOMINATION"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_NOMINATION NOT IN (SELECT ID_NOMINATION FROM T_WC_T2S_NOMINATION) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_PERSON_NOMINATION"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_NOMINATION NOT IN (SELECT ID_NOMINATION FROM T_WC_T2S_NOMINATION) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                elif intindex == 45:
+                    #----------------------------------------------------
+                    print("T2S_MOVEMENT processing")
+
+                    arrlists = {1: 'custom-movement', 2: 'movement-delete'}
+                    for intlist, strlist in arrlists.items():
+                        strsql = ""
+                        strsqldelete = ""
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strlist,"Current sub process in the TMDb database movie preprocess",0)
+                        if intlist == 1:
+                            strcurrentprocess = f"{intlist}: Copying from T_WC_CUSTOM_LIST to T2S_MOVEMENT"
+                            strsql += "SELECT 'custom' AS MOVEMENT_SOURCE, 'movement' AS MOVEMENT_TYPE, T_WC_CUSTOM_LIST.ID_CUSTOM_LIST AS ID_RECORD, T_WC_CUSTOM_LIST.LIST_NAME AS NAME, T_WC_CUSTOM_LIST.LIST_NAME_FR AS NAME_FR, T_WC_CUSTOM_LIST.OVERVIEW AS OVERVIEW, 'en' AS LANG, T_WC_CUSTOM_LIST.POSTER_PATH, T_WC_CUSTOM_LIST.ID_IMDB_LIST, T_WC_CUSTOM_LIST.WIKIDATA_PROPERTIES, T_WC_CUSTOM_LIST.TMDB_ELEMENTS "
+                            strsql += "FROM T_WC_CUSTOM_LIST WHERE DELETED = 0 AND TARGET_TABLE = 4 "
+                            strsql += "ORDER BY ID_RECORD ASC "
+                            target_field_name = "MOVEMENT_NAME"
+                        elif intlist == 2:
+                            strcurrentprocess = f"{intlist}: Deleting from T2S_MOVEMENT"
+                            strsqldelete += "DELETE FROM T_WC_T2S_MOVEMENT WHERE ID_RECORD NOT IN (SELECT ID_CUSTOM_LIST FROM T_WC_CUSTOM_LIST WHERE TARGET_TABLE = 4 AND DELETED = 0) "
+                            print(strsqldelete)
+                            cursor.execute(strsqldelete)
+                            continue
+                        if strsql != "":
+                            print(strsql)
+                            cursor.execute(strsql)
+                            lngrowcount = cursor.rowcount
+                            print(f"{lngrowcount} lines")
+                            lnglinesprocessed = 0
+                            results = cursor.fetchall()
+                            for row in results:
+                                lnglinesprocessed += 1
+                                lngrecordid = row['ID_RECORD']
+                                strrecordname = row['NAME']
+                                strrecordnamefr = row['NAME_FR'] or ''
+                                strrecordoverview = row['OVERVIEW']
+                                strrecordmovementsource = row['MOVEMENT_SOURCE']
+                                strrecordmovementtype = row['MOVEMENT_TYPE']
+                                strrecordposterpath = row['POSTER_PATH']
+                                print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordmovementsource + ")")
+                                arrlistcouples = {
+                                    'ID_RECORD': lngrecordid,
+                                    'MOVEMENT_NAME': strrecordname,
+                                    'MOVEMENT_NAME_FR': strrecordnamefr,
+                                    'OVERVIEW': strrecordoverview,
+                                    'MOVEMENT_SOURCE': strrecordmovementsource,
+                                    'MOVEMENT_TYPE': strrecordmovementtype,
+                                    'POSTER_PATH': strrecordposterpath
+                                }
+                                strsqltablename = "T_WC_T2S_MOVEMENT"
+                                strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND MOVEMENT_SOURCE = '{strrecordmovementsource}'"
+                                cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(lngrecordid),"Current record in the TMDb database movie preprocess",0)
+
+                                strsqlmovies = ""
+                                strsqlseries = ""
+                                # Mechanism 1: parse IMDb IDs/URLs from ID_IMDB_LIST (newline-separated)
+                                strimdblist = row['ID_IMDB_LIST'] or ''
+                                arrimdbids = re.findall(r'(tt\d+)', strimdblist)
+                                strsqlmovies_imdb = ""
+                                strsqlseries_imdb = ""
+                                if arrimdbids:
+                                    strimdbidlist = "'" + "','".join(arrimdbids) + "'"
+                                    strfieldorder = "'" + "','".join(arrimdbids) + "'"
+                                    strsqlmovies_imdb = "SELECT ID_MOVIE, FIELD(ID_IMDB, " + strfieldorder + ") AS DISPLAY_ORDER FROM T_WC_TMDB_MOVIE WHERE ID_IMDB IN (" + strimdbidlist + ") AND ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '' "
+                                    strsqlseries_imdb = "SELECT ID_SERIE, FIELD(ID_IMDB, " + strfieldorder + ") AS DISPLAY_ORDER FROM T_WC_TMDB_SERIE WHERE ID_IMDB IN (" + strimdbidlist + ") AND ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '' "
+                                # Mechanism 2: Wikidata property/item filter from WIKIDATA_PROPERTIES
+                                strwikidataproperties = row['WIKIDATA_PROPERTIES'] or ''
+                                arrwdtokens = re.findall(r'[PQ]\d+', strwikidataproperties)
+                                strwdpropertyid = next((t for t in arrwdtokens if t.startswith('P')), '')
+                                strwditemid = next((t for t in arrwdtokens if t.startswith('Q')), '')
+                                strsqlmovies_wikidata = ""
+                                strsqlseries_wikidata = ""
+                                if strwdpropertyid and strwditemid:
+                                    strsqlmovies_wikidata = "SELECT DISTINCT T_WC_TMDB_MOVIE.ID_MOVIE, 0 AS DISPLAY_ORDER FROM T_WC_TMDB_MOVIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_MOVIE.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strwdpropertyid + "' AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = '" + strwditemid + "' AND T_WC_TMDB_MOVIE.ADULT = 0 AND T_WC_TMDB_MOVIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_MOVIE.ID_WIKIDATA <> '' "
+                                    strsqlseries_wikidata = "SELECT DISTINCT T_WC_TMDB_SERIE.ID_SERIE, 0 AS DISPLAY_ORDER FROM T_WC_TMDB_SERIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_SERIE.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strwdpropertyid + "' AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = '" + strwditemid + "' AND T_WC_TMDB_SERIE.ADULT = 0 AND T_WC_TMDB_SERIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_SERIE.ID_WIKIDATA <> '' "
+                                # Mechanism 3: TMDb keyword filter from TMDB_ELEMENTS
+                                strtmdbelements = row['TMDB_ELEMENTS'] or ''
+                                strsqlmovies_keyword = ""
+                                strsqlseries_keyword = ""
+                                strkeywordmatch = re.search(r"T_WC_TMDB_KEYWORD\.NAME\s*=\s*'([^']+)'", strtmdbelements.replace('&#039;', "'"))
+                                if strkeywordmatch:
+                                    strkeywordname = strkeywordmatch.group(1).strip().replace("'", "''")
+                                    print(f"Found keyword in TMDB_ELEMENTS: {strkeywordname}")
+                                    strsqlmovies_keyword = "SELECT T_WC_TMDB_MOVIE_KEYWORD.ID_MOVIE, 0 AS DISPLAY_ORDER FROM T_WC_TMDB_MOVIE_KEYWORD INNER JOIN T_WC_TMDB_KEYWORD ON T_WC_TMDB_MOVIE_KEYWORD.ID_KEYWORD = T_WC_TMDB_KEYWORD.ID_KEYWORD INNER JOIN T_WC_TMDB_MOVIE ON T_WC_TMDB_MOVIE.ID_MOVIE = T_WC_TMDB_MOVIE_KEYWORD.ID_MOVIE WHERE T_WC_TMDB_KEYWORD.NAME = '" + strkeywordname + "' AND T_WC_TMDB_MOVIE.ADULT = 0 AND T_WC_TMDB_MOVIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_MOVIE.ID_WIKIDATA <> '' "
+                                    strsqlseries_keyword = "SELECT T_WC_TMDB_SERIE_KEYWORD.ID_SERIE, 0 AS DISPLAY_ORDER FROM T_WC_TMDB_SERIE_KEYWORD INNER JOIN T_WC_TMDB_KEYWORD ON T_WC_TMDB_SERIE_KEYWORD.ID_KEYWORD = T_WC_TMDB_KEYWORD.ID_KEYWORD INNER JOIN T_WC_TMDB_SERIE ON T_WC_TMDB_SERIE.ID_SERIE = T_WC_TMDB_SERIE_KEYWORD.ID_SERIE WHERE T_WC_TMDB_KEYWORD.NAME = '" + strkeywordname + "' AND T_WC_TMDB_SERIE.ADULT = 0 AND T_WC_TMDB_SERIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_SERIE.ID_WIKIDATA <> '' "
+                                    print(f"Constructed SQL for keyword filter: {strsqlmovies_keyword} / {strsqlseries_keyword}")
+                                # Combine mechanisms cumulatively
+                                arrsqlmovies_sources = [s for s in [strsqlmovies_imdb, strsqlmovies_wikidata, strsqlmovies_keyword] if s]
+                                arrsqlseries_sources = [s for s in [strsqlseries_imdb, strsqlseries_wikidata, strsqlseries_keyword] if s]
+                                if len(arrsqlmovies_sources) > 1:
+                                    strsqlmovies = "SELECT ID_MOVIE, MAX(DISPLAY_ORDER) AS DISPLAY_ORDER FROM (" + "UNION ALL ".join(arrsqlmovies_sources) + ") combined GROUP BY ID_MOVIE ORDER BY DISPLAY_ORDER "
+                                elif arrsqlmovies_sources:
+                                    strsqlmovies = arrsqlmovies_sources[0] + ("ORDER BY DISPLAY_ORDER " if strsqlmovies_imdb else "ORDER BY ID_MOVIE ")
+                                if len(arrsqlseries_sources) > 1:
+                                    strsqlseries = "SELECT ID_SERIE, MAX(DISPLAY_ORDER) AS DISPLAY_ORDER FROM (" + "UNION ALL ".join(arrsqlseries_sources) + ") combined GROUP BY ID_SERIE ORDER BY DISPLAY_ORDER "
+                                elif arrsqlseries_sources:
+                                    strsqlseries = arrsqlseries_sources[0] + ("ORDER BY DISPLAY_ORDER " if strsqlseries_imdb else "ORDER BY ID_SERIE ")
+
+                                if strsqlmovies != "":
+                                    print(f"Executing SQL for movies: {strsqlmovies}")
+                                    cursor2.execute(strsqlmovies)
+                                    lngmoviecount = cursor2.rowcount
+                                    lngseriescount = 0
+                                    if strsqlseries != "":
+                                        cursor4.execute(strsqlseries)
+                                        lngseriescount = cursor4.rowcount
+                                    if lngmoviecount + lngseriescount > 1:
+                                        lngmovementid = cp.f_sqlupdatearray(strsqltablename, arrlistcouples, strsqlupdatecondition, 1)
+                                        if lngmovementid is None:
+                                            strsqlmovement = "SELECT ID_MOVEMENT FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                            cursor3.execute(strsqlmovement)
+                                            lngrowcount2 = cursor3.rowcount
+                                            if lngrowcount2 == 0:
+                                                print("Error: Failed to create/update movement - lngmovementid is None")
+                                                continue
+                                            lngmovementid = cursor3.fetchone()["ID_MOVEMENT"]
+                                        results_movies = cursor2.fetchall()
+                                        lngdisplayorderprev = 0
+                                        for rowm in results_movies:
+                                            lngmovieid = rowm["ID_MOVIE"]
+                                            lngdisplayorder = rowm["DISPLAY_ORDER"]
+                                            if lngdisplayorder is None:
+                                                lngdisplayorder = lngdisplayorderprev
+                                            else:
+                                                lngdisplayorderprev = lngdisplayorder
+                                            arrmovielistcouples = {
+                                                'ID_MOVIE': lngmovieid,
+                                                'ID_MOVEMENT': lngmovementid,
+                                                'DISPLAY_ORDER': lngdisplayorder
+                                            }
+                                            strsqlupdatecondition2 = "ID_MOVIE = " + str(lngmovieid) + " AND ID_MOVEMENT = " + str(lngmovementid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                            cp.f_sqlupdatearray("T_WC_T2S_MOVIE_MOVEMENT", arrmovielistcouples, strsqlupdatecondition2, 1)
+                                        if strsqlseries != "":
+                                            results_series = cursor4.fetchall()
+                                            lngdisplayorderprev = 0
+                                            for rows in results_series:
+                                                lngserieid = rows["ID_SERIE"]
+                                                lngdisplayorder = rows["DISPLAY_ORDER"]
+                                                if lngdisplayorder is None:
+                                                    lngdisplayorder = lngdisplayorderprev
+                                                else:
+                                                    lngdisplayorderprev = lngdisplayorder
+                                                arrserielistcouples = {
+                                                    'ID_SERIE': lngserieid,
+                                                    'ID_MOVEMENT': lngmovementid,
+                                                    'DISPLAY_ORDER': lngdisplayorder
+                                                }
+                                                strsqlupdatecondition2 = "ID_SERIE = " + str(lngserieid) + " AND ID_MOVEMENT = " + str(lngmovementid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                cp.f_sqlupdatearray("T_WC_T2S_SERIE_MOVEMENT", arrserielistcouples, strsqlupdatecondition2, 1)
+                                        arrlistcouples = {
+                                            'MOVIE_COUNT': lngmoviecount,
+                                            'SERIE_COUNT': lngseriescount
+                                        }
+                                        cp.f_sqlupdatearray(strsqltablename, arrlistcouples, strsqlupdatecondition, 1)
+                                    else:
+                                        strsqldeletemvt = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                        print(strsqldeletemvt)
+                                        cursor2.execute(strsqldeletemvt)
+                    if 1:
+                        strsqltablename = "T_WC_T2S_MOVEMENT"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE MOVEMENT_TYPE IS NULL "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        # Update T_WC_T2S_MOVEMENT.IMDB_RATING and T_WC_T2S_MOVEMENT.IMDB_RATING_ADJUSTED
+                        strsql = """UPDATE T_WC_T2S_MOVEMENT t
+JOIN (
+    SELECT
+        mt.ID_MOVEMENT,
+        AVG(m.IMDB_RATING) AS AVG_IMDB_RATING,
+        AVG(m.IMDB_RATING_ADJUSTED) AS AVG_IMDB_RATING_ADJUSTED
+    FROM T_WC_T2S_MOVIE_MOVEMENT mt
+    INNER JOIN T_WC_T2S_MOVIE m
+        ON m.ID_MOVIE = mt.ID_MOVIE
+    INNER JOIN T_WC_T2S_MOVEMENT t2
+        ON t2.ID_MOVEMENT = mt.ID_MOVEMENT
+       AND t2.MOVEMENT_TYPE = 'movement'
+    GROUP BY mt.ID_MOVEMENT
+) x
+    ON x.ID_MOVEMENT = t.ID_MOVEMENT
+SET
+    t.IMDB_RATING = x.AVG_IMDB_RATING,
+    t.IMDB_RATING_ADJUSTED = x.AVG_IMDB_RATING_ADJUSTED;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        strsqltablename = "T_WC_T2S_MOVIE_MOVEMENT"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_MOVEMENT NOT IN (SELECT ID_MOVEMENT FROM T_WC_T2S_MOVEMENT) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_SERIE_MOVEMENT"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_MOVEMENT NOT IN (SELECT ID_MOVEMENT FROM T_WC_T2S_MOVEMENT) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                elif intindex == 46:
+                    #----------------------------------------------------
+                    print("T2S_DEATH processing")
+
+                    arrp1196excludeditems = ["Q110999040", "Q6682074"]
+                    strp1196excludeditems = "'" + "','".join(arrp1196excludeditems) + "'"
+
+                    arrgroups = {1: 'en-cause-of-death', 2: 'en-manner-of-death'}
+                    for intgroup, strgroup in arrgroups.items():
+                        strsql = ""
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strgroup,"Current sub process in the TMDb database person preprocess",0)
+                        if intgroup == 1:
+                            strpropertyid = "P509"
+                        elif intgroup == 2:
+                            strpropertyid = "P1196"
+                        else:
+                            strpropertyid = ""
+                        if strpropertyid != "":
+                            strcurrentprocess = f"{intgroup}: Copying from WIKIDATA {strpropertyid} to T2S_DEATH"
+                            strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                            strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                            strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strpropertyid + "' "
+                            if intgroup == 2:
+                                strsql += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM NOT IN (" + strp1196excludeditems + ") "
+                            strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
+                            target_field_name = "DEATH_NAME"
+                        strrecorddeathsource = strpropertyid
+                        if strsql != "":
+                            print(strsql)
+                            cursor.execute(strsql)
+                            lngrowcount = cursor.rowcount
+                            print(f"{lngrowcount} lines")
+                            results = cursor.fetchall()
+                            for row in results:
+                                strrecordid = row['ID_ITEM']
+                                cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(strrecordid),"Current record in the TMDb database movie preprocess",0)
+
+                                strrecordname = ""
+                                strrecordoverview = ""
+                                strrecordimagepath = ""
+                                strsqlitem = ""
+                                strsqlitem += "SELECT LABEL, DESCRIPTION, WIKIPEDIA_IMAGE_PATH "
+                                strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
+                                strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'en'"
+                                arrvalues = cp.f_fieldsfromquery(
+                                    strsqlitem,
+                                    "strrecordname|strrecordoverview|strrecordimagepath",
+                                    "LABEL|DESCRIPTION|WIKIPEDIA_IMAGE_PATH",
+                                    params=(strrecordid,),
+                                    target_dict=None,
+                                )
+                                strrecordname = arrvalues.get("strrecordname", "")
+                                strrecordoverview = arrvalues.get("strrecordoverview", "")
+                                strrecordimagepath = arrvalues.get("strrecordimagepath", "")
+
+                                strsqlitem = ""
+                                strsqlitem += "SELECT LABEL "
+                                strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
+                                strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'fr'"
+                                arrvalues = cp.f_fieldsfromquery(
+                                    strsqlitem,
+                                    "strrecordnamefr",
+                                    "LABEL",
+                                    params=(strrecordid,),
+                                    target_dict=None,
+                                )
+                                strrecordnamefr = arrvalues.get("strrecordnamefr", "")
+
+                                strrecorddeathtype = "death"
+                                print("Processing record: " + str(strrecordid) + ": " + strrecordname + " (" + strrecorddeathsource + ")")
+
+                                if target_field_name == "DEATH_NAME":
+                                    arrdeathcouples = {
+                                        'ID_WIKIDATA': strrecordid,
+                                        'DEATH_NAME': strrecordname,
+                                        'DEATH_NAME_FR': strrecordnamefr,
+                                        'OVERVIEW': strrecordoverview,
+                                        'DEATH_SOURCE': strrecorddeathsource,
+                                        'DEATH_TYPE': strrecorddeathtype,
+                                        'LANG': 'en',
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordimagepath,
+                                    }
+                                strsqltablename = "T_WC_T2S_DEATH"
+                                strsqlupdatecondition = f"ID_WIKIDATA = '{strrecordid}' AND DEATH_SOURCE = '{strrecorddeathsource}'"
+
+                                strsqlpersons = ""
+                                if intgroup == 1 or intgroup == 2:
+                                    strsqlpersons += "SELECT DISTINCT T_WC_TMDB_PERSON.ID_PERSON, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.NAME, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.BIRTHDAY, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.DEATHDAY, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.ID_IMDB, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.BIOGRAPHY, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.PROFILE_PATH, "
+                                    strsqlpersons += "T_WC_TMDB_PERSON.ID_WIKIDATA "
+                                    strsqlpersons += "FROM T_WC_TMDB_PERSON "
+                                    strsqlpersons += "INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
+                                    strsqlpersons += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
+                                    strsqlpersons += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
+                                    strsqlpersons += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = %s "
+                                    strsqlpersons += "ORDER BY T_WC_TMDB_PERSON.POPULARITY DESC "
+                                if strsqlpersons != "":
+                                    cursor2.execute(strsqlpersons, (strpropertyid, strrecordid))
+                                    person_results = cursor2.fetchall()
+                                    lngpersoncount = len(person_results)
+                                    if lngpersoncount > 1:
+                                        lngdeathid = cp.f_sqlupdatearray(strsqltablename, arrdeathcouples, strsqlupdatecondition, 1)
+                                        if lngdeathid is None:
+                                            strsqldeath = "SELECT ID_DEATH FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                            cursor3.execute(strsqldeath)
+                                            lngrowcount2 = cursor3.rowcount
+                                            if lngrowcount2 == 0:
+                                                print("Error: Failed to create/update death - lngdeathid is None")
+                                                continue
+                                            lngdeathid = cursor3.fetchone()["ID_DEATH"]
+                                        if intgroup == 1 or intgroup == 2:
+                                            lngdisplayorder = 0
+                                            for prow in person_results:
+                                                lngpersonid = prow["ID_PERSON"]
+                                                lngdisplayorder += 1
+                                                arrpersondeathcouples = {
+                                                    'ID_PERSON': lngpersonid,
+                                                    'ID_DEATH': lngdeathid,
+                                                    'DISPLAY_ORDER': lngdisplayorder,
+                                                }
+                                                strsqlupdatecondition2 = "ID_PERSON = " + str(lngpersonid) + " AND ID_DEATH = " + str(lngdeathid) + " AND DISPLAY_ORDER = " + str(lngdisplayorder)
+                                                cp.f_sqlupdatearray("T_WC_T2S_PERSON_DEATH", arrpersondeathcouples, strsqlupdatecondition2, 1)
+                                            arrdeathcouples = {
+                                                'PERSON_COUNT': lngpersoncount,
+                                            }
+                                            cp.f_sqlupdatearray(strsqltablename, arrdeathcouples, strsqlupdatecondition, 1)
+                                    else:
+                                        strsqltablename = "T_WC_T2S_DEATH"
+                                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
+                                        print(strsqldelete)
+                                        cursor2.execute(strsqldelete)
+
+                    if 1:
+                        strsqltablename = "T_WC_T2S_DEATH"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE DEATH_TYPE IS NULL "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsqltablename = "T_WC_T2S_DEATH"
+                        strsqldelete = """DELETE FROM T_WC_T2S_DEATH
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM T_WC_WIKIDATA_ITEM_PROPERTY w
+    WHERE w.ID_PROPERTY = T_WC_T2S_DEATH.DEATH_SOURCE
+      AND w.ID_ITEM = T_WC_T2S_DEATH.ID_WIKIDATA
+      AND NOT (
+          w.ID_PROPERTY = 'P1196'
+          AND w.ID_ITEM IN (""" + strp1196excludeditems + """ )
+      )
+);
+                        """
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
+
+                        strsql = """UPDATE T_WC_T2S_DEATH t
+JOIN (
+    SELECT
+        mt.ID_DEATH,
+        AVG(m.POPULARITY) AS AVG_POPULARITY
+    FROM T_WC_T2S_PERSON_DEATH mt
+    INNER JOIN T_WC_T2S_PERSON m
+        ON m.ID_PERSON = mt.ID_PERSON
+    INNER JOIN T_WC_T2S_DEATH t2
+        ON t2.ID_DEATH = mt.ID_DEATH
+       AND t2.DEATH_TYPE = 'death'
+    GROUP BY mt.ID_DEATH
+) x
+    ON x.ID_DEATH = t.ID_DEATH
+SET
+    t.POPULARITY = x.AVG_POPULARITY;
+                        """
+                        print(strsql)
+                        cursor2.execute(strsql)
+
+                        strsqltablename = "T_WC_T2S_PERSON_DEATH"
+                        strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_DEATH NOT IN (SELECT ID_DEATH FROM T_WC_T2S_DEATH) "
+                        print(strsqldelete)
+                        cursor2.execute(strsqldelete)
 
                 elif intindex == 4:
                     #----------------------------------------------------
@@ -1251,7 +2868,7 @@ WHERE t2s.ID_MOVIE >= {lngmovierangestart}
 
                             strsqlmovies = f"""
 UPDATE T_WC_T2S_MOVIE t2s
-INNER JOIN T_WC_WIKIDATA_MOVIE w 
+INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w 
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 SET t2s.WIKIDATA_TITLE = w.TITLE, 
     t2s.ALIASES = w.ALIASES, 
@@ -1497,7 +3114,7 @@ WHERE t2s.ID_SERIE >= {lngserierangestart}
 
                             strsqlseries = f"""
 UPDATE T_WC_T2S_SERIE t2s
-INNER JOIN T_WC_WIKIDATA_SERIE w 
+INNER JOIN T_WC_WIKIDATA_SERIE_V1 w 
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 SET t2s.WIKIDATA_TITLE = w.TITLE, 
     t2s.ALIASES = w.ALIASES, 
@@ -1597,7 +3214,7 @@ WHERE t2s.ID_SERIE >= {lngserierangestart}
 
                             strsqlpersons = f"""
     UPDATE T_WC_T2S_PERSON t2s
-    INNER JOIN T_WC_WIKIDATA_PERSON w 
+    INNER JOIN T_WC_WIKIDATA_PERSON_V1 w 
         ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
     SET t2s.WIKIDATA_NAME = w.NAME, 
         t2s.ALIASES = w.ALIASES, 
@@ -1937,7 +3554,7 @@ ORDER BY COMPTE DESC """
                     if 1:
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from WIKIDATA_ITEM to T2S_ITEM","Current sub process in the TMDb database movie preprocess",0)
                         # Get the maximum ID_ROW value from the database
-                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_WIKIDATA_ITEM")
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_WIKIDATA_ITEM_V1")
                         result = cursor.fetchone()
                         lngitemrangemax = result['max_id'] if result['max_id'] is not None else 0
                         print(f"Maximum ID_ROW in database: {lngitemrangemax}")
@@ -1963,7 +3580,7 @@ SELECT
     WIKIPEDIA_IMAGE_PATH, INSTANCE_OF,
     DAT_CREAT, TIM_UPDATED, 
     DELETED
-FROM T_WC_WIKIDATA_ITEM
+FROM T_WC_WIKIDATA_ITEM_V1
 WHERE LANG = 'en' 
 AND ID_ROW >= {lngitemrangestart} AND ID_ROW <= {lngitemrangeend}
 ON DUPLICATE KEY UPDATE
@@ -1983,7 +3600,7 @@ ON DUPLICATE KEY UPDATE
 DELETE FROM T_WC_T2S_ITEM 
 WHERE ID_ROW >= {lngitemrangestart} AND ID_ROW <= {lngitemrangeend}
 AND ID_ROW NOT IN (
-    SELECT ID_ROW FROM T_WC_WIKIDATA_ITEM 
+    SELECT ID_ROW FROM T_WC_WIKIDATA_ITEM_V1 
     WHERE LANG = 'en'
         AND ID_ROW >= {lngitemrangestart} AND ID_ROW <= {lngitemrangeend}
 ) """
@@ -1992,7 +3609,7 @@ AND ID_ROW NOT IN (
 
                             strsqlitems = f"""
 UPDATE T_WC_T2S_ITEM t2s
-INNER JOIN T_WC_WIKIDATA_ITEM t 
+INNER JOIN T_WC_WIKIDATA_ITEM_V1 t 
     ON t2s.ID_WIKIDATA = t.ID_WIKIDATA
 SET t2s.ITEM_LABEL_FR = t.LABEL
 WHERE t2s.ID_ROW >= {lngitemrangestart} 
@@ -2523,7 +4140,7 @@ WHERE t2s.ID_ROW >= {lngitemrangestart}
                                             lngmovieidcriterionspine = 0
                                             strmoviealiases = ""
                                             if strmovieidwikidata != "":
-                                                strsqlwikidata = "SELECT * FROM " + cp.strsqlns + "WIKIDATA_MOVIE WHERE ID_WIKIDATA = '" + strmovieidwikidata +"' "
+                                                strsqlwikidata = "SELECT * FROM " + cp.strsqlns + "WIKIDATA_MOVIE_V1 WHERE ID_WIKIDATA = '" + strmovieidwikidata +"' "
                                                 cursor3.execute(strsqlwikidata)
                                                 results3 = cursor3.fetchall()
                                                 for row3 in results3:
@@ -2576,10 +4193,10 @@ WHERE t2s.ID_ROW >= {lngitemrangestart}
                                             
                                             # Cast processing
                                             strsqlmoviecast = ""
-                                            strsqlmoviecast += "SELECT " + cp.strsqlns + "TMDB_PERSON.ID_PERSON, " + cp.strsqlns + "TMDB_PERSON.NAME, " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA, " + cp.strsqlns + "WIKIDATA_PERSON.ALIASES, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CAST_CHARACTER "
+                                            strsqlmoviecast += "SELECT " + cp.strsqlns + "TMDB_PERSON.ID_PERSON, " + cp.strsqlns + "TMDB_PERSON.NAME, " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA, " + cp.strsqlns + "WIKIDATA_PERSON_V1.ALIASES, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CAST_CHARACTER "
                                             strsqlmoviecast += "FROM " + cp.strsqlns + "TMDB_PERSON_MOVIE "
                                             strsqlmoviecast += "INNER JOIN " + cp.strsqlns + "TMDB_PERSON ON " + cp.strsqlns + "TMDB_PERSON_MOVIE.ID_PERSON = " + cp.strsqlns + "TMDB_PERSON.ID_PERSON "
-                                            strsqlmoviecast += "INNER JOIN " + cp.strsqlns + "WIKIDATA_PERSON ON " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA = " + cp.strsqlns + "WIKIDATA_PERSON.ID_WIKIDATA "
+                                            strsqlmoviecast += "INNER JOIN " + cp.strsqlns + "WIKIDATA_PERSON_V1 ON " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA = " + cp.strsqlns + "WIKIDATA_PERSON_V1.ID_WIKIDATA "
                                             strsqlmoviecast += "WHERE " + cp.strsqlns + "TMDB_PERSON_MOVIE.ID_MOVIE = " + str(lngmovieid) + " "
                                             strsqlmoviecast += "AND " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREDIT_TYPE = 'cast' "
                                             # Adding a condition to keep only persons with a Wikidata id, so probably a Wikipedia page
@@ -2623,10 +4240,10 @@ WHERE t2s.ID_ROW >= {lngitemrangestart}
                                             
                                             # Crew processing
                                             strsqlmoviecrew = ""
-                                            strsqlmoviecrew += "SELECT " + cp.strsqlns + "TMDB_PERSON.ID_PERSON, " + cp.strsqlns + "TMDB_PERSON.NAME, " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA, " + cp.strsqlns + "WIKIDATA_PERSON.ALIASES, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREW_DEPARTMENT, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREW_JOB "
+                                            strsqlmoviecrew += "SELECT " + cp.strsqlns + "TMDB_PERSON.ID_PERSON, " + cp.strsqlns + "TMDB_PERSON.NAME, " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA, " + cp.strsqlns + "WIKIDATA_PERSON_V1.ALIASES, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREW_DEPARTMENT, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREW_JOB "
                                             strsqlmoviecrew += "FROM " + cp.strsqlns + "TMDB_PERSON_MOVIE "
                                             strsqlmoviecrew += "INNER JOIN " + cp.strsqlns + "TMDB_PERSON ON " + cp.strsqlns + "TMDB_PERSON_MOVIE.ID_PERSON = " + cp.strsqlns + "TMDB_PERSON.ID_PERSON "
-                                            strsqlmoviecrew += "INNER JOIN " + cp.strsqlns + "WIKIDATA_PERSON ON " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA = " + cp.strsqlns + "WIKIDATA_PERSON.ID_WIKIDATA "
+                                            strsqlmoviecrew += "INNER JOIN " + cp.strsqlns + "WIKIDATA_PERSON_V1 ON " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA = " + cp.strsqlns + "WIKIDATA_PERSON_V1.ID_WIKIDATA "
                                             strsqlmoviecrew += "WHERE " + cp.strsqlns + "TMDB_PERSON_MOVIE.ID_MOVIE = " + str(lngmovieid) + " "
                                             strsqlmoviecrew += "AND " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREDIT_TYPE = 'crew' "
                                             strsqlmoviecrew += "AND " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREW_DEPARTMENT IN ('Art', 'Camera', 'Directing', 'Editing', 'Sound', 'Writing', 'Production', 'Costume & Make-Up', 'Visual Effects') "
