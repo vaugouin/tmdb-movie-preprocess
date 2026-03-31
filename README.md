@@ -134,6 +134,24 @@ Computes movie/serie counts per production company and copies qualifying compani
 
 ---
 
+### Process 48 — T2S_CHARACTER
+
+Builds the character dimension from acting credits in `T_WC_T2S_PERSON_MOVIE` and `T_WC_T2S_PERSON_SERIE`.
+
+**Reads:** `T_WC_T2S_PERSON_MOVIE`, `T_WC_T2S_PERSON_SERIE`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
+**Writes:** `T_WC_T2S_CHARACTER`, `T_WC_T2S_MOVIE_CHARACTER`, `T_WC_T2S_SERIE_CHARACTER`, `T_WC_T2S_PERSON_CHARACTER`
+
+**Filter:** `CREDIT_TYPE = 'cast'` AND `DELETED = 0 (or NULL)` AND `CAST_CHARACTER` not null/empty
+
+**Operations:**
+- Inserts missing characters into `T_WC_T2S_CHARACTER` based on `CAST_CHARACTER` (no splitting).
+- Rebuilds character junction tables from person-movie and person-serie acting credits.
+- Updates per-character KPIs:
+  - `MOVIE_COUNT`, `SERIE_COUNT`, `PERSON_COUNT`
+  - `IMDB_RATING`, `IMDB_RATING_ADJUSTED` (averaged across linked movies and series)
+  - `POPULARITY` (averaged across linked persons)
+- Full stale delete: removes characters no longer present in either source credit table.
+
 ### Process 8 — T2S_NETWORK
 
 Computes serie counts per broadcast network and copies qualifying networks into the T2S layer.
@@ -217,16 +235,20 @@ Copies Wikidata item records (English + French labels) into the T2S layer.
 
 Populates `T_WC_T2S_COLLECTION` from TMDb lists and collections, with linked movies and series.
 
-**Reads:** `T_WC_TMDB_LIST`, `T_WC_TMDB_LIST_LANG`, `T_WC_TMDB_COLLECTION`, `T_WC_TMDB_COLLECTION_LANG`, `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`
+**Reads:** `T_WC_TMDB_LIST`, `T_WC_TMDB_LIST_LANG`, `T_WC_TMDB_COLLECTION`, `T_WC_TMDB_COLLECTION_LANG`, `T_WC_CUSTOM_LIST` (TARGET_TABLE = 2), `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`
 **Writes:** `T_WC_T2S_COLLECTION`, `T_WC_T2S_MOVIE_COLLECTION`, `T_WC_T2S_SERIE_COLLECTION`
 
-**Subprocesses:** `en-list`, `fr-list`, `en-collection`, `fr-collection`
+**Subprocesses:** `en-list`, `fr-list`, `en-collection`, `fr-collection`, `custom-collection`
 
 **Operations:**
 - For each list/collection record, queries associated movies and series filtered by `ADULT = 0` and `ID_WIKIDATA IS NOT NULL`.
+- **custom-collection:** Processes records from `T_WC_CUSTOM_LIST` where `TARGET_TABLE = 2`. Elements are resolved using up to three cumulative mechanisms:
+  - **Mechanism 1 (IMDb list):** Parses `tt\d+` IDs from the `ID_IMDB_LIST` field; preserves input order via SQL `FIELD()`.
+  - **Mechanism 2 (Wikidata):** Extracts a `P\d+` property and `Q\d+` item from `WIKIDATA_PROPERTIES`; joins against `T_WC_WIKIDATA_ITEM_PROPERTY`.
+  - **Mechanism 3 (TMDb keyword):** Parses `T_WC_TMDB_KEYWORD.NAME = '...'` from `TMDB_ELEMENTS`; joins against `T_WC_TMDB_MOVIE_KEYWORD` / `T_WC_TMDB_SERIE_KEYWORD`.
 - Inserts/updates the collection record, then upserts linked movie and serie entries with display order.
 - Skips records with fewer than 2 total elements; deletes any existing record for those.
-- Full stale delete: removes `T_WC_T2S_COLLECTION` rows whose source record is no longer present in the corresponding TMDb source table.
+- Full stale delete: removes `T_WC_T2S_COLLECTION` rows whose source record is no longer present in the corresponding TMDb source table or `T_WC_CUSTOM_LIST`.
 
 ---
 
@@ -255,19 +277,22 @@ Populates `T_WC_T2S_LIST` from TMDb lists and custom lists, with linked movies a
 
 ### Process 43 — T2S_GROUP
 
-Builds person groups from Wikidata membership and employment relationships.
+Builds person groups from Wikidata membership and employment relationships, and from custom group definitions.
 
-**Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_TMDB_PERSON`, `T_WC_T2S_PERSON`
-**Writes:** `T_WC_T2S_GROUP`, `T_WC_T2S_GROUP_PERSON`
+**Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3), `T_WC_TMDB_PERSON`, `T_WC_T2S_PERSON`
+**Writes:** `T_WC_T2S_GROUP`, `T_WC_T2S_PERSON_GROUP`
 
 **Subprocesses / Wikidata properties:**
 - `en-group` → P463 (member of)
 - `en-employer` → P108 (employer)
+- `custom-group` → `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3)
 
 **Operations:**
 - For each Wikidata property/item pair, retrieves the item's English and French labels, description, and Wikipedia image.
 - Inserts/updates `T_WC_T2S_GROUP`.
 - Queries persons linked to the item via Wikidata (ordered by popularity) and upserts into `T_WC_T2S_GROUP_PERSON`.
+- **custom-group:** Builds groups from `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3) and resolves member persons using up to three cumulative mechanisms (IMDb list `nm\d+`, Wikidata property/item, or a TMDb person name expression).
+- Full stale delete: removes custom groups whose source record no longer exists in `T_WC_CUSTOM_LIST`.
 
 ---
 
@@ -346,7 +371,7 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 | Chunk processing | Most copy processes iterate over source IDs in batches of 1000 to avoid memory pressure. |
 | `INSERT … ON DUPLICATE KEY UPDATE` | Idempotent upsert — safe to re-run without duplicating data. |
 | `cp.f_sqlupdatearray()` | Generic upsert helper from the `citizenphil` module. |
-| Multi-mechanism element resolution | Processes 42 and 45 combine IMDb, Wikidata, and TMDb keyword sources with `UNION ALL` + `GROUP BY`. |
+| Multi-mechanism element resolution | Processes 41 (custom-collection), 42, and 45 combine multiple sources with `UNION ALL` + `GROUP BY`. |
 | Wikidata filter | Any movie or serie written to a T2S junction table must satisfy `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`. |
 | Full stale delete | Some dimension processes delete parent rows whose source record (TMDb list/collection/custom list or Wikidata property) no longer exists, in addition to orphan link cleanup. |
 | Server variables | `cp.f_setservervariable()` persists the current process/record for external monitoring. |
@@ -365,12 +390,13 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 | T_WC_TMDB_PERSON_MOVIE | T_WC_T2S_PERSON_MOVIE |
 | T_WC_TMDB_PERSON_SERIE | T_WC_T2S_PERSON_SERIE |
 | T_WC_TMDB_LIST / T_WC_CUSTOM_LIST (TARGET_TABLE=1) | T_WC_T2S_LIST, T_WC_T2S_MOVIE_LIST, T_WC_T2S_SERIE_LIST |
-| T_WC_TMDB_COLLECTION | T_WC_T2S_COLLECTION, T_WC_T2S_MOVIE_COLLECTION, T_WC_T2S_SERIE_COLLECTION |
+| T_WC_TMDB_COLLECTION / T_WC_CUSTOM_LIST (TARGET_TABLE=2) | T_WC_T2S_COLLECTION, T_WC_T2S_MOVIE_COLLECTION, T_WC_T2S_SERIE_COLLECTION |
 | T_WC_TMDB_KEYWORD / T_WC_TMDB_LIST / T_WC_TMDB_COLLECTION | T_WC_T2S_TOPIC |
 | T_WC_TMDB_MOVIE (technical fields) | T_WC_T2S_TECHNICAL, T_WC_T2S_MOVIE_TECHNICAL |
 | T_WC_WIKIDATA_ITEM_V1 | T_WC_T2S_ITEM |
-| T_WC_WIKIDATA_ITEM_PROPERTY (P463, P108) | T_WC_T2S_GROUP, T_WC_T2S_PERSON_GROUP |
+| T_WC_WIKIDATA_ITEM_PROPERTY (P463, P108) / T_WC_CUSTOM_LIST (TARGET_TABLE=3) | T_WC_T2S_GROUP, T_WC_T2S_PERSON_GROUP |
 | T_WC_WIKIDATA_ITEM_PROPERTY (P166) | T_WC_T2S_AWARD, T_WC_T2S_MOVIE_AWARD, T_WC_T2S_SERIE_AWARD, T_WC_T2S_PERSON_AWARD |
 | T_WC_CUSTOM_LIST (TARGET_TABLE=4) | T_WC_T2S_MOVEMENT, T_WC_T2S_MOVIE_MOVEMENT, T_WC_T2S_SERIE_MOVEMENT |
 | T_WC_WIKIDATA_ITEM_PROPERTY (P509, P1196) | T_WC_T2S_DEATH, T_WC_T2S_PERSON_DEATH |
 | T_WC_WIKIDATA_ITEM_PROPERTY (P1411) | T_WC_T2S_NOMINATION, T_WC_T2S_MOVIE_NOMINATION, T_WC_T2S_SERIE_NOMINATION, T_WC_T2S_PERSON_NOMINATION |
+| T_WC_T2S_PERSON_MOVIE / T_WC_T2S_PERSON_SERIE (acting credits) | T_WC_T2S_CHARACTER, T_WC_T2S_MOVIE_CHARACTER, T_WC_T2S_SERIE_CHARACTER, T_WC_T2S_PERSON_CHARACTER |
