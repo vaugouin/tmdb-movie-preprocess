@@ -1,3 +1,4 @@
 citizenphilsecrets.py
 *.pyc
 data/*
+.env

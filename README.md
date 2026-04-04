@@ -192,7 +192,186 @@ Links persons to series in the T2S layer (same pattern as Process 9).
 
 ---
 
-### Process 20 — TMDB_KEYWORD *(stub)*
+### Process 11 — T2S_MOVIE_GENRE
+
+Copies movie↔genre relations into the T2S layer (filtered to movies that exist in `T_WC_T2S_MOVIE`).
+
+**Reads:** `T_WC_TMDB_MOVIE_GENRE`, `T_WC_T2S_MOVIE`
+**Writes:** `T_WC_T2S_MOVIE_GENRE`
+
+**Operations:**
+- Chunked copy by `ID_ROW` (1000 rows).
+- `INSERT … ON DUPLICATE KEY UPDATE` of link fields.
+- Range-limited stale delete: removes rows in the processed `ID_ROW` range no longer present in TMDB source (with the same movie existence filter).
+
+---
+
+### Process 12 — T2S_SERIE_GENRE
+
+Copies serie↔genre relations into the T2S layer (filtered to series that exist in `T_WC_T2S_SERIE`).
+
+**Reads:** `T_WC_TMDB_SERIE_GENRE`, `T_WC_T2S_SERIE`
+**Writes:** `T_WC_T2S_SERIE_GENRE`
+
+**Operations:** Same as Process 11 but for series.
+
+---
+
+### Process 13 — T2S_MOVIE_COMPANY
+
+Copies movie↔company relations into the T2S layer.
+
+**Reads:** `T_WC_TMDB_MOVIE_COMPANY`, `T_WC_T2S_MOVIE`, `T_WC_T2S_COMPANY`
+**Writes:** `T_WC_T2S_MOVIE_COMPANY`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates existence of both `ID_MOVIE` and `ID_COMPANY` in T2S.
+
+---
+
+### Process 14 — T2S_SERIE_COMPANY
+
+Copies serie↔company relations into the T2S layer.
+
+**Reads:** `T_WC_TMDB_SERIE_COMPANY`, `T_WC_T2S_SERIE`, `T_WC_T2S_COMPANY`
+**Writes:** `T_WC_T2S_SERIE_COMPANY`
+
+**Operations:** Same as Process 13 but for series.
+
+---
+
+### Process 15 — T2S_SERIE_NETWORK
+
+Copies serie↔network relations into the T2S layer.
+
+**Reads:** `T_WC_TMDB_SERIE_NETWORK`, `T_WC_T2S_SERIE`, `T_WC_T2S_NETWORK`
+**Writes:** `T_WC_T2S_SERIE_NETWORK`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates existence of both `ID_SERIE` and `ID_NETWORK` in T2S.
+
+---
+
+### Process 16 — T2S_MOVIE_PRODUCTION_COUNTRY
+
+Copies movie production countries into the T2S layer.
+
+**Reads:** `T_WC_TMDB_MOVIE_PRODUCTION_COUNTRY`, `T_WC_T2S_MOVIE`
+**Writes:** `T_WC_T2S_MOVIE_PRODUCTION_COUNTRY`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates `ID_MOVIE` exists in T2S.
+
+---
+
+### Process 17 — T2S_SERIE_PRODUCTION_COUNTRY
+
+Copies serie production countries into the T2S layer.
+
+**Reads:** `T_WC_TMDB_SERIE_PRODUCTION_COUNTRY`, `T_WC_T2S_SERIE`
+**Writes:** `T_WC_T2S_SERIE_PRODUCTION_COUNTRY`
+
+**Operations:** Same as Process 16 but for series.
+
+---
+
+### Process 18 — T2S_MOVIE_SPOKEN_LANGUAGE
+
+Copies movie spoken languages into the T2S layer.
+
+**Reads:** `T_WC_TMDB_MOVIE_SPOKEN_LANGUAGE`, `T_WC_T2S_MOVIE`
+**Writes:** `T_WC_T2S_MOVIE_SPOKEN_LANGUAGE`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates `ID_MOVIE` exists in T2S.
+
+---
+
+### Process 19 — T2S_SERIE_SPOKEN_LANGUAGE
+
+Copies serie spoken languages into the T2S layer.
+
+**Reads:** `T_WC_TMDB_SERIE_SPOKEN_LANGUAGE`, `T_WC_T2S_SERIE`
+**Writes:** `T_WC_T2S_SERIE_SPOKEN_LANGUAGE`
+
+**Operations:** Same as Process 18 but for series.
+
+---
+
+### Process 20 — T2S_COMPANY_IMAGE
+
+Copies company images into the T2S layer.
+
+**Reads:** `T_WC_TMDB_COMPANY_IMAGE`, `T_WC_T2S_COMPANY`
+**Writes:** `T_WC_T2S_COMPANY_IMAGE`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates `ID_COMPANY` exists in T2S.
+
+---
+
+### Process 21 — T2S_MOVIE_IMAGE
+
+Copies movie images into the T2S layer.
+
+**Reads:** `T_WC_TMDB_MOVIE_IMAGE`, `T_WC_T2S_MOVIE`
+**Writes:** `T_WC_T2S_MOVIE_IMAGE`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates `ID_MOVIE` exists in T2S.
+
+---
+
+### Process 22 — T2S_NETWORK_IMAGE
+
+Copies network images into the T2S layer.
+
+**Reads:** `T_WC_TMDB_NETWORK_IMAGE`, `T_WC_T2S_NETWORK`
+**Writes:** `T_WC_T2S_NETWORK_IMAGE`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates `ID_NETWORK` exists in T2S.
+
+---
+
+### Process 23 — T2S_PERSON_IMAGE
+
+Copies person images into the T2S layer.
+
+**Reads:** `T_WC_TMDB_PERSON_IMAGE`, `T_WC_T2S_PERSON`
+**Writes:** `T_WC_T2S_PERSON_IMAGE`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates `ID_PERSON` exists in T2S.
+
+---
+
+### Process 24 — T2S_SERIE_IMAGE
+
+Copies serie images into the T2S layer.
+
+**Reads:** `T_WC_TMDB_SERIE_IMAGE`, `T_WC_T2S_SERIE`
+**Writes:** `T_WC_T2S_SERIE_IMAGE`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates `ID_SERIE` exists in T2S.
+
+---
+
+### Process 25 — T2S_MOVIE_VIDEO
+
+Copies movie videos into the T2S layer.
+
+**Reads:** `T_WC_TMDB_MOVIE_VIDEO`, `T_WC_T2S_MOVIE`
+**Writes:** `T_WC_T2S_MOVIE_VIDEO`
+
+**Operations:** Chunked upsert + range-limited stale delete; validates `ID_MOVIE` exists in T2S.
+
+---
+
+### Process 26 — T2S_SERIE_VIDEO
+
+Copies serie videos into the T2S layer.
+
+**Reads:** `T_WC_TMDB_SERIE_VIDEO`, `T_WC_T2S_SERIE`
+**Writes:** `T_WC_T2S_SERIE_VIDEO`
+
+**Operations:** Same as Process 25 but for series.
+
+---
+
+### Process 60 — TMDB_KEYWORD *(stub)*
 
 Reserved for keyword processing. Not yet implemented.
 
@@ -389,6 +568,22 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 | T_WC_TMDB_NETWORK | T_WC_T2S_NETWORK |
 | T_WC_TMDB_PERSON_MOVIE | T_WC_T2S_PERSON_MOVIE |
 | T_WC_TMDB_PERSON_SERIE | T_WC_T2S_PERSON_SERIE |
+| T_WC_TMDB_MOVIE_GENRE | T_WC_T2S_MOVIE_GENRE |
+| T_WC_TMDB_SERIE_GENRE | T_WC_T2S_SERIE_GENRE |
+| T_WC_TMDB_MOVIE_COMPANY | T_WC_T2S_MOVIE_COMPANY |
+| T_WC_TMDB_SERIE_COMPANY | T_WC_T2S_SERIE_COMPANY |
+| T_WC_TMDB_SERIE_NETWORK | T_WC_T2S_SERIE_NETWORK |
+| T_WC_TMDB_MOVIE_PRODUCTION_COUNTRY | T_WC_T2S_MOVIE_PRODUCTION_COUNTRY |
+| T_WC_TMDB_SERIE_PRODUCTION_COUNTRY | T_WC_T2S_SERIE_PRODUCTION_COUNTRY |
+| T_WC_TMDB_MOVIE_SPOKEN_LANGUAGE | T_WC_T2S_MOVIE_SPOKEN_LANGUAGE |
+| T_WC_TMDB_SERIE_SPOKEN_LANGUAGE | T_WC_T2S_SERIE_SPOKEN_LANGUAGE |
+| T_WC_TMDB_COMPANY_IMAGE | T_WC_T2S_COMPANY_IMAGE |
+| T_WC_TMDB_MOVIE_IMAGE | T_WC_T2S_MOVIE_IMAGE |
+| T_WC_TMDB_NETWORK_IMAGE | T_WC_T2S_NETWORK_IMAGE |
+| T_WC_TMDB_PERSON_IMAGE | T_WC_T2S_PERSON_IMAGE |
+| T_WC_TMDB_SERIE_IMAGE | T_WC_T2S_SERIE_IMAGE |
+| T_WC_TMDB_MOVIE_VIDEO | T_WC_T2S_MOVIE_VIDEO |
+| T_WC_TMDB_SERIE_VIDEO | T_WC_T2S_SERIE_VIDEO |
 | T_WC_TMDB_LIST / T_WC_CUSTOM_LIST (TARGET_TABLE=1) | T_WC_T2S_LIST, T_WC_T2S_MOVIE_LIST, T_WC_T2S_SERIE_LIST |
 | T_WC_TMDB_COLLECTION / T_WC_CUSTOM_LIST (TARGET_TABLE=2) | T_WC_T2S_COLLECTION, T_WC_T2S_MOVIE_COLLECTION, T_WC_T2S_SERIE_COLLECTION |
 | T_WC_TMDB_KEYWORD / T_WC_TMDB_LIST / T_WC_TMDB_COLLECTION | T_WC_T2S_TOPIC |

@@ -14,8 +14,9 @@ import psutil
 import re
 import sys
 
-#python -m spacy download fr_core_news_lg
-nlp = spacy.load("fr_core_news_lg")
+if 0:
+    #python -m spacy download fr_core_news_lg
+    nlp = spacy.load("fr_core_news_lg")
 
 # Global settings for pre processing
 # Test settings 2024-11-29
@@ -551,12 +552,13 @@ def batch_update_data(connection, df, batch_size=1000):
 strdattoday = datetime.now(cp.paris_tz).strftime("%Y-%m-%d")
 
 try:
-    with cp.connectioncp:
-        with cp.connectioncp.cursor() as cursor:
-            cursor2 = cp.connectioncp.cursor()
-            cursor3 = cp.connectioncp.cursor()
-            cursor4 = cp.connectioncp.cursor()
-            cursor5 = cp.connectioncp.cursor()
+    conn = cp.f_getconnection()
+    with conn:
+        with conn.cursor() as cursor:
+            cursor2 = conn.cursor()
+            cursor3 = conn.cursor()
+            cursor4 = conn.cursor()
+            cursor5 = conn.cursor()
             start_time = time.time()
             strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
             cp.f_setservervariable("strtmdbmoviepreprocessstartdatetime",strnow,"Date and time of the last start of the TMDb database preprocess",0)
@@ -577,7 +579,7 @@ try:
             #arrprocessscope = {6: 'T2S_PERSON'}
             #arrprocessscope = {4: 'T2S_MOVIE'}
             #arrprocessscope = {5: 'T2S_SERIE'}
-            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 40: 'T2S_ITEM', 48: 'T2S_CHARACTER'}
+            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 40: 'T2S_ITEM'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
@@ -594,8 +596,8 @@ try:
             #arrprocessscope = {41: 'T2S_COLLECTION', 42: 'T2S_LIST'}
             #arrprocessscope = {3: 'T2S_TOPIC'}
             #arrprocessscope = {43: 'T2S_GROUP'}
-            #if strnow.startswith("2026-03-31"):
-            #    arrprocessscope = {48: 'T2S_CHARACTER'}
+            if strnow.startswith("2026-04-03"):
+                arrprocessscope = {11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO'}
             for intindex, strdesc in arrprocessscope.items():
                 strprocessesexecuted += str(intindex) + ", "
                 cp.f_setservervariable("strtmdbmoviepreprocessprocessesexecuted",strprocessesexecuted,strprocessesexecuteddesc,0)
@@ -894,9 +896,9 @@ ORDER BY COMPTE DESC """
                             arrkeywordcouples["NAME_WORD_COUNT"] = lngnamewordcount
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
 
-                    arrtopics = {1: 'en-list', 2: 'fr-list', 3: 'en-collection', 4: 'fr-collection', 5: 'en-keyword'}    
-                    #arrtopics = {5: 'en-keyword'}
-                    #arrtopics = {1: 'en-list', 2: 'fr-list'}
+                    #arrtopics = {1: 'en-list', 2: 'fr-list', 3: 'en-collection', 4: 'fr-collection', 5: 'en-keyword'}
+                    # Lists and collections are copied to the Topic table anymore!
+                    arrtopics = {5: 'en-keyword'}
                     for inttopic, strtopic in arrtopics.items():
                         strsql = ""
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strtopic,"Current sub process in the TMDb database movie preprocess",0)
@@ -1111,14 +1113,14 @@ ORDER BY COMPTE DESC """
                         strsqldelete = ""
                         strsqldelete += "DELETE FROM T_WC_T2S_TOPIC "
                         strsqldelete += "WHERE TOPIC_SOURCE = 'list' "
-                        strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_LIST FROM T_WC_TMDB_LIST WHERE USE_FOR_TAGGING > 0) "
+                        #strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_LIST FROM T_WC_TMDB_LIST WHERE USE_FOR_TAGGING > 0) "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
 
                         strsqldelete = ""
                         strsqldelete += "DELETE FROM T_WC_T2S_TOPIC "
                         strsqldelete += "WHERE TOPIC_SOURCE = 'collection' "
-                        strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_COLLECTION FROM T_WC_TMDB_COLLECTION) "
+                        #strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_COLLECTION FROM T_WC_TMDB_COLLECTION) "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
 
@@ -3668,7 +3670,870 @@ ORDER BY COMPTE DESC """
                             cursor2.execute(strsqlpersonmoviesdelete)
                             cp.connectioncp.commit()
 
+                elif intindex == 11:
+                    #----------------------------------------------------
+                    print("T2S_MOVIE_GENRE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_MOVIE_GENRE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentmoviegenreid",str(lngrangestart),"Current movie-genre ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_MOVIE_GENRE (
+    ID_ROW, ID_MOVIE, ID_GENRE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_MOVIE, ID_GENRE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_MOVIE_GENRE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+ON DUPLICATE KEY UPDATE
+    ID_MOVIE = VALUES(ID_MOVIE),
+    ID_GENRE = VALUES(ID_GENRE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_MOVIE_GENRE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_MOVIE_GENRE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 12:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_GENRE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_SERIE_GENRE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentseriegenreid",str(lngrangestart),"Current serie-genre ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_SERIE_GENRE (
+    ID_ROW, ID_SERIE, ID_GENRE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_SERIE, ID_GENRE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_SERIE_GENRE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+ON DUPLICATE KEY UPDATE
+    ID_SERIE = VALUES(ID_SERIE),
+    ID_GENRE = VALUES(ID_GENRE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_SERIE_GENRE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_SERIE_GENRE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 13:
+                    #----------------------------------------------------
+                    print("T2S_MOVIE_COMPANY processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_MOVIE_COMPANY")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentmoviecompanyid",str(lngrangestart),"Current movie-company ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_MOVIE_COMPANY (
+    ID_ROW, ID_MOVIE, ID_COMPANY,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_MOVIE, ID_COMPANY,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_MOVIE_COMPANY
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+  AND ID_COMPANY IN (SELECT ID_COMPANY FROM T_WC_T2S_COMPANY)
+ON DUPLICATE KEY UPDATE
+    ID_MOVIE = VALUES(ID_MOVIE),
+    ID_COMPANY = VALUES(ID_COMPANY),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_MOVIE_COMPANY
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_MOVIE_COMPANY
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+      AND ID_COMPANY IN (SELECT ID_COMPANY FROM T_WC_T2S_COMPANY)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 14:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_COMPANY processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_SERIE_COMPANY")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentseriecompanyid",str(lngrangestart),"Current serie-company ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_SERIE_COMPANY (
+    ID_ROW, ID_SERIE, ID_COMPANY,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_SERIE, ID_COMPANY,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_SERIE_COMPANY
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+  AND ID_COMPANY IN (SELECT ID_COMPANY FROM T_WC_T2S_COMPANY)
+ON DUPLICATE KEY UPDATE
+    ID_SERIE = VALUES(ID_SERIE),
+    ID_COMPANY = VALUES(ID_COMPANY),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_SERIE_COMPANY
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_SERIE_COMPANY
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+      AND ID_COMPANY IN (SELECT ID_COMPANY FROM T_WC_T2S_COMPANY)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 15:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_NETWORK processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_SERIE_NETWORK")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentserienetworkid",str(lngrangestart),"Current serie-network ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_SERIE_NETWORK (
+    ID_ROW, ID_SERIE, ID_NETWORK,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_SERIE, ID_NETWORK,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_SERIE_NETWORK
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+  AND ID_NETWORK IN (SELECT ID_NETWORK FROM T_WC_T2S_NETWORK)
+ON DUPLICATE KEY UPDATE
+    ID_SERIE = VALUES(ID_SERIE),
+    ID_NETWORK = VALUES(ID_NETWORK),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_SERIE_NETWORK
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_SERIE_NETWORK
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+      AND ID_NETWORK IN (SELECT ID_NETWORK FROM T_WC_T2S_NETWORK)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 16:
+                    #----------------------------------------------------
+                    print("T2S_MOVIE_PRODUCTION_COUNTRY processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_MOVIE_PRODUCTION_COUNTRY")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentmoviecountryid",str(lngrangestart),"Current movie production country ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_MOVIE_PRODUCTION_COUNTRY (
+    ID_ROW, ID_MOVIE, COUNTRY_CODE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_MOVIE, COUNTRY_CODE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_MOVIE_PRODUCTION_COUNTRY
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+ON DUPLICATE KEY UPDATE
+    ID_MOVIE = VALUES(ID_MOVIE),
+    COUNTRY_CODE = VALUES(COUNTRY_CODE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_MOVIE_PRODUCTION_COUNTRY
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_MOVIE_PRODUCTION_COUNTRY
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 17:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_PRODUCTION_COUNTRY processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_SERIE_PRODUCTION_COUNTRY")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentseriedcountryid",str(lngrangestart),"Current serie production country ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_SERIE_PRODUCTION_COUNTRY (
+    ID_ROW, ID_SERIE, COUNTRY_CODE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_SERIE, COUNTRY_CODE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_SERIE_PRODUCTION_COUNTRY
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+ON DUPLICATE KEY UPDATE
+    ID_SERIE = VALUES(ID_SERIE),
+    COUNTRY_CODE = VALUES(COUNTRY_CODE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_SERIE_PRODUCTION_COUNTRY
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_SERIE_PRODUCTION_COUNTRY
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 18:
+                    #----------------------------------------------------
+                    print("T2S_MOVIE_SPOKEN_LANGUAGE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_MOVIE_SPOKEN_LANGUAGE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentmoviespokenlangid",str(lngrangestart),"Current movie spoken language ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_MOVIE_SPOKEN_LANGUAGE (
+    ID_ROW, ID_MOVIE, SPOKEN_LANGUAGE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_MOVIE, SPOKEN_LANGUAGE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_MOVIE_SPOKEN_LANGUAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+ON DUPLICATE KEY UPDATE
+    ID_MOVIE = VALUES(ID_MOVIE),
+    SPOKEN_LANGUAGE = VALUES(SPOKEN_LANGUAGE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_MOVIE_SPOKEN_LANGUAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_MOVIE_SPOKEN_LANGUAGE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 19:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_SPOKEN_LANGUAGE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_SERIE_SPOKEN_LANGUAGE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentseriespokenlangid",str(lngrangestart),"Current serie spoken language ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_SERIE_SPOKEN_LANGUAGE (
+    ID_ROW, ID_SERIE, SPOKEN_LANGUAGE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_ROW, ID_SERIE, SPOKEN_LANGUAGE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM T_WC_TMDB_SERIE_SPOKEN_LANGUAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+ON DUPLICATE KEY UPDATE
+    ID_SERIE = VALUES(ID_SERIE),
+    SPOKEN_LANGUAGE = VALUES(SPOKEN_LANGUAGE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_SERIE_SPOKEN_LANGUAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_SERIE_SPOKEN_LANGUAGE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
                 elif intindex == 20:
+                    #----------------------------------------------------
+                    print("T2S_COMPANY_IMAGE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_COMPANY_IMAGE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentcompanyimageid",str(lngrangestart),"Current company image ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_COMPANY_IMAGE (
+    ID_ROW, ID_COMPANY,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+)
+SELECT
+    ID_ROW, ID_COMPANY,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+FROM T_WC_TMDB_COMPANY_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_COMPANY IN (SELECT ID_COMPANY FROM T_WC_T2S_COMPANY)
+ON DUPLICATE KEY UPDATE
+    ID_COMPANY = VALUES(ID_COMPANY),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED),
+    TYPE_IMAGE = VALUES(TYPE_IMAGE),
+    LANG = VALUES(LANG),
+    IMAGE_PATH = VALUES(IMAGE_PATH),
+    ASPECT_RATIO = VALUES(ASPECT_RATIO),
+    WIDTH = VALUES(WIDTH),
+    HEIGHT = VALUES(HEIGHT),
+    VOTE_AVERAGE = VALUES(VOTE_AVERAGE),
+    VOTE_COUNT = VALUES(VOTE_COUNT) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_COMPANY_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_COMPANY_IMAGE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_COMPANY IN (SELECT ID_COMPANY FROM T_WC_T2S_COMPANY)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 21:
+                    #----------------------------------------------------
+                    print("T2S_MOVIE_IMAGE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_MOVIE_IMAGE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentmovieimageid",str(lngrangestart),"Current movie image ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_MOVIE_IMAGE (
+    ID_ROW, ID_MOVIE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+)
+SELECT
+    ID_ROW, ID_MOVIE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+FROM T_WC_TMDB_MOVIE_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+ON DUPLICATE KEY UPDATE
+    ID_MOVIE = VALUES(ID_MOVIE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED),
+    TYPE_IMAGE = VALUES(TYPE_IMAGE),
+    LANG = VALUES(LANG),
+    IMAGE_PATH = VALUES(IMAGE_PATH),
+    ASPECT_RATIO = VALUES(ASPECT_RATIO),
+    WIDTH = VALUES(WIDTH),
+    HEIGHT = VALUES(HEIGHT),
+    VOTE_AVERAGE = VALUES(VOTE_AVERAGE),
+    VOTE_COUNT = VALUES(VOTE_COUNT) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_MOVIE_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_MOVIE_IMAGE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 22:
+                    #----------------------------------------------------
+                    print("T2S_NETWORK_IMAGE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_NETWORK_IMAGE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentnetworkimageid",str(lngrangestart),"Current network image ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_NETWORK_IMAGE (
+    ID_ROW, ID_NETWORK,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+)
+SELECT
+    ID_ROW, ID_NETWORK,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+FROM T_WC_TMDB_NETWORK_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_NETWORK IN (SELECT ID_NETWORK FROM T_WC_T2S_NETWORK)
+ON DUPLICATE KEY UPDATE
+    ID_NETWORK = VALUES(ID_NETWORK),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED),
+    TYPE_IMAGE = VALUES(TYPE_IMAGE),
+    LANG = VALUES(LANG),
+    IMAGE_PATH = VALUES(IMAGE_PATH),
+    ASPECT_RATIO = VALUES(ASPECT_RATIO),
+    WIDTH = VALUES(WIDTH),
+    HEIGHT = VALUES(HEIGHT),
+    VOTE_AVERAGE = VALUES(VOTE_AVERAGE),
+    VOTE_COUNT = VALUES(VOTE_COUNT) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_NETWORK_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_NETWORK_IMAGE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_NETWORK IN (SELECT ID_NETWORK FROM T_WC_T2S_NETWORK)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 23:
+                    #----------------------------------------------------
+                    print("T2S_PERSON_IMAGE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_PERSON_IMAGE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentpersonimageid",str(lngrangestart),"Current person image ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_PERSON_IMAGE (
+    ID_ROW, ID_PERSON,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+)
+SELECT
+    ID_ROW, ID_PERSON,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+FROM T_WC_TMDB_PERSON_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_PERSON IN (SELECT ID_PERSON FROM T_WC_T2S_PERSON)
+ON DUPLICATE KEY UPDATE
+    ID_PERSON = VALUES(ID_PERSON),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED),
+    TYPE_IMAGE = VALUES(TYPE_IMAGE),
+    LANG = VALUES(LANG),
+    IMAGE_PATH = VALUES(IMAGE_PATH),
+    ASPECT_RATIO = VALUES(ASPECT_RATIO),
+    WIDTH = VALUES(WIDTH),
+    HEIGHT = VALUES(HEIGHT),
+    VOTE_AVERAGE = VALUES(VOTE_AVERAGE),
+    VOTE_COUNT = VALUES(VOTE_COUNT) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_PERSON_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_PERSON_IMAGE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_PERSON IN (SELECT ID_PERSON FROM T_WC_T2S_PERSON)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 24:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_IMAGE processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_SERIE_IMAGE")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentserieimageid",str(lngrangestart),"Current serie image ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_SERIE_IMAGE (
+    ID_ROW, ID_SERIE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+)
+SELECT
+    ID_ROW, ID_SERIE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    TYPE_IMAGE, LANG, IMAGE_PATH, ASPECT_RATIO, WIDTH, HEIGHT, VOTE_AVERAGE, VOTE_COUNT
+FROM T_WC_TMDB_SERIE_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+ON DUPLICATE KEY UPDATE
+    ID_SERIE = VALUES(ID_SERIE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED),
+    TYPE_IMAGE = VALUES(TYPE_IMAGE),
+    LANG = VALUES(LANG),
+    IMAGE_PATH = VALUES(IMAGE_PATH),
+    ASPECT_RATIO = VALUES(ASPECT_RATIO),
+    WIDTH = VALUES(WIDTH),
+    HEIGHT = VALUES(HEIGHT),
+    VOTE_AVERAGE = VALUES(VOTE_AVERAGE),
+    VOTE_COUNT = VALUES(VOTE_COUNT) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_SERIE_IMAGE
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_SERIE_IMAGE
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 25:
+                    #----------------------------------------------------
+                    print("T2S_MOVIE_VIDEO processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_MOVIE_VIDEO")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentmovievideoid",str(lngrangestart),"Current movie video ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_MOVIE_VIDEO (
+    ID_ROW, ID_MOVIE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    LANG, COUNTRY_CODE, VIDEO_KEY, VIDEO_NAME, VIDEO_SITE, VIDEO_TYPE,
+    QUALITY, QUALITY_TEXT, DAT_PUBLISHED, ID_CREDIT, OFFICIAL
+)
+SELECT
+    ID_ROW, ID_MOVIE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    LANG, COUNTRY_CODE, VIDEO_KEY, VIDEO_NAME, VIDEO_SITE, VIDEO_TYPE,
+    QUALITY, QUALITY_TEXT, DAT_PUBLISHED, ID_CREDIT, OFFICIAL
+FROM T_WC_TMDB_MOVIE_VIDEO
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+ON DUPLICATE KEY UPDATE
+    ID_MOVIE = VALUES(ID_MOVIE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED),
+    LANG = VALUES(LANG),
+    COUNTRY_CODE = VALUES(COUNTRY_CODE),
+    VIDEO_KEY = VALUES(VIDEO_KEY),
+    VIDEO_NAME = VALUES(VIDEO_NAME),
+    VIDEO_SITE = VALUES(VIDEO_SITE),
+    VIDEO_TYPE = VALUES(VIDEO_TYPE),
+    QUALITY = VALUES(QUALITY),
+    QUALITY_TEXT = VALUES(QUALITY_TEXT),
+    DAT_PUBLISHED = VALUES(DAT_PUBLISHED),
+    ID_CREDIT = VALUES(ID_CREDIT),
+    OFFICIAL = VALUES(OFFICIAL) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_MOVIE_VIDEO
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_MOVIE_VIDEO
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_MOVIE IN (SELECT ID_MOVIE FROM T_WC_T2S_MOVIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 26:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_VIDEO processing")
+                    if 1:
+                        cursor.execute("SELECT MAX(ID_ROW) as max_id FROM T_WC_TMDB_SERIE_VIDEO")
+                        result = cursor.fetchone()
+                        lngrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Maximum ID_ROW in database: {lngrangemax}")
+                        lngchunksize = 1000
+                        for lngrangestart in range(1, lngrangemax + 1, lngchunksize):
+                            lngrangeend = min(lngrangestart + lngchunksize - 1, lngrangemax)
+                            print(f"Processing rows from ID {lngrangestart} to {lngrangeend}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentserievideoid",str(lngrangestart),"Current serie video ID in the TMDb database preprocess",0)
+                            strsql = f"""
+INSERT INTO T_WC_T2S_SERIE_VIDEO (
+    ID_ROW, ID_SERIE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    LANG, COUNTRY_CODE, VIDEO_KEY, VIDEO_NAME, VIDEO_SITE, VIDEO_TYPE,
+    QUALITY, QUALITY_TEXT, DAT_PUBLISHED, ID_CREDIT, OFFICIAL
+)
+SELECT
+    ID_ROW, ID_SERIE,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED,
+    LANG, COUNTRY_CODE, VIDEO_KEY, VIDEO_NAME, VIDEO_SITE, VIDEO_TYPE,
+    QUALITY, QUALITY_TEXT, DAT_PUBLISHED, ID_CREDIT, OFFICIAL
+FROM T_WC_TMDB_SERIE_VIDEO
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+ON DUPLICATE KEY UPDATE
+    ID_SERIE = VALUES(ID_SERIE),
+    DELETED = VALUES(DELETED),
+    DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+    ID_CREATOR = VALUES(ID_CREATOR),
+    DAT_CREAT = VALUES(DAT_CREAT),
+    ID_OWNER = VALUES(ID_OWNER),
+    TIM_UPDATED = VALUES(TIM_UPDATED),
+    ID_USER_UPDATED = VALUES(ID_USER_UPDATED),
+    LANG = VALUES(LANG),
+    COUNTRY_CODE = VALUES(COUNTRY_CODE),
+    VIDEO_KEY = VALUES(VIDEO_KEY),
+    VIDEO_NAME = VALUES(VIDEO_NAME),
+    VIDEO_SITE = VALUES(VIDEO_SITE),
+    VIDEO_TYPE = VALUES(VIDEO_TYPE),
+    QUALITY = VALUES(QUALITY),
+    QUALITY_TEXT = VALUES(QUALITY_TEXT),
+    DAT_PUBLISHED = VALUES(DAT_PUBLISHED),
+    ID_CREDIT = VALUES(ID_CREDIT),
+    OFFICIAL = VALUES(OFFICIAL) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+                            strsql = f"""
+DELETE FROM T_WC_T2S_SERIE_VIDEO
+WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+  AND ID_ROW NOT IN (
+    SELECT ID_ROW FROM T_WC_TMDB_SERIE_VIDEO
+    WHERE ID_ROW >= {lngrangestart} AND ID_ROW <= {lngrangeend}
+      AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
+  ) """
+                            cursor2.execute(strsql)
+                            cp.connectioncp.commit()
+
+                elif intindex == 60:
                     #----------------------------------------------------
                     print("TMDB_KEYWORD processing")
 
@@ -3756,25 +4621,36 @@ WHERE t2s.ID_ROW >= {lngitemrangestart}
                             0,
                         )
 
-                        strsql = """INSERT INTO T_WC_T2S_CHARACTER (CAST_CHARACTER)
-SELECT src.CAST_CHARACTER
+                        strsql = """INSERT INTO T_WC_T2S_CHARACTER (CAST_CHARACTER, CAST_CHARACTER_KEY)
+SELECT src.CAST_CHARACTER,
+       src.CAST_CHARACTER_KEY
 FROM (
-    SELECT DISTINCT CAST_CHARACTER
-    FROM T_WC_T2S_PERSON_MOVIE
-    WHERE CREDIT_TYPE = 'cast'
-      AND (DELETED = 0 OR DELETED IS NULL)
-      AND CAST_CHARACTER IS NOT NULL
-      AND CAST_CHARACTER <> ''
-    UNION
-    SELECT DISTINCT CAST_CHARACTER
-    FROM T_WC_T2S_PERSON_SERIE
-    WHERE CREDIT_TYPE = 'cast'
-      AND (DELETED = 0 OR DELETED IS NULL)
-      AND CAST_CHARACTER IS NOT NULL
-      AND CAST_CHARACTER <> ''
+    SELECT
+        MIN(t.CAST_CHARACTER) AS CAST_CHARACTER,
+        t.CAST_CHARACTER_KEY
+    FROM (
+        SELECT
+            CAST_CHARACTER,
+            replace(trim(regexp_replace(lcase(regexp_replace(CAST_CHARACTER,'[^[:alnum:] ]',' ')),' +',' ')),' ','') AS CAST_CHARACTER_KEY
+        FROM T_WC_T2S_PERSON_MOVIE
+        WHERE CREDIT_TYPE = 'cast'
+          AND (DELETED = 0 OR DELETED IS NULL)
+          AND CAST_CHARACTER IS NOT NULL
+          AND CAST_CHARACTER <> ''
+        UNION ALL
+        SELECT
+            CAST_CHARACTER,
+            replace(trim(regexp_replace(lcase(regexp_replace(CAST_CHARACTER,'[^[:alnum:] ]',' ')),' +',' ')),' ','') AS CAST_CHARACTER_KEY
+        FROM T_WC_T2S_PERSON_SERIE
+        WHERE CREDIT_TYPE = 'cast'
+          AND (DELETED = 0 OR DELETED IS NULL)
+          AND CAST_CHARACTER IS NOT NULL
+          AND CAST_CHARACTER <> ''
+    ) t
+    GROUP BY t.CAST_CHARACTER_KEY
 ) src
 LEFT JOIN T_WC_T2S_CHARACTER c
-  ON c.CAST_CHARACTER_KEY = replace(trim(regexp_replace(lcase(regexp_replace(src.CAST_CHARACTER,'[^[:alnum:] ]',' ')),' +',' ')),' ','')
+  ON c.CAST_CHARACTER_KEY = src.CAST_CHARACTER_KEY
 WHERE c.ID_CHARACTER IS NULL
 """
                         print(strsql)
@@ -5449,5 +6325,7 @@ WHERE src.CAST_CHARACTER_KEY IS NULL
     print("Process completed")
 except pymysql.MySQLError as e:
     print(f"❌ MySQL Error: {e}")
-    cp.connectioncp.rollback()
+    conn = getattr(cp, "connectioncp", None)
+    if conn is not None and getattr(conn, "open", False):
+        conn.rollback()
 
