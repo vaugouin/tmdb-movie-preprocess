@@ -414,19 +414,30 @@ Copies Wikidata item records (English + French labels) into the T2S layer.
 
 Populates `T_WC_T2S_COLLECTION` from TMDb lists and collections, with linked movies and series.
 
-**Reads:** `T_WC_TMDB_LIST`, `T_WC_TMDB_LIST_LANG`, `T_WC_TMDB_COLLECTION`, `T_WC_TMDB_COLLECTION_LANG`, `T_WC_CUSTOM_LIST` (TARGET_TABLE = 2), `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`
+**Reads:** `T_WC_TMDB_LIST`, `T_WC_TMDB_LIST_LANG`, `T_WC_TMDB_COLLECTION`, `T_WC_TMDB_COLLECTION_LANG`, `T_WC_CUSTOM_LIST` (TARGET_TABLE = 2), `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`
 **Writes:** `T_WC_T2S_COLLECTION`, `T_WC_T2S_MOVIE_COLLECTION`, `T_WC_T2S_SERIE_COLLECTION`
 
 **Subprocesses:** `en-list`, `fr-list`, `en-collection`, `fr-collection`, `custom-collection`
 
 **Operations:**
 - For each list/collection record, queries associated movies and series filtered by `ADULT = 0` and `ID_WIKIDATA IS NOT NULL`.
+- **en-list / fr-list:** Movie links in `T_WC_T2S_MOVIE_COLLECTION` are written in `DAT_RELEASE ASC` order; series links in `T_WC_T2S_SERIE_COLLECTION` are written in `DAT_FIRST_AIR DESC` order.
+- **en-collection / fr-collection:** Movie links in `T_WC_T2S_MOVIE_COLLECTION` are written in `DAT_RELEASE ASC` order.
 - **custom-collection:** Processes records from `T_WC_CUSTOM_LIST` where `TARGET_TABLE = 2`. Elements are resolved using up to three cumulative mechanisms:
   - **Mechanism 1 (IMDb list):** Parses `tt\d+` IDs from the `ID_IMDB_LIST` field; preserves input order via SQL `FIELD()`.
   - **Mechanism 2 (Wikidata):** Extracts a `P\d+` property and `Q\d+` item from `WIKIDATA_PROPERTIES`; joins against `T_WC_WIKIDATA_ITEM_PROPERTY`.
   - **Mechanism 3 (TMDb keyword):** Parses `T_WC_TMDB_KEYWORD.NAME = '...'` from `TMDB_ELEMENTS`; joins against `T_WC_TMDB_MOVIE_KEYWORD` / `T_WC_TMDB_SERIE_KEYWORD`.
-- Inserts/updates the collection record, then upserts linked movie and serie entries with display order.
+- **custom-collection ordering:** `SORT_BY` controls display order for both movies and series:
+  - `1` = original IMDb list order ascending
+  - `2` = original IMDb list order descending
+  - `3` = `IMDB_RATING_WEIGHTED` ascending
+  - `4` = `IMDB_RATING_WEIGHTED` descending
+  - `5` = release date ascending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
+  - `6` = release date descending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
+- **custom-collection rating source:** `IMDB_RATING_WEIGHTED` is read from `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` for score-based ordering, while release dates and IMDb IDs still come from `T_WC_TMDB_MOVIE` / `T_WC_TMDB_SERIE`.
+- Inserts/updates the collection record, then upserts linked movie and serie entries with sequential display order based on the SQL result order.
 - Skips records with fewer than 2 total elements; deletes any existing record for those.
+- Post-processing: updates `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `IMDB_RATING_ADJUSTED` on `T_WC_T2S_COLLECTION` from linked movies.
 - Full stale delete: removes `T_WC_T2S_COLLECTION` rows whose source record is no longer present in the corresponding TMDb source table or `T_WC_CUSTOM_LIST`.
 
 ---
@@ -435,7 +446,7 @@ Populates `T_WC_T2S_COLLECTION` from TMDb lists and collections, with linked mov
 
 Populates `T_WC_T2S_LIST` from TMDb lists and custom lists, with linked movies and series.
 
-**Reads:** `T_WC_TMDB_LIST`, `T_WC_TMDB_LIST_LANG`, `T_WC_CUSTOM_LIST` (TARGET_TABLE = 1), `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`
+**Reads:** `T_WC_TMDB_LIST`, `T_WC_TMDB_LIST_LANG`, `T_WC_CUSTOM_LIST` (TARGET_TABLE = 1), `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`
 **Writes:** `T_WC_T2S_LIST`, `T_WC_T2S_MOVIE_LIST`, `T_WC_T2S_SERIE_LIST`
 
 **Subprocesses:** `en-list`, `fr-list`, `custom-list`, `list-delete`
@@ -446,17 +457,24 @@ Populates `T_WC_T2S_LIST` from TMDb lists and custom lists, with linked movies a
   - **Mechanism 1 (IMDb list):** Parses `tt\d+` IDs from the `ID_IMDB_LIST` field; preserves input order via SQL `FIELD()`.
   - **Mechanism 2 (Wikidata):** Extracts a `P\d+` property and `Q\d+` item from `WIKIDATA_PROPERTIES`; joins against `T_WC_WIKIDATA_ITEM_PROPERTY`.
   - **Mechanism 3 (TMDb keyword):** Parses `T_WC_TMDB_KEYWORD.NAME = '...'` from `TMDB_ELEMENTS`; joins against `T_WC_TMDB_MOVIE_KEYWORD` / `T_WC_TMDB_SERIE_KEYWORD`.
-
-  When multiple mechanisms match, results are combined with `UNION ALL` and deduplicated (`MAX(DISPLAY_ORDER) GROUP BY`).
+- **custom-list ordering:** `SORT_BY` controls display order for both movies and series:
+  - `1` = original IMDb list order ascending
+  - `2` = original IMDb list order descending
+  - `3` = `IMDB_RATING_WEIGHTED` ascending
+  - `4` = `IMDB_RATING_WEIGHTED` descending
+  - `5` = release date ascending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
+  - `6` = release date descending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
+- When multiple mechanisms match, results are combined with `UNION ALL`, deduplicated by element ID, and ordered according to `SORT_BY`.
+- **custom-list rating source:** `IMDB_RATING_WEIGHTED` is read from `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` for score-based ordering, while release dates and IMDb IDs still come from `T_WC_TMDB_MOVIE` / `T_WC_TMDB_SERIE`.
 - **list-delete:** Removes list records that no longer have a corresponding source entry.
 - All mechanisms apply filter: `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`.
-- Post-processing: updates `IMDB_RATING` / `IMDB_RATING_ADJUSTED` on `T_WC_T2S_LIST` from linked movies.
+- Post-processing: updates `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `IMDB_RATING_ADJUSTED` on `T_WC_T2S_LIST` from linked movies.
 
 ---
 
 ### Process 43 — T2S_GROUP
 
-Builds person groups from Wikidata membership and employment relationships, and from custom group definitions.
+Builds person groups from Wikidata membership, employment, and sports-team relationships, and from custom group definitions.
 
 **Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3), `T_WC_TMDB_PERSON`, `T_WC_T2S_PERSON`
 **Writes:** `T_WC_T2S_GROUP`, `T_WC_T2S_PERSON_GROUP`
@@ -464,6 +482,7 @@ Builds person groups from Wikidata membership and employment relationships, and 
 **Subprocesses / Wikidata properties:**
 - `en-group` → P463 (member of)
 - `en-employer` → P108 (employer)
+- `en-sports-team` → P54 (member of sports team)
 - `custom-group` → `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3)
 
 **Operations:**
@@ -471,6 +490,13 @@ Builds person groups from Wikidata membership and employment relationships, and 
 - Inserts/updates `T_WC_T2S_GROUP`.
 - Queries persons linked to the item via Wikidata (ordered by popularity) and upserts into `T_WC_T2S_GROUP_PERSON`.
 - **custom-group:** Builds groups from `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3) and resolves member persons using up to three cumulative mechanisms (IMDb list `nm\d+`, Wikidata property/item, or a TMDb person name expression).
+- **custom-group ordering:** `SORT_BY` controls display order for persons:
+  - `1` = original IMDb list order ascending
+  - `2` = original IMDb list order descending
+  - `3` = `IMDB_RATING`/`POPULARITY` ascending
+  - `4` = `IMDB_RATING`/`POPULARITY` descending
+  - `5` = `DAT_RELEASE`/`BIRTHDAY` ascending
+  - `6` = `DAT_RELEASE`/`BIRTHDAY` descending
 - Full stale delete: removes custom groups whose source record no longer exists in `T_WC_CUSTOM_LIST`.
 
 ---
@@ -486,8 +512,8 @@ Builds award records from the Wikidata "award received" property (P166).
 - Selects all distinct Wikidata items used as values of property P166.
 - For each award item, retrieves English/French label, description, and image.
 - Inserts/updates `T_WC_T2S_AWARD`.
-- Links movies, series, and persons that received the award (via Wikidata property join) into the respective junction tables with incremental display order.
-- Post-processing: updates average `IMDB_RATING` / `IMDB_RATING_ADJUSTED` and `POPULARITY` on `T_WC_T2S_AWARD` from linked entities.
+- Links movies and series that received the award in `IMDB_RATING_WEIGHTED DESC` order, and links persons in their existing person ordering, into the respective junction tables with incremental display order.
+- Post-processing: updates average `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, `IMDB_RATING_ADJUSTED`, and `POPULARITY` on `T_WC_T2S_AWARD` from linked entities.
 
 ---
 
@@ -495,16 +521,24 @@ Builds award records from the Wikidata "award received" property (P166).
 
 Populates `T_WC_T2S_MOVEMENT` from custom lists that define cinematic movements.
 
-**Reads:** `T_WC_CUSTOM_LIST` (TARGET_TABLE = 4), `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`
+**Reads:** `T_WC_CUSTOM_LIST` (TARGET_TABLE = 4), `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`
 **Writes:** `T_WC_T2S_MOVEMENT`, `T_WC_T2S_MOVIE_MOVEMENT`, `T_WC_T2S_SERIE_MOVEMENT`
 
 **Subprocesses:** `custom-movement`, `movement-delete`
 
 **Operations:**
 - **custom-movement:** For each active custom list (TARGET_TABLE = 4, DELETED = 0), resolves member movies and series using the same three cumulative mechanisms as Process 42 (IMDb list, Wikidata property/item, TMDb keyword).
+- **custom-movement ordering:** `SORT_BY` controls display order for both movies and series:
+  - `1` = original IMDb list order ascending
+  - `2` = original IMDb list order descending
+  - `3` = `IMDB_RATING_WEIGHTED` ascending
+  - `4` = `IMDB_RATING_WEIGHTED` descending
+  - `5` = release date ascending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
+  - `6` = release date descending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
+- **custom-movement rating source:** `IMDB_RATING_WEIGHTED` is read from `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` for score-based ordering, while release dates and IMDb IDs still come from `T_WC_TMDB_MOVIE` / `T_WC_TMDB_SERIE`.
 - Skips records with fewer than 2 total elements; deletes any existing record for those.
 - **movement-delete:** Removes movement records whose source custom list no longer exists or has been deleted.
-- Post-processing: updates `IMDB_RATING` / `IMDB_RATING_ADJUSTED` on `T_WC_T2S_MOVEMENT` from linked movies; cascades orphan cleanup to `T_WC_T2S_MOVIE_MOVEMENT` and `T_WC_T2S_SERIE_MOVEMENT`.
+- Post-processing: updates `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `IMDB_RATING_ADJUSTED` on `T_WC_T2S_MOVEMENT` from linked movies; cascades orphan cleanup to `T_WC_T2S_MOVIE_MOVEMENT` and `T_WC_T2S_SERIE_MOVEMENT`.
 - All mechanisms apply filter: `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`.
 
 ---

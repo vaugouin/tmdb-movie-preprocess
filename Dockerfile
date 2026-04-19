@@ -4,6 +4,6 @@ WORKDIR /app
 COPY requirements.txt /app/
 # RUN pip uninstall spacy
 RUN pip install --upgrade pip && pip install -r requirements.txt
-RUN python -m spacy download fr_core_news_lg
+# RUN python -m spacy download fr_core_news_lg
 COPY . /app/
 CMD ["python", "./tmdb-movie-preprocess.py"]
