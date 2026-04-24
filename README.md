@@ -14,9 +14,13 @@ for intindex, strdesc in arrprocessscope.items():
     ...
 ```
 
-The default scope runs processes: **1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 40, 41, 42, 43, 44, 45, 46, 47**.
+The current default scope runs processes: **1, 2, 60, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 40**.
 
 Progress is tracked server-side via `cp.f_setservervariable()`. Multiple cursor objects (`cursor`, `cursor2` … `cursor5`) allow parallel DB operations within a single process.
+
+Recent performance-sensitive T2S rebuilds now use a **staging-table rebuild + atomic rename swap** pattern instead of chunked upsert/delete synchronization. In those branches, the script builds a full `*_BUILD` table, validates it where needed, atomically swaps it into place with `RENAME TABLE`, and then drops the previous `*_OLD` table automatically after a successful swap.
+
+Wikimedia API calls used by process `60` support the following environment variables: `WIKIMEDIA_USER_AGENT`, `WIKIMEDIA_REQUEST_DELAY_SECONDS`, `WIKIMEDIA_BACKOFF_SECONDS`, `WIKIMEDIA_MAX_RETRIES`, and `WIKIMEDIA_TIMEOUT_SECONDS`.
 
 ---
 
@@ -98,7 +102,7 @@ Copies filtered series records from `T_WC_TMDB_SERIE` into the T2S layer.
 **Operations:**
 - Processes in chunks of 1000 records by `ID_SERIE` range.
 - `INSERT … ON DUPLICATE KEY UPDATE` for ~30 fields.
-- Additional UPDATE step: enriches `IMDB_RATING` / `IMDB_RATING_ADJUSTED` from `T_WC_IMDB_MOVIE_RATING_IMPORT` via `ID_IMDB` join.
+- Additional UPDATE step: enriches `IMDB_RATING` from `T_WC_IMDB_MOVIE_RATING_IMPORT` via `ID_IMDB` join.
 - Deletes records within processed range that no longer exist in source.
 
 ---
@@ -148,7 +152,7 @@ Builds the character dimension from acting credits in `T_WC_T2S_PERSON_MOVIE` an
 - Rebuilds character junction tables from person-movie and person-serie acting credits.
 - Updates per-character KPIs:
   - `MOVIE_COUNT`, `SERIE_COUNT`, `PERSON_COUNT`
-  - `IMDB_RATING`, `IMDB_RATING_ADJUSTED` (averaged across linked movies and series)
+  - `IMDB_RATING` (averaged across linked movies and series)
   - `POPULARITY` (averaged across linked persons)
 - Full stale delete: removes characters no longer present in either source credit table.
 
@@ -200,9 +204,10 @@ Copies movie↔genre relations into the T2S layer (filtered to movies that exist
 **Writes:** `T_WC_T2S_MOVIE_GENRE`
 
 **Operations:**
-- Chunked copy by `ID_ROW` (1000 rows).
-- `INSERT … ON DUPLICATE KEY UPDATE` of link fields.
-- Range-limited stale delete: removes rows in the processed `ID_ROW` range no longer present in TMDB source (with the same movie existence filter).
+- Rebuilds the full target into `T_WC_T2S_MOVIE_GENRE_BUILD` in one pass.
+- Uses `ROW_NUMBER()` ranking during the rebuild to compute stable `DISPLAY_ORDER` values.
+- Atomically swaps `T_WC_T2S_MOVIE_GENRE_BUILD` into place with `RENAME TABLE`.
+- Drops `T_WC_T2S_MOVIE_GENRE_OLD` automatically after a successful swap.
 
 ---
 
@@ -213,7 +218,7 @@ Copies serie↔genre relations into the T2S layer (filtered to series that exist
 **Reads:** `T_WC_TMDB_SERIE_GENRE`, `T_WC_T2S_SERIE`
 **Writes:** `T_WC_T2S_SERIE_GENRE`
 
-**Operations:** Same as Process 11 but for series.
+**Operations:** Same as Process 11 but for series, using a full rebuild into `T_WC_T2S_SERIE_GENRE_BUILD`, atomic rename swap, and automatic cleanup of `T_WC_T2S_SERIE_GENRE_OLD`.
 
 ---
 
@@ -224,7 +229,7 @@ Copies movie↔company relations into the T2S layer.
 **Reads:** `T_WC_TMDB_MOVIE_COMPANY`, `T_WC_T2S_MOVIE`, `T_WC_T2S_COMPANY`
 **Writes:** `T_WC_T2S_MOVIE_COMPANY`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates existence of both `ID_MOVIE` and `ID_COMPANY` in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates existence of both `ID_MOVIE` and `ID_COMPANY` in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -246,7 +251,7 @@ Copies serie↔network relations into the T2S layer.
 **Reads:** `T_WC_TMDB_SERIE_NETWORK`, `T_WC_T2S_SERIE`, `T_WC_T2S_NETWORK`
 **Writes:** `T_WC_T2S_SERIE_NETWORK`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates existence of both `ID_SERIE` and `ID_NETWORK` in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates existence of both `ID_SERIE` and `ID_NETWORK` in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -257,7 +262,7 @@ Copies movie production countries into the T2S layer.
 **Reads:** `T_WC_TMDB_MOVIE_PRODUCTION_COUNTRY`, `T_WC_T2S_MOVIE`
 **Writes:** `T_WC_T2S_MOVIE_PRODUCTION_COUNTRY`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates `ID_MOVIE` exists in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_MOVIE` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -279,7 +284,7 @@ Copies movie spoken languages into the T2S layer.
 **Reads:** `T_WC_TMDB_MOVIE_SPOKEN_LANGUAGE`, `T_WC_T2S_MOVIE`
 **Writes:** `T_WC_T2S_MOVIE_SPOKEN_LANGUAGE`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates `ID_MOVIE` exists in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_MOVIE` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -301,7 +306,7 @@ Copies company images into the T2S layer.
 **Reads:** `T_WC_TMDB_COMPANY_IMAGE`, `T_WC_T2S_COMPANY`
 **Writes:** `T_WC_T2S_COMPANY_IMAGE`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates `ID_COMPANY` exists in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_COMPANY` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -312,7 +317,7 @@ Copies movie images into the T2S layer.
 **Reads:** `T_WC_TMDB_MOVIE_IMAGE`, `T_WC_T2S_MOVIE`
 **Writes:** `T_WC_T2S_MOVIE_IMAGE`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates `ID_MOVIE` exists in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_MOVIE` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -323,7 +328,7 @@ Copies network images into the T2S layer.
 **Reads:** `T_WC_TMDB_NETWORK_IMAGE`, `T_WC_T2S_NETWORK`
 **Writes:** `T_WC_T2S_NETWORK_IMAGE`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates `ID_NETWORK` exists in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_NETWORK` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -334,7 +339,7 @@ Copies person images into the T2S layer.
 **Reads:** `T_WC_TMDB_PERSON_IMAGE`, `T_WC_T2S_PERSON`
 **Writes:** `T_WC_T2S_PERSON_IMAGE`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates `ID_PERSON` exists in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_PERSON` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -345,7 +350,7 @@ Copies serie images into the T2S layer.
 **Reads:** `T_WC_TMDB_SERIE_IMAGE`, `T_WC_T2S_SERIE`
 **Writes:** `T_WC_T2S_SERIE_IMAGE`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates `ID_SERIE` exists in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_SERIE` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -356,7 +361,7 @@ Copies movie videos into the T2S layer.
 **Reads:** `T_WC_TMDB_MOVIE_VIDEO`, `T_WC_T2S_MOVIE`
 **Writes:** `T_WC_T2S_MOVIE_VIDEO`
 
-**Operations:** Chunked upsert + range-limited stale delete; validates `ID_MOVIE` exists in T2S.
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_MOVIE` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
 
 ---
 
@@ -371,9 +376,31 @@ Copies serie videos into the T2S layer.
 
 ---
 
-### Process 60 — TMDB_KEYWORD *(stub)*
+### Process 60 — Link Wikidata items to topics
 
-Reserved for keyword processing. Not yet implemented.
+Links TMDb keywords to Wikidata items before process `3` builds `T_WC_T2S_TOPIC`, and spreads the work over rolling daily batches.
+
+**Reads:** `T_WC_TMDB_KEYWORD`, Wikipedia API, Wikidata API
+**Writes:** `T_WC_TMDB_KEYWORD`
+
+**Selection strategy:**
+- Processes up to `3000` keywords per run.
+- Selects rows where `NAME` is not null/empty.
+- Orders by `TIM_WIKIPEDIA_SEARCH ASC, ID_KEYWORD ASC` so never-checked and oldest-checked keywords are processed first.
+- Updates `TIM_WIKIPEDIA_SEARCH` for matched, unmatched, and exception cases so the batch rotates across the full keyword table over time.
+
+**Operations:**
+- Searches Wikipedia candidates for each keyword and resolves the selected page to a Wikidata item.
+- Validates the Wikidata entity type against a blocked `P31` set to reject media-work entity classes that should not become generic topics.
+- Stores the matched Wikidata ID, English Wikidata label, and match confidence on `T_WC_TMDB_KEYWORD`.
+- Persists the last attempted search timestamp in `TIM_WIKIPEDIA_SEARCH` even when no match is found or a request fails.
+- Uses a throttled Wikimedia request wrapper with retry/backoff on HTTP `429` responses.
+
+**Updated columns on `T_WC_TMDB_KEYWORD`:**
+- `ID_WIKIDATA`
+- `WIKIDATA_LABEL`
+- `CONFIDENCE`
+- `TIM_WIKIPEDIA_SEARCH`
 
 ---
 
@@ -403,10 +430,10 @@ Copies Wikidata item records (English + French labels) into the T2S layer.
 **Writes:** `T_WC_T2S_ITEM`
 
 **Operations:**
-- Processes in chunks of 1000 records by `ID_ROW`.
-- `INSERT … ON DUPLICATE KEY UPDATE` for English item fields: `ID_WIKIDATA`, `ITEM_LABEL`, `ALIASES`, `DESCRIPTION`, `WIKIPEDIA_IMAGE_PATH`, `INSTANCE_OF`.
-- Additional UPDATE step: adds `ITEM_LABEL_FR` from the French rows of the same source table.
-- Deletes stale records.
+- Rebuilds the full target in `T_WC_T2S_ITEM_BUILD` from `T_WC_WIKIDATA_ITEM_V1`.
+- Preserves `WIKIPEDIA_IMAGE_PATH` and `INSTANCE_OF` from the English Wikidata source rows.
+- Applies French-label enrichment to the build table before the atomic rename swap.
+- Atomically swaps the build table into place and automatically drops `T_WC_T2S_ITEM_OLD` after a successful swap.
 
 ---
 
@@ -435,9 +462,10 @@ Populates `T_WC_T2S_COLLECTION` from TMDb lists and collections, with linked mov
   - `5` = release date ascending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
   - `6` = release date descending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
 - **custom-collection rating source:** `IMDB_RATING_WEIGHTED` is read from `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` for score-based ordering, while release dates and IMDb IDs still come from `T_WC_TMDB_MOVIE` / `T_WC_TMDB_SERIE`.
+- When a custom collection resolves a Wikidata `Q...` item, `ID_WIKIDATA` and `WIKIPEDIA_IMAGE_PATH` are populated using the shared helper lookup across Wikidata item/movie/serie/person tables.
 - Inserts/updates the collection record, then upserts linked movie and serie entries with sequential display order based on the SQL result order.
 - Skips records with fewer than 2 total elements; deletes any existing record for those.
-- Post-processing: updates `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `IMDB_RATING_ADJUSTED` on `T_WC_T2S_COLLECTION` from linked movies.
+- Post-processing: updates `IMDB_RATING` and `IMDB_RATING_WEIGHTED` on `T_WC_T2S_COLLECTION` from linked movies.
 - Full stale delete: removes `T_WC_T2S_COLLECTION` rows whose source record is no longer present in the corresponding TMDb source table or `T_WC_CUSTOM_LIST`.
 
 ---
@@ -468,7 +496,8 @@ Populates `T_WC_T2S_LIST` from TMDb lists and custom lists, with linked movies a
 - **custom-list rating source:** `IMDB_RATING_WEIGHTED` is read from `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` for score-based ordering, while release dates and IMDb IDs still come from `T_WC_TMDB_MOVIE` / `T_WC_TMDB_SERIE`.
 - **list-delete:** Removes list records that no longer have a corresponding source entry.
 - All mechanisms apply filter: `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`.
-- Post-processing: updates `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `IMDB_RATING_ADJUSTED` on `T_WC_T2S_LIST` from linked movies.
+- When a custom list resolves a Wikidata `Q...` item, `ID_WIKIDATA` and `WIKIPEDIA_IMAGE_PATH` are populated using the shared helper lookup across Wikidata item/movie/serie/person tables.
+- Post-processing: updates `IMDB_RATING` and `IMDB_RATING_WEIGHTED` on `T_WC_T2S_LIST` from linked movies.
 
 ---
 
@@ -486,10 +515,11 @@ Builds person groups from Wikidata membership, employment, and sports-team relat
 - `custom-group` → `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3)
 
 **Operations:**
-- For each Wikidata property/item pair, retrieves the item's English and French labels, description, and Wikipedia image.
+- For each Wikidata property/item pair, retrieves the item's English and French labels and description; `WIKIPEDIA_IMAGE_PATH` is resolved through the shared helper lookup.
 - Inserts/updates `T_WC_T2S_GROUP`.
-- Queries persons linked to the item via Wikidata (ordered by popularity) and upserts into `T_WC_T2S_GROUP_PERSON`.
+- Queries persons linked to the item via Wikidata (ordered by popularity) and upserts into `T_WC_T2S_PERSON_GROUP`.
 - **custom-group:** Builds groups from `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3) and resolves member persons using up to three cumulative mechanisms (IMDb list `nm\d+`, Wikidata property/item, or a TMDb person name expression).
+- When a custom group resolves a Wikidata `Q...` item, `ID_WIKIDATA` is set from that item and `WIKIPEDIA_IMAGE_PATH` is populated through the same helper lookup.
 - **custom-group ordering:** `SORT_BY` controls display order for persons:
   - `1` = original IMDb list order ascending
   - `2` = original IMDb list order descending
@@ -510,10 +540,10 @@ Builds award records from the Wikidata "award received" property (P166).
 
 **Operations:**
 - Selects all distinct Wikidata items used as values of property P166.
-- For each award item, retrieves English/French label, description, and image.
+- For each award item, retrieves English/French label and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_AWARD`.
 - Links movies and series that received the award in `IMDB_RATING_WEIGHTED DESC` order, and links persons in their existing person ordering, into the respective junction tables with incremental display order.
-- Post-processing: updates average `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, `IMDB_RATING_ADJUSTED`, and `POPULARITY` on `T_WC_T2S_AWARD` from linked entities.
+- Post-processing: updates average `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `POPULARITY` on `T_WC_T2S_AWARD` from linked entities.
 
 ---
 
@@ -536,9 +566,10 @@ Populates `T_WC_T2S_MOVEMENT` from custom lists that define cinematic movements.
   - `5` = release date ascending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
   - `6` = release date descending (`DAT_RELEASE` for movies, `DAT_FIRST_AIR` for series)
 - **custom-movement rating source:** `IMDB_RATING_WEIGHTED` is read from `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` for score-based ordering, while release dates and IMDb IDs still come from `T_WC_TMDB_MOVIE` / `T_WC_TMDB_SERIE`.
+- When a custom movement resolves a Wikidata `Q...` item, `ID_WIKIDATA` and `WIKIPEDIA_IMAGE_PATH` are populated using the shared helper lookup across Wikidata item/movie/serie/person tables.
 - Skips records with fewer than 2 total elements; deletes any existing record for those.
 - **movement-delete:** Removes movement records whose source custom list no longer exists or has been deleted.
-- Post-processing: updates `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `IMDB_RATING_ADJUSTED` on `T_WC_T2S_MOVEMENT` from linked movies; cascades orphan cleanup to `T_WC_T2S_MOVIE_MOVEMENT` and `T_WC_T2S_SERIE_MOVEMENT`.
+- Post-processing: updates `IMDB_RATING` and `IMDB_RATING_WEIGHTED` on `T_WC_T2S_MOVEMENT` from linked movies; cascades orphan cleanup to `T_WC_T2S_MOVIE_MOVEMENT` and `T_WC_T2S_SERIE_MOVEMENT`.
 - All mechanisms apply filter: `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`.
 
 ---
@@ -555,7 +586,7 @@ Builds death-related dimension records from Wikidata death properties.
 - `en-manner-of-death` → P1196
 
 **Operations:**
-- For each Wikidata item used as a value of P509/P1196, retrieves English/French labels, description, and image.
+- For each Wikidata item used as a value of P509/P1196, retrieves English/French labels and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_DEATH` and links persons into `T_WC_T2S_PERSON_DEATH` ordered by person popularity.
 - Full stale delete: removes `T_WC_T2S_DEATH` rows no longer present in `T_WC_WIKIDATA_ITEM_PROPERTY` for the corresponding property.
 
@@ -570,7 +601,7 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 
 **Operations:**
 - Selects all distinct Wikidata items used as values of property P1411.
-- For each nomination item, retrieves English/French label, description, and image.
+- For each nomination item, retrieves English/French label and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_NOMINATION`.
 - Links movies, series, and persons that have the nomination (via Wikidata property join) into the respective junction tables with incremental display order.
 - Full stale delete: removes `T_WC_T2S_NOMINATION` rows no longer present in `T_WC_WIKIDATA_ITEM_PROPERTY` for P1411.
@@ -583,9 +614,11 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 |---------|-------------|
 | Chunk processing | Most copy processes iterate over source IDs in batches of 1000 to avoid memory pressure. |
 | `INSERT … ON DUPLICATE KEY UPDATE` | Idempotent upsert — safe to re-run without duplicating data. |
+| Staging rebuild + atomic swap | Processes 7, 8, 11–26, and 40 rebuild eligible targets into `*_BUILD`, atomically swap with `RENAME TABLE`, and automatically drop `*_OLD` after success. |
 | `cp.f_sqlupdatearray()` | Generic upsert helper from the `citizenphil` module. |
 | Multi-mechanism element resolution | Processes 41 (custom-collection), 42, and 45 combine multiple sources with `UNION ALL` + `GROUP BY`. |
 | Wikidata filter | Any movie or serie written to a T2S junction table must satisfy `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`. |
+| Shared Wikidata image lookup | `f_getwikidataimagepath()` resolves the first non-empty `WIKIPEDIA_IMAGE_PATH` from `T_WC_WIKIDATA_ITEM_V1`, `T_WC_WIKIDATA_MOVIE_V1`, `T_WC_WIKIDATA_SERIE_V1`, then `T_WC_WIKIDATA_PERSON_V1`. |
 | Full stale delete | Some dimension processes delete parent rows whose source record (TMDb list/collection/custom list or Wikidata property) no longer exists, in addition to orphan link cleanup. |
 | Server variables | `cp.f_setservervariable()` persists the current process/record for external monitoring. |
 
