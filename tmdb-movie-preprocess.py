@@ -811,7 +811,6 @@ SET
                                 strrecordcollectiontype = row['COLLECTION_TYPE']
                                 strrecordposterpath = row['POSTER_PATH']
                                 strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
-                                strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordidwikidata)
                                 print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordcollectionsource + ")")
                                 if target_field_name == "COLLECTION_NAME":
                                     arrcollectioncouples = {
@@ -821,8 +820,6 @@ SET
                                         'COLLECTION_SOURCE': strrecordcollectionsource,
                                         'COLLECTION_TYPE': strrecordcollectiontype,
                                         'POSTER_PATH': strrecordposterpath,
-                                        'ID_WIKIDATA': strrecordidwikidata,
-                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
                                     if intcollection == 5:
                                         arrcollectioncouples['COLLECTION_NAME_FR'] = row['NAME_FR'] or ''
@@ -832,9 +829,10 @@ SET
                                         'COLLECTION_NAME_FR': strrecordname,
                                         'COLLECTION_SOURCE': strrecordcollectionsource,
                                         'COLLECTION_TYPE': strrecordcollectiontype,
-                                        'ID_WIKIDATA': strrecordidwikidata,
-                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
+                                if strrecordidwikidata:
+                                    arrcollectioncouples['ID_WIKIDATA'] = strrecordidwikidata
+                                    arrcollectioncouples['WIKIPEDIA_IMAGE_PATH'] = f_getwikidataimagepath(strrecordidwikidata)
                                 strsqltablename = "T_WC_T2S_COLLECTION"
                                 strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND COLLECTION_SOURCE = '{strrecordcollectionsource}'"
                                 cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(lngrecordid),"Current record in the TMDb database movie preprocess",0)
