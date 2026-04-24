@@ -1,4 +1,5 @@
 import time
+import os
 import requests
 import pymysql.cursors
 #from pymysql import Error
@@ -25,7 +26,9 @@ from tmdb_preprocess_helpers import (
     f_buildcustomaggregatequery,
     f_buildcustomorderbyclause,
     f_getcustomsortby,
+    f_getwikidataimagepath,
     f_getlemma,
+    f_linktmdbkeywordtowikidata,
     f_tmdbpersonsetusedfortags,
     f_wikidataitemproperties,
     process_value,
@@ -95,7 +98,7 @@ try:
             #arrprocessscope = {6: 'T2S_PERSON'}
             #arrprocessscope = {4: 'T2S_MOVIE'}
             #arrprocessscope = {5: 'T2S_SERIE'}
-            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 40: 'T2S_ITEM'}
+            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 60: 'Link Wikidata items to topics', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 40: 'T2S_ITEM'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
@@ -112,8 +115,8 @@ try:
             #arrprocessscope = {41: 'T2S_COLLECTION', 42: 'T2S_LIST'}
             #arrprocessscope = {3: 'T2S_TOPIC'}
             #arrprocessscope = {43: 'T2S_GROUP'}
-            #if strnow.startswith("2026-04-18"):
-            #    arrprocessscope = {13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 40: 'T2S_ITEM'}
+            if strnow.startswith("2026-04-22"):
+                arrprocessscope = {60: 'Link Wikidata items to topics', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 40: 'T2S_ITEM'}
             for intindex, strdesc in arrprocessscope.items():
                 strprocessesexecuted += str(intindex) + ", "
                 cp.f_setservervariable("strtmdbmoviepreprocessprocessesexecuted",strprocessesexecuted,strprocessesexecuteddesc,0)
@@ -316,6 +319,112 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                             cursor2.execute(strsqldelete)
                             cp.connectioncp.commit()
 
+                elif intindex == 60:
+                    print("Link Wikidata items to topics processing")
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Wikipedia entity linking for TMDb keywords","Current sub process in the TMDb database movie preprocess",0)
+                    strsqlkeywords = ""
+                    strsqlkeywords += "SELECT ID_KEYWORD, NAME "
+                    strsqlkeywords += "FROM T_WC_TMDB_KEYWORD "
+                    strsqlkeywords += "WHERE NAME IS NOT NULL AND NAME <> '' "
+                    #strsqlkeywords += "AND (ID_WIKIDATA IS NULL OR ID_WIKIDATA = '') "
+                    # I may include the following condition so that only keywords that are topics will be processed
+                    #strsqlkeywords += "AND USED_FOR_T2S_TOPIC = 1 "
+                    strsqlkeywords += "ORDER BY TIM_WIKIPEDIA_SEARCH ASC, ID_KEYWORD ASC "
+                    strsqlkeywords += "LIMIT 3000 "
+                    # The LIMIT is for processing 3000 keywords a day so 90000 for 30 days (full keyword list)
+                    print(strsqlkeywords)
+                    cursor2.execute(strsqlkeywords)
+                    print("Number of rows: " + str(cursor2.rowcount))
+                    results = cursor2.fetchall()
+                    session = requests.Session()
+                    strwikimediauseragent = os.getenv("WIKIMEDIA_USER_AGENT", "tmdb-movie-preprocess/1.0")
+                    session.headers.update({"User-Agent": strwikimediauseragent})
+                    session.wikimedia_request_delay_seconds = float(os.getenv("WIKIMEDIA_REQUEST_DELAY_SECONDS", "0.25"))
+                    session.wikimedia_backoff_seconds = float(os.getenv("WIKIMEDIA_BACKOFF_SECONDS", "1.0"))
+                    session.wikimedia_max_retries = int(os.getenv("WIKIMEDIA_MAX_RETRIES", "4"))
+                    session.wikimedia_timeout_seconds = float(os.getenv("WIKIMEDIA_TIMEOUT_SECONDS", "20"))
+                    arrentitytypecache = {}
+                    for row in results:
+                        lngkeywordid = row['ID_KEYWORD']
+                        strkeywordname = row['NAME'] or ''
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentkeywordid",str(lngkeywordid),"Current keyword ID in the TMDb database movie preprocess",0)
+                        print("Processing keyword: " + str(lngkeywordid) + ": " + strkeywordname)
+                        try:
+                            arrmatch = f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache)
+                        except Exception as exc:
+                            print("Wikipedia/Wikidata linking error for keyword " + str(lngkeywordid) + ": " + str(exc))
+                            arrkeywordcouples = {
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                            cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
+                            continue
+                        if arrmatch and arrmatch.get("wikibase_item"):
+                            print("Matched keyword '" + strkeywordname + "' to " + arrmatch.get("title", "") + " (" + arrmatch["wikibase_item"] + ") with confidence " + str(round(arrmatch.get("confidence", 0.0), 4)))
+                            arrkeywordcouples = {
+                                "ID_WIKIDATA": arrmatch["wikibase_item"],
+                                "WIKIDATA_LABEL": arrmatch.get("wikidata_label", ""),
+                                "CONFIDENCE": arrmatch.get("confidence", 0.0),
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                            cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
+                        else:
+                            print("No match found for keyword '" + strkeywordname + "'")
+                            arrkeywordcouples = {
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                            cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
+                elif intindex == 61:
+                    print("Link Wikidata items to collections processing")
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Link Wikidata items to T2S collections","Current sub process in the TMDb database movie preprocess",0)
+                    strsqlcollections = ""
+                    strsqlcollections += "SELECT ID_T2S_COLLECTION "
+                    strsqlcollections += "FROM T_WC_T2S_COLLECTION "
+                    strsqlcollections += "WHERE ID_WIKIDATA IS NULL OR ID_WIKIDATA = '' "
+                    strsqlcollections += "ORDER BY ID_T2S_COLLECTION ASC "
+                    print(strsqlcollections)
+                    cursor2.execute(strsqlcollections)
+                    print("Number of rows: " + str(cursor2.rowcount))
+                    arrcollections = cursor2.fetchall()
+                    for row in arrcollections:
+                        lngcollectionid = row['ID_T2S_COLLECTION']
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentcollectionid",str(lngcollectionid),"Current collection ID in the TMDb database movie preprocess",0)
+                        print("Processing collection: " + str(lngcollectionid))
+                        strsqlmovies = ""
+                        strsqlmovies += "SELECT T_WC_T2S_MOVIE.ID_WIKIDATA "
+                        strsqlmovies += "FROM T_WC_T2S_MOVIE "
+                        strsqlmovies += "INNER JOIN T_WC_T2S_MOVIE_COLLECTION ON T_WC_T2S_MOVIE.ID_MOVIE = T_WC_T2S_MOVIE_COLLECTION.ID_MOVIE "
+                        strsqlmovies += "WHERE T_WC_T2S_MOVIE_COLLECTION.ID_T2S_COLLECTION = " + str(lngcollectionid) + " "
+                        strsqlmovies += "AND T_WC_T2S_MOVIE.ID_WIKIDATA IS NOT NULL AND T_WC_T2S_MOVIE.ID_WIKIDATA <> '' "
+                        print(strsqlmovies)
+                        cursor3.execute(strsqlmovies)
+                        arrmovies = cursor3.fetchall()
+                        arrmoviewikidataids = sorted({row3['ID_WIKIDATA'] for row3 in arrmovies if row3.get('ID_WIKIDATA')})
+                        intmoviecount = len(arrmoviewikidataids)
+                        if intmoviecount == 0:
+                            continue
+                        strwikidataidlist = "'" + "','".join(arrmoviewikidataids) + "'"
+                        strsqlitem = ""
+                        strsqlitem += "SELECT ID_ITEM "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                        strsqlitem += "WHERE ID_WIKIDATA IN (" + strwikidataidlist + ") "
+                        strsqlitem += "AND ID_PROPERTY = 'P179' "
+                        strsqlitem += "GROUP BY ID_ITEM "
+                        strsqlitem += "HAVING COUNT(DISTINCT ID_WIKIDATA) = " + str(intmoviecount) + " "
+                        strsqlitem += "AND (SELECT COUNT(DISTINCT ip2.ID_WIKIDATA) "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_PROPERTY ip2 "
+                        strsqlitem += "WHERE ip2.ID_ITEM = T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                        strsqlitem += "AND ip2.ID_PROPERTY = 'P179') = " + str(intmoviecount) + " "
+                        strsqlitem += "ORDER BY ID_ITEM ASC "
+                        print(strsqlitem)
+                        cursor4.execute(strsqlitem)
+                        arritems = cursor4.fetchall()
+                        if arritems:
+                            strwikidataitemid = arritems[0]['ID_ITEM']
+                            print("Matched collection " + str(lngcollectionid) + " to Wikidata item " + strwikidataitemid)
+                            arrcollectioncouples = {
+                                "ID_WIKIDATA": strwikidataitemid
+                            }
+                            cp.f_sqlupdatearray("T_WC_T2S_COLLECTION",arrcollectioncouples,"ID_T2S_COLLECTION = " + str(lngcollectionid),0)
                 elif intindex == 3:
                     #----------------------------------------------------
                     print("T2S_TOPIC processing")
@@ -449,6 +558,7 @@ ORDER BY COMPTE DESC """
                                 strrecordtopictype = row['TOPIC_TYPE']
                                 strrecordposterpath = row['POSTER_PATH']
                                 strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
+                                strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordidwikidata)
                                 print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordtopicsource + ")")
                                 if target_field_name == "TOPIC_NAME":
                                     arrtopiccouples = {
@@ -459,7 +569,8 @@ ORDER BY COMPTE DESC """
                                         'TOPIC_TYPE': strrecordtopictype,
                                         'LANG': strrecordlang,
                                         'POSTER_PATH': strrecordposterpath,
-                                        'ID_WIKIDATA': strrecordidwikidata
+                                        'ID_WIKIDATA': strrecordidwikidata,
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
                                 elif target_field_name == "TOPIC_NAME_FR":
                                     arrtopiccouples = {
@@ -467,7 +578,8 @@ ORDER BY COMPTE DESC """
                                         'TOPIC_NAME_FR': strrecordname,
                                         'TOPIC_SOURCE': strrecordtopicsource,
                                         'TOPIC_TYPE': strrecordtopictype,
-                                        'ID_WIKIDATA': strrecordidwikidata
+                                        'ID_WIKIDATA': strrecordidwikidata,
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
                                 strsqltablename = "T_WC_T2S_TOPIC"
                                 strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND TOPIC_SOURCE = '{strrecordtopicsource}'"
@@ -699,6 +811,7 @@ SET
                                 strrecordcollectiontype = row['COLLECTION_TYPE']
                                 strrecordposterpath = row['POSTER_PATH']
                                 strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
+                                strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordidwikidata)
                                 print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordcollectionsource + ")")
                                 if target_field_name == "COLLECTION_NAME":
                                     arrcollectioncouples = {
@@ -708,7 +821,8 @@ SET
                                         'COLLECTION_SOURCE': strrecordcollectionsource,
                                         'COLLECTION_TYPE': strrecordcollectiontype,
                                         'POSTER_PATH': strrecordposterpath,
-                                        'ID_WIKIDATA': strrecordidwikidata
+                                        'ID_WIKIDATA': strrecordidwikidata,
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
                                     if intcollection == 5:
                                         arrcollectioncouples['COLLECTION_NAME_FR'] = row['NAME_FR'] or ''
@@ -718,7 +832,8 @@ SET
                                         'COLLECTION_NAME_FR': strrecordname,
                                         'COLLECTION_SOURCE': strrecordcollectionsource,
                                         'COLLECTION_TYPE': strrecordcollectiontype,
-                                        'ID_WIKIDATA': strrecordidwikidata
+                                        'ID_WIKIDATA': strrecordidwikidata,
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
                                 strsqltablename = "T_WC_T2S_COLLECTION"
                                 strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND COLLECTION_SOURCE = '{strrecordcollectionsource}'"
@@ -774,6 +889,7 @@ SET
                                     strwditemid = next((t for t in arrwdtokens if t.startswith('Q')), '')
                                     if strwditemid:
                                         arrcollectioncouples['ID_WIKIDATA'] = strwditemid
+                                        arrcollectioncouples['WIKIPEDIA_IMAGE_PATH'] = f_getwikidataimagepath(strwditemid)
                                     strsqlmovies_wikidata = ""
                                     strsqlseries_wikidata = ""
                                     if strwdpropertyid and strwditemid:
@@ -1007,6 +1123,7 @@ SET
                                 strrecordlisttype = row['LIST_TYPE']
                                 strrecordposterpath = row['POSTER_PATH']
                                 strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
+                                strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordidwikidata)
                                 print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordlistsource + ")")
                                 if target_field_name == "LIST_NAME":
                                     arrlistcouples = {
@@ -1016,7 +1133,8 @@ SET
                                         'LIST_SOURCE': strrecordlistsource,
                                         'LIST_TYPE': strrecordlisttype,
                                         'POSTER_PATH': strrecordposterpath,
-                                        'ID_WIKIDATA': strrecordidwikidata
+                                        'ID_WIKIDATA': strrecordidwikidata,
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
                                     if intlist == 3:
                                         arrlistcouples['LIST_NAME_FR'] = row['NAME_FR'] or ''
@@ -1026,7 +1144,8 @@ SET
                                         'LIST_NAME_FR': strrecordname,
                                         'LIST_SOURCE': strrecordlistsource,
                                         'LIST_TYPE': strrecordlisttype,
-                                        'ID_WIKIDATA': strrecordidwikidata
+                                        'ID_WIKIDATA': strrecordidwikidata,
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
                                 strsqltablename = "T_WC_T2S_LIST"
                                 strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND LIST_SOURCE = '{strrecordlistsource}'"
@@ -1073,6 +1192,7 @@ SET
                                     strwditemid = next((t for t in arrwdtokens if t.startswith('Q')), '')
                                     if strwditemid:
                                         arrlistcouples['ID_WIKIDATA'] = strwditemid
+                                        arrlistcouples['WIKIPEDIA_IMAGE_PATH'] = f_getwikidataimagepath(strwditemid)
                                     strsqlmovies_wikidata = ""
                                     strsqlseries_wikidata = ""
                                     if strwdpropertyid and strwditemid:
@@ -1274,6 +1394,7 @@ SET
                                     strrecordnamefr = row['NAME_FR'] or ''
                                     strrecordoverview = row['OVERVIEW'] or ''
                                     strrecordposterpath = row['POSTER_PATH'] or ''
+                                    strrecordwikipediaimagepath = ""
                                 else:
                                     strrecordid = row['ID_ITEM']
                                     strrecordname = ""
@@ -1293,6 +1414,7 @@ SET
                                     strrecordname = arrvalues.get("strrecordname", "")
                                     strrecordoverview = arrvalues.get("strrecordoverview", "")
                                     strrecordposterpath = arrvalues.get("strrecordposterpath", "")
+                                    strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordid)
                                     strsqlitem = ""
                                     strsqlitem += "SELECT LABEL "
                                     strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
@@ -1315,7 +1437,7 @@ SET
                                         'OVERVIEW': strrecordoverview,
                                         'GROUP_SOURCE': strrecordgroupsource,
                                         'GROUP_TYPE': strrecordgrouptype,
-                                        'WIKIPEDIA_IMAGE_PATH': strrecordposterpath
+                                        'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                     }
                                 strsqltablename = "T_WC_T2S_GROUP"
                                 strsqlupdatecondition = f"ID_WIKIDATA = '{strrecordid}' AND GROUP_SOURCE = '{strrecordgroupsource}'"
@@ -1519,6 +1641,7 @@ SET
                         strawardname = arrvalues.get("strawardname", "")
                         strawardoverview = arrvalues.get("strawardoverview", "")
                         strawardimagepath = arrvalues.get("strawardimagepath", "")
+                        strawardimagepath = f_getwikidataimagepath(strawardwikidataid)
 
                         strsqlitem = ""
                         strsqlitem += "SELECT LABEL "
@@ -1793,6 +1916,7 @@ SET
                         strnominationname = arrvalues.get("strnominationname", "")
                         strnominationoverview = arrvalues.get("strnominationoverview", "")
                         strnominationimagepath = arrvalues.get("strnominationimagepath", "")
+                        strnominationimagepath = f_getwikidataimagepath(strnominationwikidataid)
 
                         strsqlitem = ""
                         strsqlitem += "SELECT LABEL "
@@ -2064,6 +2188,7 @@ SET
                                 strrecordmovementtype = row['MOVEMENT_TYPE']
                                 strrecordposterpath = row['POSTER_PATH']
                                 strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
+                                strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordidwikidata)
                                 print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordmovementsource + ")")
                                 arrlistcouples = {
                                     'ID_RECORD': lngrecordid,
@@ -2073,7 +2198,8 @@ SET
                                     'MOVEMENT_SOURCE': strrecordmovementsource,
                                     'MOVEMENT_TYPE': strrecordmovementtype,
                                     'POSTER_PATH': strrecordposterpath,
-                                    'ID_WIKIDATA': strrecordidwikidata
+                                    'ID_WIKIDATA': strrecordidwikidata,
+                                    'WIKIPEDIA_IMAGE_PATH': strrecordwikipediaimagepath
                                 }
                                 strsqltablename = "T_WC_T2S_MOVEMENT"
                                 strsqlupdatecondition = f"ID_RECORD = '{lngrecordid}' AND MOVEMENT_SOURCE = '{strrecordmovementsource}'"
@@ -2099,6 +2225,7 @@ SET
                                 strwditemid = next((t for t in arrwdtokens if t.startswith('Q')), '')
                                 if strwditemid:
                                     arrlistcouples['ID_WIKIDATA'] = strwditemid
+                                    arrlistcouples['WIKIPEDIA_IMAGE_PATH'] = f_getwikidataimagepath(strwditemid)
                                 strsqlmovies_wikidata = ""
                                 strsqlseries_wikidata = ""
                                 if strwdpropertyid and strwditemid:
@@ -2284,6 +2411,7 @@ SET
                                 strrecordname = arrvalues.get("strrecordname", "")
                                 strrecordoverview = arrvalues.get("strrecordoverview", "")
                                 strrecordimagepath = arrvalues.get("strrecordimagepath", "")
+                                strrecordimagepath = f_getwikidataimagepath(strrecordid)
 
                                 strsqlitem = ""
                                 strsqlitem += "SELECT LABEL "
@@ -4003,10 +4131,6 @@ RENAME TABLE
                         cursor2.execute(strsql)
                         cp.connectioncp.commit()
 
-                elif intindex == 60:
-                    #----------------------------------------------------
-                    print("TMDB_KEYWORD processing")
-
 
                 elif intindex == 40:
                     #----------------------------------------------------
@@ -4369,1398 +4493,6 @@ WHERE src.CAST_CHARACTER_KEY IS NULL
                         cursor2.execute(strsql)
                         cp.connectioncp.commit()
 
-                elif intindex == 30:
-                    #----------------------------------------------------
-                    intmovielangmeta = False
-                    intmovielangmeta = True
-                    # Check if today is Wednesday
-                    if datetime.now().weekday() == 2:
-                        print("Today is Wednesday!")
-                        intmovielangmeta = True
-                    if intmovielangmeta:
-                        print("TMDB_MOVIE processing to TMDB_MOVIE_LANG_META")
-                        strmovieidold = cp.f_getservervariable("strtmdbmoviepreprocesscurrentvalue",0)
-                        strcurrentprocess = ""
-                        intindex = 1
-                        arrlang = {1: 'fr', 2: 'en'}
-                        arrlang = {1: 'fr'}
-                        #arrlang = {2: 'en'}
-                        for intlang, strlang in arrlang.items():
-                            strlangalt = ""
-                            if strlang == "fr":
-                                strlangalt = "en"
-                            strcurrentprocess = f"Preprocessing {strlang} movies from TMDB_MOVIE to TMDB_MOVIE_LANG_META"
-                            strsql = ""
-                            strsql += "SELECT "
-                            strsql += "T_WC_TMDB_MOVIE.ID_MOVIE, T_WC_TMDB_MOVIE.DAT_RELEASE, T_WC_TMDB_MOVIE.GENRES, T_WC_TMDB_MOVIE.ID_IMDB, T_WC_TMDB_MOVIE.ID_WIKIDATA, "
-                            strsql += "T_WC_TMDB_MOVIE.ID_COLLECTION, T_WC_TMDB_MOVIE.ORIGINAL_LANGUAGE, T_WC_TMDB_MOVIE.ORIGINAL_TITLE, T_WC_TMDB_MOVIE.RUNTIME, "
-                            strsql += "T_WC_TMDB_MOVIE.COLOR_TECHNOLOGY, T_WC_TMDB_MOVIE.FILM_TECHNOLOGY, T_WC_TMDB_MOVIE.ASPECT_RATIO, T_WC_TMDB_MOVIE.FILM_FORMAT, "
-                            strsql += "T_WC_TMDB_MOVIE.SOUND_SYSTEM, T_WC_TMDB_MOVIE.SOUND_TECHNOLOGY, T_WC_TMDB_MOVIE.NUM_AUDIO_TRACKS "
-                            #strsql += ", T_WC_TMDB_MOVIE.TITLE, T_WC_TMDB_MOVIE.OVERVIEW "
-                            strsql += "FROM T_WC_TMDB_MOVIE "
-                            # Exporting only movies with an IMDb ID
-                            strsql += "WHERE T_WC_TMDB_MOVIE.ID_IMDB IS NOT NULL AND T_WC_TMDB_MOVIE.ID_IMDB <> '' "
-                            # And movies with a Wikidata ID
-                            strsql += "AND T_WC_TMDB_MOVIE.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_MOVIE.ID_WIKIDATA <> '' "
-                            if strmovieidold != "":
-                                strsql += "AND T_WC_TMDB_MOVIE.ID_MOVIE >= " + strmovieidold + " "
-                            #strsql += "AND T_WC_TMDB_MOVIE.ID_MOVIE IN (392207) "
-                            #strsql += "AND T_WC_TMDB_MOVIE.ID_MOVIE <= 100 "
-                            #strsql += "ORDER BY T_WC_TMDB_MOVIE.POPULARITY DESC "
-                            strsql += "ORDER BY T_WC_TMDB_MOVIE.ID_MOVIE ASC "
-                            #strsql += "LIMIT 10 "
-                            #strsql += "LIMIT 1000 "
-                            
-                            #intresettables = True
-                            intresettables = False
-                            #intresetusedforsimilarity = True
-                            intresetusedforsimilarity = False
-                            
-                            if strsql != "":
-                                print(strcurrentprocess)
-                                cp.f_setservervariable("strtmdbmoviepreprocesscurrentprocess",strcurrentprocess,"Current process in the TMDb database preprocess",0)
-                                if intresettables:
-                                    # First we delete all the records in the target tables
-                                    # T_WC_TMDB_MOVIE_LANG_META
-                                    strsqlpurge = "DELETE FROM T_WC_TMDB_MOVIE_LANG_META WHERE LANG = '" + strlang + "' "
-                                    #print(strsqlpurge)
-                                    cursor2.execute(strsqlpurge)
-                                    cp.connectioncp.commit()
-                                    # T_WC_TMDB_MOVIE_LANG_PREPROCESSED
-                                    strsqlpurge = "DELETE FROM T_WC_TMDB_MOVIE_LANG_PREPROCESSED WHERE LANG = '" + strlang + "' "
-                                    #print(strsqlpurge)
-                                    cursor2.execute(strsqlpurge)
-                                    cp.connectioncp.commit()
-                                if intresetusedforsimilarity:
-                                    #Now we reset all used keywords for tags
-                                    strsqlupdate = "UPDATE T_WC_TMDB_KEYWORD SET USED_FOR_SIMILARITY = NULL WHERE USED_FOR_SIMILARITY IS NOT NULL "
-                                    #print(strsqlupdate)
-                                    cursor2.execute(strsqlupdate)
-                                    cp.connectioncp.commit()
-                                    #Now we reset all used persons for tags
-                                    strsqlupdate = "UPDATE T_WC_TMDB_PERSON SET USED_FOR_SIMILARITY = NULL WHERE USED_FOR_SIMILARITY IS NOT NULL "
-                                    #print(strsqlupdate)
-                                    cursor2.execute(strsqlupdate)
-                                    cp.connectioncp.commit()
-                                
-                                # Now we process the SELECT query
-                                print(strsql)
-                                #cp.f_setservervariable("strtmdbmoviepreprocesscurrentsql",strsql,"Current SQL query in the TMDb database preprocess",0)
-                                cursor.execute(strsql)
-                                lngrowcount = cursor.rowcount
-                                print(f"{lngrowcount} lines")
-                                #time.sleep(5)
-                                lnglinesprocessed = 0
-                                # Fetching all rows from the last executed statement
-                                results = cursor.fetchall()
-                                # Iterating through the results and printing
-                                for row in results:
-                                    # print("------------------------------------------")
-                                    lnglinesprocessed += 1
-                                    lngmovieid = row['ID_MOVIE']
-                                    print(f"{lnglinesprocessed}: ID_MOVIE={lngmovieid}")
-                                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentmovieid",str(lngmovieid),"Current movie ID in the TMDb database preprocess",0)
-                                    if intindex == 1:
-                                        datrelease = row['DAT_RELEASE']
-                                        strmoviegenres = row['GENRES']
-                                        strmovieidimdb = row['ID_IMDB']
-                                        strmovieidwikidata = row['ID_WIKIDATA']
-                                        lngmoviecollectionid = row['ID_COLLECTION']
-                                        strmovieoriginallanguage = row['ORIGINAL_LANGUAGE']
-                                        strmovieoriginaltitle = row['ORIGINAL_TITLE']
-                                        lngmovieruntime = row['RUNTIME']
-                                        strmoviecolortech = row['COLOR_TECHNOLOGY']
-                                        strmoviefilmtech = row['FILM_TECHNOLOGY']
-                                        strmovieaspectratio = row['ASPECT_RATIO']
-                                        strmoviefilmformat = row['FILM_FORMAT']
-                                        strmoviesoundsystem = row['SOUND_SYSTEM']
-                                        strmoviesoundtech = row['SOUND_TECHNOLOGY']
-                                        lngmovienumaudiotracks = row['NUM_AUDIO_TRACKS']
-                                        #strmovieformatline = row['WIKIPEDIA_FORMAT_LINE']
-
-                                        strmovietitle = ""
-                                        strmovieoverview = ""
-                                        strtags = ""
-                                        strmovieoverviewlemma = ""
-                                        strmoviekeywordslemma = ""
-                                        
-                                        intiscolor = 0
-                                        intisblackandwhite = 0
-                                        intissilent = 0
-                                        intis3d = 0
-                                        strcolortechnology = ""
-                                        strfilmtechnology = ""
-                                        straspectratio = ""
-                                        strfilmformat = ""
-                                        strsoundsystem = ""
-                                        intnumaudiotracks = 0
-                                        intisvalidformat = 0
-                                        
-                                        # Retrieving title and overview in the current language if any
-                                        if strlang == "en":
-                                            strsqlmovielang = "SELECT TITLE, OVERVIEW FROM T_WC_TMDB_MOVIE WHERE ID_MOVIE = " + str(lngmovieid) + " "
-                                        else:
-                                            strsqlmovielang = "SELECT TITLE, OVERVIEW FROM T_WC_TMDB_MOVIE_LANG WHERE ID_MOVIE = " + str(lngmovieid) + " AND LANG = '" + strlang + "' "
-                                        #print(strsqlmovielang)
-                                        cursor2.execute(strsqlmovielang)
-                                        results2 = cursor2.fetchall()
-                                        # Iterating through the results 
-                                        for row2 in results2:
-                                            strmovietitle = row2['TITLE']
-                                            strmovieoverview = row2['OVERVIEW']
-                                            break
-                                        
-                                        strmovietitlealt = ""
-                                        strmovieoverviewalt = ""
-                                        # Retrieving title and overview in the current language if any
-                                        if strlangalt == 'en':
-                                            strsqlmovielang = "SELECT TITLE, OVERVIEW FROM T_WC_TMDB_MOVIE WHERE ID_MOVIE = " + str(lngmovieid) + " "
-                                            #print(strsqlmovielang)
-                                            cursor2.execute(strsqlmovielang)
-                                            results2 = cursor2.fetchall()
-                                            # Iterating through the results 
-                                            for row2 in results2:
-                                                if row2['TITLE']:
-                                                    strmovietitlealt = row2['TITLE']
-                                                if row2['OVERVIEW']:
-                                                    strmovieoverviewalt = row2['OVERVIEW']
-                                                break
-                                        
-                                        if strmovieoverview != "" and strmovietitle != "":
-                                            if strlang == "fr":
-                                                # Fixing movie overview when it contains a \' element (espaped as \\\')
-                                                strmovieoverview=strmovieoverview.replace("\\\'", "'")
-                                                # Fixing movie overview when it contains a \" element (espaped as \\\")
-                                                strmovieoverview=strmovieoverview.replace('\\\"', '"')
-                                                #print(strmovieoverview)
-                                                # Movie title and movie overview are provided so we can go further
-                                                # Process movie overview with Spacy to get lemmas and NER
-                                                doc = nlp(strmovieoverview)
-                                                # Return tokens and their POS tags only for NOUN, PROPN, VERB, or ADJ
-                                                #doc_pos = [(token.lemma_, token.pos_, token.idx) for token in doc if token.pos_ in ["NOUN", "PROPN", "VERB", "ADJ"]]
-                                                #doc_ner = [(ent.text, ent.label_, ent.start_char) for ent in doc.ents]
-                                                # Process tokens for Part Of Speech (POS)
-                                                for token in doc:
-                                                    if token.pos_ in ["NOUN", "PROPN", "VERB", "ADJ", "X", "NUM"]:
-                                                        lnglemmeid = 0
-                                                        strtokenlemma = token.lemma_.strip()
-                                                        if strtokenlemma != "\\":
-                                                            strtokenpos = token.pos_
-                                                            lngstartchar = token.idx
-                                                            if strmovieoverviewlemma != "":
-                                                                strmovieoverviewlemma += " "
-                                                            strmovieoverviewlemma += strtokenlemma
-                                                            strsqllemme = "SELECT ID_LEMME FROM T_WC_TMDB_SPACY_LEMME WHERE LANG = '" + strlang + "' AND NAME = '" + strtokenlemma.replace("'", "\\'") + "' AND LABEL = '" + strtokenpos + "' ORDER BY ID_LEMME "
-                                                            #print(strsqllemme)
-                                                            cursor2.execute(strsqllemme)
-                                                            lngrowcount = cursor2.rowcount
-                                                            if lngrowcount > 0:
-                                                                results2 = cursor2.fetchall()
-                                                                # Iterating through the results 
-                                                                for row2 in results2:
-                                                                    lnglemmeid = row2['ID_LEMME']
-                                                                    #print(strsqllemme,"-> FOUND",lnglemmeid)
-                                                                    break
-                                                            if lnglemmeid == 0:
-                                                                # Lemme not found so INSERT 
-                                                                #print(strsqllemme,"-> NOT FOUND")
-                                                                arrcouples = {}
-                                                                arrcouples["LANG"] = strlang
-                                                                arrcouples["NAME"] = strtokenlemma
-                                                                arrcouples["LABEL"] = strtokenpos
-                                                                # INSERT/UPDATE this record
-                                                                strsqltablename = "T_WC_TMDB_SPACY_LEMME"
-                                                                strsqlupdatecondition = "1 = 0 "
-                                                                lnglemmeid = cp.f_sqlupdatearray(strsqltablename,arrcouples,strsqlupdatecondition,1)
-                                                            if lnglemmeid != 0:
-                                                                # We now have a lemma id so we link this lemma to the current movie
-                                                                arrcouples = {}
-                                                                arrcouples["ID_MOVIE"] = lngmovieid
-                                                                arrcouples["ID_LEMME"] = lnglemmeid
-                                                                arrcouples["START_CHAR"] = lngstartchar
-                                                                # INSERT/UPDATE this record
-                                                                strsqltablename = "T_WC_TMDB_MOVIE_LEMME"
-                                                                strsqlupdatecondition = f"ID_MOVIE = {lngmovieid} AND ID_LEMME = {lnglemmeid} AND START_CHAR = {lngstartchar} "
-                                                                lngresult = cp.f_sqlupdatearray(strsqltablename,arrcouples,strsqlupdatecondition,1)
-                                                # Process NER
-                                                for ent in doc.ents:
-                                                    lnglemmeid = 0
-                                                    strtokenlemma = ent.text.strip()
-                                                    if strtokenlemma != "\\":
-                                                        strtokenpos = ent.label_
-                                                        lngstartchar = ent.start_char
-                                                        strsqllemme = "SELECT ID_LEMME FROM T_WC_TMDB_SPACY_LEMME WHERE LANG = '" + strlang + "' AND NAME = '" + strtokenlemma.replace("'", "\\'") + "' AND LABEL = '" + strtokenpos + "' ORDER BY ID_LEMME "
-                                                        cursor2.execute(strsqllemme)
-                                                        lngrowcount = cursor2.rowcount
-                                                        if lngrowcount > 0:
-                                                            results2 = cursor2.fetchall()
-                                                            # Iterating through the results 
-                                                            for row2 in results2:
-                                                                lnglemmeid = row2['ID_LEMME']
-                                                                #print(strsqllemme,"-> FOUND",lnglemmeid)
-                                                                break
-                                                        if lnglemmeid == 0:
-                                                            # Lemme not found so INSERT 
-                                                            #print(strsqllemme,"-> NOT FOUND")
-                                                            arrcouples = {}
-                                                            arrcouples["LANG"] = strlang
-                                                            arrcouples["NAME"] = strtokenlemma
-                                                            arrcouples["LABEL"] = strtokenpos
-                                                            # INSERT/UPDATE this record
-                                                            strsqltablename = "T_WC_TMDB_SPACY_LEMME"
-                                                            strsqlupdatecondition = "1 = 0 "
-                                                            lnglemmeid = cp.f_sqlupdatearray(strsqltablename,arrcouples,strsqlupdatecondition,1)
-                                                        if lnglemmeid != 0:
-                                                            # We now have a lemma id so we link this lemma to the current movie
-                                                            arrcouples = {}
-                                                            arrcouples["ID_MOVIE"] = lngmovieid
-                                                            arrcouples["ID_LEMME"] = lnglemmeid
-                                                            arrcouples["START_CHAR"] = lngstartchar
-                                                            # INSERT/UPDATE this record
-                                                            strsqltablename = "T_WC_TMDB_MOVIE_LEMME"
-                                                            strsqlupdatecondition = f"ID_MOVIE = {lngmovieid} AND ID_LEMME = {lnglemmeid} AND START_CHAR = {lngstartchar} "
-                                                            lngresult = cp.f_sqlupdatearray(strsqltablename,arrcouples,strsqlupdatecondition,1)
-                                            
-                                        stryearrelease = ""
-                                        if datrelease:
-                                            stryearrelease = datrelease.strftime("%Y")
-                                        
-                                        # Retrieving collection name if any
-                                        strcollectionname = ""
-                                        if lngmoviecollectionid:
-                                            # In English
-                                            # Adding this collection id to the tag list for the current movie
-                                            strtags += " " + "c" + str(lngmoviecollectionid)
-                                            strsqlcollection = "SELECT NAME FROM T_WC_TMDB_COLLECTION WHERE ID_COLLECTION = " + str(lngmoviecollectionid) + " "
-                                            #print(strsqlcollection)
-                                            cursor2.execute(strsqlcollection)
-                                            results2 = cursor2.fetchall()
-                                            # Iterating through the results 
-                                            for row2 in results2:
-                                                if row2['NAME'] != "":
-                                                    strcollectionname = row2['NAME']
-                                                    #print("-> strcollectionname",strcollectionname)
-                                                break
-                                            if strlang != "en":
-                                                # In the current language
-                                                strsqlcollection = "SELECT NAME FROM T_WC_TMDB_COLLECTION_LANG WHERE ID_COLLECTION = " + str(lngmoviecollectionid) + " AND LANG = '" + strlang + "' "
-                                                #print(strsqlcollection)
-                                                cursor2.execute(strsqlcollection)
-                                                results2 = cursor2.fetchall()
-                                                # Iterating through the results 
-                                                for row2 in results2:
-                                                    if row2['NAME'] != "":
-                                                        strcollectionname = row2['NAME']
-                                                        #print("-> strcollectionname",strcollectionname)
-                                                    break
-                                        
-                                        # Retrieving original language
-                                        stroriginallanguagename = ""
-                                        if strmovieoriginallanguage != "":
-                                            strsqllang = "SELECT DESCRIPTION FROM T_WC_TMDB_LANG_LANG WHERE LANG = '" + strmovieoriginallanguage + "' AND LANG_DISPLAY = '" + strlang + "' "
-                                            #print(strsqllang)
-                                            cursor2.execute(strsqllang)
-                                            results2 = cursor2.fetchall()
-                                            # Iterating through the results 
-                                            for row2 in results2:
-                                                if row2['DESCRIPTION']:
-                                                    stroriginallanguagename = row2['DESCRIPTION']
-                                                break
-                                        
-                                        # Retrieving genres
-                                        #print(strmoviegenres)
-                                        intdocumentary = False
-                                        if strmoviegenres != "":
-                                            if "|Documentary|" in strmoviegenres:
-                                                # This is a documentary
-                                                intdocumentary = True
-                                        strmoviegenres = cp.f_genrestranslatefr(strmoviegenres)
-                                        if strmoviegenres != "":
-                                            if strmoviegenres[0] == "|":
-                                                strmoviegenres = strmoviegenres[1:]
-                                            if strmoviegenres != "":
-                                                if strmoviegenres[-1] == "|":
-                                                    strmoviegenres = strmoviegenres[:-1]
-                                            strmoviegenresdb = strmoviegenres
-                                            strmoviegenresdb = strmoviegenresdb.replace("-", "")
-                                            strmoviegenresdb = strmoviegenresdb.replace(" ", "")
-                                            strmoviegenresdb = strmoviegenresdb.replace("|"," ")
-                                            strtags += " " + strmoviegenresdb
-                                            strmoviegenres = strmoviegenres.replace("|",", ")
-                                        
-                                        # Retrieving color technology
-                                        #print('strmoviecolortech', strmoviecolortech)
-                                        if strmoviecolortech:
-                                            if strmoviecolortech != "":
-                                                if strmoviecolortech[0] == "|":
-                                                    strmoviecolortech = strmoviecolortech[1:]
-                                                if strmoviecolortech != "":
-                                                    if strmoviecolortech[-1] == "|":
-                                                        strmoviecolortech = strmoviecolortech[:-1]
-                                                strmoviecolortech = strmoviecolortech.replace("|",", ")
-                                            
-                                        # Retrieving film technology
-                                        #print('strmoviefilmtech', strmoviefilmtech)
-                                        if strmoviefilmtech:
-                                            if strmoviefilmtech != "":
-                                                if strmoviefilmtech[0] == "|":
-                                                    strmoviefilmtech = strmoviefilmtech[1:]
-                                                if strmoviefilmtech != "":
-                                                    if strmoviefilmtech[-1] == "|":
-                                                        strmoviefilmtech = strmoviefilmtech[:-1]
-                                                strmoviefilmtech = strmoviefilmtech.replace("|",", ")
-                                            
-                                        # Retrieving sound system
-                                        #print('strmoviesoundsystem', strmoviesoundsystem)
-                                        if strmoviesoundsystem:
-                                            if strmoviesoundsystem != "":
-                                                if strmoviesoundsystem[0] == "|":
-                                                    strmoviesoundsystem = strmoviesoundsystem[1:]
-                                                if strmoviesoundsystem != "":
-                                                    if strmoviesoundsystem[-1] == "|":
-                                                        strmoviesoundsystem = strmoviesoundsystem[:-1]
-                                                strmoviesoundsystem = strmoviesoundsystem.replace("|",", ")
-                                            
-                                        # Retrieving sound technology
-                                        #print('strmoviesoundtech', strmoviesoundtech)
-                                        if strmoviesoundtech:
-                                            if strmoviesoundtech != "":
-                                                if strmoviesoundtech[0] == "|":
-                                                    strmoviesoundtech = strmoviesoundtech[1:]
-                                                if strmoviesoundtech != "":
-                                                    if strmoviesoundtech[-1] == "|":
-                                                        strmoviesoundtech = strmoviesoundtech[:-1]
-                                                strmoviesoundtech = strmoviesoundtech.replace("|",", ")
-                                            
-                                        # Retrieving keywords
-                                        if strlang != "en":
-                                            strkeywordstable = cp.strsqlns + "TMDB_KEYWORD_LANG"
-                                        else:
-                                            strkeywordstable = cp.strsqlns + "TMDB_KEYWORD"
-                                        strsqlkeywords = "SELECT " + strkeywordstable + ".ID_KEYWORD, " + strkeywordstable + ".NAME "
-                                        strsqlkeywords +="FROM T_WC_TMDB_MOVIE_KEYWORD "
-                                        strsqlkeywords +="INNER JOIN " + strkeywordstable + " ON T_WC_TMDB_MOVIE_KEYWORD.ID_KEYWORD = " + strkeywordstable + ".ID_KEYWORD "
-                                        strsqlkeywords +="WHERE T_WC_TMDB_MOVIE_KEYWORD.ID_MOVIE = " + str(lngmovieid) + " AND T_WC_TMDB_MOVIE_KEYWORD.DELETED = 0 "
-                                        if strlang != "en":
-                                            strsqlkeywords += " AND " + strkeywordstable + ".LANG = '" + strlang + "' "
-                                        strsqlkeywords += "ORDER BY T_WC_TMDB_MOVIE_KEYWORD.DISPLAY_ORDER "
-                                        strmoviekeywords = ""
-                                        strsep = ", "
-                                        #print(strsqlkeywords)
-                                        cursor2.execute(strsqlkeywords)
-                                        results2 = cursor2.fetchall()
-                                        # Iterating through the results 
-                                        for row2 in results2:
-                                            lngmoviekeywordid = row2['ID_KEYWORD']
-                                            # Adding this keyword id to the tag list for the current movie
-                                            strtags += " " + "k" + str(lngmoviekeywordid)
-                                            strmoviekeyword = row2['NAME']
-                                            if strmoviekeywordslemma != "":
-                                                strmoviekeywordslemma += " "
-                                            strmoviekeywordslemma += f_getlemma(strmoviekeyword)
-                                            if len(strmoviekeywords + strsep + strmoviekeyword) > lngmaxlengthkeywords:
-                                                # String is too long, so we stop appending keywords
-                                                break
-                                            else:
-                                                # Adding this keyword
-                                                if strmoviekeywords != "":
-                                                    strmoviekeywords += strsep
-                                                strmoviekeywords += strmoviekeyword
-                                                # Marking this keyword as used for tags
-                                                strsqlupdate = "UPDATE T_WC_TMDB_KEYWORD SET USED_FOR_SIMILARITY = 1 WHERE ID_KEYWORD = " + str(lngmoviekeywordid)
-                                                # print(strsqlupdate)
-                                                cursor3.execute(strsqlupdate)
-                                                # Commit the changes to the database
-                                                cp.connectioncp.commit()
-                                        
-                                        # Retrieving companies
-                                        strmoviecompanieslemma = ""
-                                        strsqlcompanies = "SELECT T_WC_TMDB_MOVIE_COMPANY.ID_COMPANY, T_WC_TMDB_COMPANY.NAME "
-                                        strsqlcompanies +="FROM T_WC_TMDB_MOVIE_COMPANY "
-                                        strsqlcompanies +="INNER JOIN T_WC_TMDB_COMPANY ON T_WC_TMDB_MOVIE_COMPANY.ID_COMPANY = T_WC_TMDB_COMPANY.ID_COMPANY "
-                                        strsqlcompanies +="WHERE T_WC_TMDB_MOVIE_COMPANY.ID_MOVIE = " + str(lngmovieid) + " AND T_WC_TMDB_MOVIE_COMPANY.DELETED = 0 "
-                                        strsqlcompanies += "ORDER BY T_WC_TMDB_MOVIE_COMPANY.DISPLAY_ORDER "
-                                        strmoviecompanies = ""
-                                        strsep = ", "
-                                        #print(strsqlcompanies)
-                                        cursor2.execute(strsqlcompanies)
-                                        results2 = cursor2.fetchall()
-                                        # Iterating through the results 
-                                        for row2 in results2:
-                                            lngmoviecompanyid = row2['ID_COMPANY']
-                                            # Adding this company ID_COMPANY to the tag list for the current movie
-                                            strtags += " " + "o" + str(lngmoviecompanyid)
-                                            strmoviecompany = row2['NAME']
-                                            if strmoviecompanieslemma != "":
-                                                strmoviecompanieslemma += " "
-                                            strmoviecompanieslemma += f_getlemma(strmoviecompany)
-                                            if len(strmoviecompanies + strsep + strmoviecompany) > lngmaxlengthcompanies:
-                                                # String is too long, so we stop appending companies
-                                                break
-                                            else:
-                                                # Adding this company
-                                                if strmoviecompanies != "":
-                                                    strmoviecompanies += strsep
-                                                strmoviecompanies += strmoviecompany
-                                                # Marking this company as used for tags
-                                                strsqlupdate = "UPDATE T_WC_TMDB_COMPANY SET USED_FOR_SIMILARITY = 1 WHERE ID_COMPANY = " + str(lngmoviecompanyid)
-                                                # print(strsqlupdate)
-                                                cursor3.execute(strsqlupdate)
-                                                # Commit the changes to the database
-                                                cp.connectioncp.commit()
-                                        
-                                        # Retrieving the IMDb rating if the IMDb ID is known and if the IMDb rating is set
-                                        dblimdbrating = 0
-                                        if strmovieidimdb != "":
-                                            strsqlimdbrating = "SELECT averageRating FROM T_WC_IMDB_MOVIE_RATING_IMPORT WHERE tconst = '" + strmovieidimdb + "' "
-                                        #print(strsqlimdbrating)
-                                        cursor2.execute(strsqlimdbrating)
-                                        results2 = cursor2.fetchall()
-                                        # Iterating through the results 
-                                        for row2 in results2:
-                                            dblimdbrating = row2['averageRating']
-                                            break
-                                        if intdocumentary:
-                                            intisdocumentary = 1
-                                            intismovie = 0
-                                        else:
-                                            intisdocumentary = 0
-                                            intismovie = 1
-                                        
-                                        if dblimdbrating >= 6 or True:
-                                            # IMDb rating is 6 or above, so we can go further
-                                            # Retrieving the lists for the current movie
-                                            strsqlmovielists="SELECT " + cp.strsqlns + "TMDB_LIST.ID_LIST, " + cp.strsqlns + "TMDB_LIST.NAME, " + cp.strsqlns + "TMDB_LIST.SHORT_NAME "
-                                            #if strlang != "en":
-                                            #    strsqlmovielists += ", " + cp.strsqlns + "TMDB_LIST_LANG.SHORT_NAME AS SHORT_NAME_LANG "
-                                            strsqlmovielists += "FROM " + cp.strsqlns + "TMDB_LIST "
-                                            strsqlmovielists += "INNER JOIN " + cp.strsqlns + "TMDB_MOVIE_LIST ON " + cp.strsqlns + "TMDB_MOVIE_LIST.ID_LIST = " + cp.strsqlns + "TMDB_LIST.ID_LIST "
-                                            #if strlang != "en":
-                                            #    strsqlmovielists += "LEFT JOIN " + cp.strsqlns + "TMDB_LIST_LANG ON " + cp.strsqlns + "TMDB_LIST.ID_LIST = " + cp.strsqlns + "TMDB_LIST_LANG.ID_LIST "
-                                            strsqlmovielists += "WHERE " + cp.strsqlns + "TMDB_MOVIE_LIST.ID_MOVIE = " + str(lngmovieid) + " AND " + cp.strsqlns + "TMDB_LIST.DELETED = 0 "
-                                            strsqlmovielists += "AND " + cp.strsqlns + "TMDB_LIST.USE_FOR_TAGGING >= 1 "
-                                            #if strlang != "en":
-                                            #    strsqlmovielists += "AND " + cp.strsqlns + "TMDB_LIST_LANG.LANG = '" + strlang + "' "
-                                            strmovielists = ""
-                                            strmovielistslemma = ""
-                                            #print(strsqlmovielists)
-                                            cursor2.execute(strsqlmovielists)
-                                            results2 = cursor2.fetchall()
-                                            # Iterating through the results 
-                                            for row2 in results2:
-                                                lngmovielistid = row2['ID_LIST']
-                                                # Adding this list id to the tag list for the current movie
-                                                strtags += " " + "l" + str(lngmovielistid)
-                                                strmovielistname = row2['NAME']
-                                                #print('strmovielistname', strmovielistname, type(strmovielistname))
-                                                strmovielistshortname = row2['SHORT_NAME']
-                                                #print('strmovielistshortname', strmovielistshortname, type(strmovielistshortname))
-                                                #strmovielistshortnamelang = row2['SHORT_NAME_LANG']
-                                                if type(strmovielistshortname) is str:
-                                                    strmovielistname = strmovielistshortname
-                                                    #print('strmovielistname', strmovielistname, type(strmovielistname))
-                                                #if strlang != "en" and strmovielistshortnamelang != "":
-                                                #    strmovielistname = strmovielistshortnamelang
-                                                if strlang != "en":
-                                                    strsqllistlang = "SELECT SHORT_NAME FROM " + cp.strsqlns + "TMDB_LIST_LANG WHERE DELETED = 0 AND ID_LIST = " + str(lngmovielistid) + " AND LANG = '" + strlang + "' "
-                                                    #print(strsqllistlang)
-                                                    cursor3.execute(strsqllistlang)
-                                                    results3 = cursor3.fetchall()
-                                                    for row3 in results3:
-                                                        if row3['SHORT_NAME'] != "":
-                                                            if type(row3['SHORT_NAME']) is str:
-                                                                strmovielistname = row3['SHORT_NAME']
-                                                                #print('strmovielistname', strmovielistname, type(strmovielistname))
-                                                if strmovielistname:
-                                                    if strmovielists != "":
-                                                        strmovielists += ", "
-                                                    strmovielists += strmovielistname
-                                                    if strmovielistslemma != "":
-                                                        strmovielistslemma += " "
-                                                    strmovielistslemma += f_getlemma(strmovielistname)
-                                                    #print('strmovielists',strmovielists)
-                                            
-                                            # If the current movie has a Wikidata id, retrieving wikidata data including Criterion Collection data
-                                            lngmovieidcriterion = 0
-                                            lngmovieidcriterionspine = 0
-                                            strmoviealiases = ""
-                                            if strmovieidwikidata != "":
-                                                strsqlwikidata = "SELECT * FROM " + cp.strsqlns + "WIKIDATA_MOVIE_V1 WHERE ID_WIKIDATA = '" + strmovieidwikidata +"' "
-                                                cursor3.execute(strsqlwikidata)
-                                                results3 = cursor3.fetchall()
-                                                for row3 in results3:
-                                                    if row3['ID_CRITERION']:
-                                                        lngmovieidcriterion = row3['ID_CRITERION']
-                                                    if row3['ID_CRITERION_SPINE']:
-                                                        lngmovieidcriterionspine = row3['ID_CRITERION_SPINE']
-                                                    if row3['ALIASES']:
-                                                        strmoviealiases = row3['ALIASES']
-                                            
-                                            strwikidatainstanceoftext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P31",", ")
-                                            strwikidataformofcreativeworktext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P7937",", ")
-                                            strwikidatagenrestext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P136",", ")
-                                            strwikidatadepictstext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P180",", ")
-                                            strwikidatacolortext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P462",", ")
-                                            strwikidataaspectratiotext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P2061",", ")
-                                            strwikidataoriginalfilmformattext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P3803",", ")
-                                            strwikidatafabricationmethodtext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P2079",", ")
-                                            strwikidatadistributedbytext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P750",", ")
-                                            strwikidataproductioncompanytext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P272",", ")
-                                            strwikidatamainsubjecttext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P921",", ")
-                                            strwikidatanarrativelocationtext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P840",", ")
-                                            strwikidatafilminglocationtext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P915",", ")
-                                            strwikidatacharacterstext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P674",", ")
-                                            strwikidatacasttext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P161",", ")
-                                            #strwikidatanominatedfortext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P1411",", ")
-                                            strwikidataawardreceivedtext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P166",", ")
-                                            strwikidatabasedontext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P144",", ")
-                                            strwikidatainspiredbytext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P941",", ")
-                                            strwikidataderivativeworktext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P4969",", ")
-                                            strwikidatamovementtext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P135",", ")
-                                            strwikidatasetinenvironmenttext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P8411",", ")
-                                            strwikidatatakesplaceinfictionaluniversetext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P1434",", ")
-                                            strwikidatacountryoforigintext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P495",", ")
-                                            strwikidatapartoftext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P361",", ")
-                                            strwikidatapartoftheseriestext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P179",", ")
-                                            strwikidatadescribedbysourcetext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P1343",", ")
-                                            strwikidatacollectiontext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P195",", ")
-                                            strwikidatamediafranchisetext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P8345",", ")
-                                            strwikidatacncfilmratingfrancetext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P2758",", ")
-                                            strwikidatainternetarchiveidtext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P724",", ")
-                                            strwikidatasetinperiodtext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P2408",", ")
-                                            strwikidatasetduringrecurringeventtext = f_wikidataitemproperties(strlang,strmovieidwikidata,"P9215",", ")
-                                            
-                                            #print(f"Cast (P161): {strwikidatacasttext}")
-                                            
-                                            
-                                            
-                                            
-                                            
-                                            # Cast processing
-                                            strsqlmoviecast = ""
-                                            strsqlmoviecast += "SELECT " + cp.strsqlns + "TMDB_PERSON.ID_PERSON, " + cp.strsqlns + "TMDB_PERSON.NAME, " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA, " + cp.strsqlns + "WIKIDATA_PERSON_V1.ALIASES, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CAST_CHARACTER "
-                                            strsqlmoviecast += "FROM " + cp.strsqlns + "TMDB_PERSON_MOVIE "
-                                            strsqlmoviecast += "INNER JOIN " + cp.strsqlns + "TMDB_PERSON ON " + cp.strsqlns + "TMDB_PERSON_MOVIE.ID_PERSON = " + cp.strsqlns + "TMDB_PERSON.ID_PERSON "
-                                            strsqlmoviecast += "INNER JOIN " + cp.strsqlns + "WIKIDATA_PERSON_V1 ON " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA = " + cp.strsqlns + "WIKIDATA_PERSON_V1.ID_WIKIDATA "
-                                            strsqlmoviecast += "WHERE " + cp.strsqlns + "TMDB_PERSON_MOVIE.ID_MOVIE = " + str(lngmovieid) + " "
-                                            strsqlmoviecast += "AND " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREDIT_TYPE = 'cast' "
-                                            # Adding a condition to keep only persons with a Wikidata id, so probably a Wikipedia page
-                                            #strsqlmoviecast += "AND T_WC_TMDB_PERSON.ID_WIKIDATA <> '' "
-                                            strsqlmoviecast += "AND " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA LIKE 'Q%' "
-                                            strsqlmoviecast += "ORDER BY " + cp.strsqlns + "TMDB_PERSON_MOVIE.DISPLAY_ORDER "
-                                            strmoviecastswithaliases = ""
-                                            strmoviecastswithoutaliases = ""
-                                            lngcast = 0
-                                            strsep = ", "
-                                            #print(strsqlmoviecast)
-                                            cursor2.execute(strsqlmoviecast)
-                                            results2 = cursor2.fetchall()
-                                            # Iterating through the results 
-                                            for row2 in results2:
-                                                lngmoviecastid = row2['ID_PERSON']
-                                                strmoviecastname = row2['NAME']
-                                                strmoviecastaliases = row2['ALIASES']
-                                                if len(strmoviecastswithaliases + strsep + strmoviecastname) > lngmaxlengthcastwithaliases:
-                                                    # String is too long, so we stop appending credits
-                                                    break
-                                                else:
-                                                    # Adding this person id to the tag list for the current movie
-                                                    strtags += " " + "p" + str(lngmoviecastid)
-                                                    f_tmdbpersonsetusedfortags(lngmoviecastid)
-                                                    # Adding this cast credit
-                                                    if strmoviecastswithaliases != "":
-                                                        strmoviecastswithaliases += strsep
-                                                    strmoviecastswithaliases += strmoviecastname
-                                                    if strmoviecastswithoutaliases != "":
-                                                        strmoviecastswithoutaliases += strsep
-                                                    strmoviecastswithoutaliases += strmoviecastname
-                                                    if strmoviecastaliases:
-                                                        if strmoviecastaliases != "":
-                                                            strmoviecastaliases = strmoviecastaliases.replace("|"," ").strip()
-                                                            if strmoviecastaliases != "":
-                                                                strmoviecastswithaliases += " " + strmoviecastaliases
-                                                    lngcast += 1
-                                                    if lngcast >= lngmaxcast:
-                                                        break
-                                            
-                                            # Crew processing
-                                            strsqlmoviecrew = ""
-                                            strsqlmoviecrew += "SELECT " + cp.strsqlns + "TMDB_PERSON.ID_PERSON, " + cp.strsqlns + "TMDB_PERSON.NAME, " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA, " + cp.strsqlns + "WIKIDATA_PERSON_V1.ALIASES, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREW_DEPARTMENT, " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREW_JOB "
-                                            strsqlmoviecrew += "FROM " + cp.strsqlns + "TMDB_PERSON_MOVIE "
-                                            strsqlmoviecrew += "INNER JOIN " + cp.strsqlns + "TMDB_PERSON ON " + cp.strsqlns + "TMDB_PERSON_MOVIE.ID_PERSON = " + cp.strsqlns + "TMDB_PERSON.ID_PERSON "
-                                            strsqlmoviecrew += "INNER JOIN " + cp.strsqlns + "WIKIDATA_PERSON_V1 ON " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA = " + cp.strsqlns + "WIKIDATA_PERSON_V1.ID_WIKIDATA "
-                                            strsqlmoviecrew += "WHERE " + cp.strsqlns + "TMDB_PERSON_MOVIE.ID_MOVIE = " + str(lngmovieid) + " "
-                                            strsqlmoviecrew += "AND " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREDIT_TYPE = 'crew' "
-                                            strsqlmoviecrew += "AND " + cp.strsqlns + "TMDB_PERSON_MOVIE.CREW_DEPARTMENT IN ('Art', 'Camera', 'Directing', 'Editing', 'Sound', 'Writing', 'Production', 'Costume & Make-Up', 'Visual Effects') "
-                                            #strsqlmoviecrew += "AND CREW_JOB IN ('Director', 'Camera', 'Directing', 'Editing', 'Sound', 'Writing') "
-                                            # Adding a condition to keep only persons with a Wikidata id, so probably a Wikipedia page
-                                            #strsqlmoviecrew += "AND T_WC_TMDB_PERSON.ID_WIKIDATA <> '' "
-                                            strsqlmoviecrew += "AND " + cp.strsqlns + "TMDB_PERSON.ID_WIKIDATA LIKE 'Q%' "
-                                            strsqlmoviecrew += "ORDER BY " + cp.strsqlns + "TMDB_PERSON_MOVIE.DISPLAY_ORDER "
-                                            strmoviecrewswithaliases = ""
-                                            strmoviecrewswithoutaliases = ""
-                                            strmoviedirectorswithaliases = ""
-                                            strmoviedirectorswithoutaliases = ""
-                                            strmoviewriterswithaliases = ""
-                                            strmoviewriterswithoutaliases = ""
-                                            strmovieproducerswithaliases = ""
-                                            strmovieproducerswithoutaliases = ""
-                                            strmovieeditorswithoutaliases = ""
-                                            strmovieartwithoutaliases = ""
-                                            strmoviecamerawithoutaliases = ""
-                                            strmovielightningwithoutaliases = ""
-                                            strmoviesoundwithoutaliases = ""
-                                            strmoviecostumemakeupwithoutaliases = ""
-                                            strmovievisualeffectswithoutaliases = ""
-                                            lngcrew = 0
-                                            lngdirectors = 0
-                                            lngwriters = 0
-                                            lngproducers = 0
-                                            lngeditors = 0
-                                            lngart = 0
-                                            lngcamera = 0
-                                            lnglightning = 0
-                                            lngsound = 0
-                                            lngcostumemakeup = 0
-                                            lngvisualeffects = 0
-                                            strsep = ", "
-                                            #print(strsqlmoviecrew)
-                                            cursor2.execute(strsqlmoviecrew)
-                                            results2 = cursor2.fetchall()
-                                            # Iterating through the results 
-                                            for row2 in results2:
-                                                lngmoviecrewid = row2['ID_PERSON']
-                                                strmoviecrewname = row2['NAME']
-                                                strmoviecrewaliases = row2['ALIASES']
-                                                strmoviecrewdepartment = row2['CREW_DEPARTMENT']
-                                                strmoviecrewjob = row2['CREW_JOB']
-                                                if strmoviecrewaliases:
-                                                    if strmoviecrewaliases != "":
-                                                        strmoviecrewaliases = strmoviecrewaliases.replace("|"," ").strip()
-                                                if strmoviecrewdepartment == "Directing":
-                                                    if strmoviecrewjob == "Director":
-                                                        # Handling director credit
-                                                        strtmp = strsep + strmoviedirectorswithaliases + strsep
-                                                        lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                        if lngpos == -1:
-                                                            # Credit not found in directors so we can add it
-                                                            strtmp = strsep + strmoviewriterswithaliases + strsep
-                                                            lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                            if lngpos == -1 or intallowpersonmultiplecredit:
-                                                                # Credit not found in writers so we can add it
-                                                                strtmp = strsep + strmoviecrewswithaliases + strsep
-                                                                lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                                if lngpos == -1 or intallowpersonmultiplecredit:
-                                                                    # Credit not found in movie crew so we can add it
-                                                                    if len(strmoviedirectorswithaliases + strsep + strmoviecrewname) <= lngmaxlengthdirectors:
-                                                                        # String is NOT too long, so we continue appending directors credits
-                                                                        if lngdirectors < lngmaxdirectors:
-                                                                            # Adding this person id to the tag list for the current movie
-                                                                            strtags += " " + "p" + str(lngmoviecrewid)
-                                                                            f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                            # Adding this director credit
-                                                                            lngdirectors += 1
-                                                                            if strmoviedirectorswithaliases != "":
-                                                                                strmoviedirectorswithaliases += strsep
-                                                                            strmoviedirectorswithaliases += strmoviecrewname
-                                                                            if strmoviedirectorswithoutaliases != "":
-                                                                                strmoviedirectorswithoutaliases += strsep
-                                                                            strmoviedirectorswithoutaliases += strmoviecrewname
-                                                                            if strmoviecrewaliases:
-                                                                                if strmoviecrewaliases != "":
-                                                                                    strmoviedirectorswithaliases += " " + strmoviecrewaliases
-                                                elif strmoviecrewdepartment == "Writing":
-                                                    # Handling writing credit
-                                                    strtmp = strsep + strmoviewriterswithaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in writers so we can add it
-                                                        strtmp = strsep + strmoviedirectorswithaliases + strsep
-                                                        lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                        if lngpos == -1 or intallowpersonmultiplecredit:
-                                                            # Credit not found in directors so we can add it
-                                                            strtmp = strsep + strmoviecrewswithaliases + strsep
-                                                            lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                            if lngpos == -1 or intallowpersonmultiplecredit:
-                                                                # Credit not found in movie crew so we can add it
-                                                                if len(strmoviewriterswithaliases + strsep + strmoviecrewname) <= lngmaxlengthwriters:
-                                                                    # String is NOT too long, so we continue appending writing credits
-                                                                    if lngwriters < lngmaxwriters:
-                                                                        # Adding this person id to the tag list for the current movie
-                                                                        strtags += " " + "p" + str(lngmoviecrewid)
-                                                                        f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                        # Adding this writing credit
-                                                                        lngwriters += 1
-                                                                        if strmoviewriterswithaliases != "":
-                                                                            strmoviewriterswithaliases += strsep
-                                                                        strmoviewriterswithaliases += strmoviecrewname
-                                                                        if strmoviewriterswithoutaliases != "":
-                                                                            strmoviewriterswithoutaliases += strsep
-                                                                        strmoviewriterswithoutaliases += strmoviecrewname
-                                                                        if strmoviecrewaliases:
-                                                                            if strmoviecrewaliases != "":
-                                                                                strmoviewriterswithaliases += " " + strmoviecrewaliases
-                                                elif strmoviecrewdepartment == "Production":
-                                                    # Handling production credit
-                                                    #print(strmoviecrewname)
-                                                    strtmp = strsep + strmovieproducerswithaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in producers so we can add it
-                                                        #print("Credit not found in producers so we can add it")
-                                                        strtmp = strsep + strmoviedirectorswithaliases + strsep
-                                                        lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                        if lngpos == -1 or intallowpersonmultiplecredit:
-                                                            # Credit not found in directors so we can add it
-                                                            #print("Credit not found in directors so we can add it")
-                                                            strtmp = strsep + strmoviecrewswithaliases + strsep
-                                                            lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                            if lngpos == -1 or intallowpersonmultiplecredit:
-                                                                #print("Credit not found in movie crew so we can add it")
-                                                                # Credit not found in movie crew so we can add it
-                                                                if len(strmovieproducerswithaliases + strsep + strmoviecrewname) <= lngmaxlengthproducers:
-                                                                    # String is NOT too long, so we continue appending production credits
-                                                                    if lngproducers < lngmaxproducers:
-                                                                        # Adding this person id to the tag list for the current movie
-                                                                        #print("Adding this person id to the tag list for the current movie")
-                                                                        strtags += " " + "p" + str(lngmoviecrewid)
-                                                                        f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                        # Adding this writing credit
-                                                                        lngproducers += 1
-                                                                        if strmovieproducerswithaliases != "":
-                                                                            strmovieproducerswithaliases += strsep
-                                                                        strmovieproducerswithaliases += strmoviecrewname
-                                                                        #print("strmovieproducerswithaliases =",strmovieproducerswithaliases)
-                                                                        if strmovieproducerswithoutaliases != "":
-                                                                            strmovieproducerswithoutaliases += strsep
-                                                                        strmovieproducerswithoutaliases += strmoviecrewname
-                                                                        #print("strmovieproducerswithoutaliases =",strmovieproducerswithoutaliases)
-                                                                        if strmoviecrewaliases:
-                                                                            if strmoviecrewaliases != "":
-                                                                                strmovieproducerswithaliases += " " + strmoviecrewaliases
-                                                                                #print("strmovieproducerswithaliases =",strmovieproducerswithaliases)
-                                                elif strmoviecrewdepartment == "Editing":
-                                                    # Handling editing credit
-                                                    #print(strmoviecrewname)
-                                                    strtmp = strsep + strmovieeditorswithoutaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in editors so we can add it
-                                                        #print("Credit not found in editors so we can add it")
-                                                        if len(strmovieeditorswithoutaliases + strsep + strmoviecrewname) <= lngmaxlengtheditors:
-                                                            # String is NOT too long, so we continue appending editing credits
-                                                            if lngeditors < lngmaxeditors:
-                                                                # Adding this person id to the tag list for the current movie
-                                                                #print("Adding this person id to the tag list for the current movie")
-                                                                strtags += " " + "p" + str(lngmoviecrewid)
-                                                                f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                # Adding this editor credit
-                                                                lngeditors += 1
-                                                                if strmovieeditorswithoutaliases != "":
-                                                                    strmovieeditorswithoutaliases += strsep
-                                                                strmovieeditorswithoutaliases += strmoviecrewname
-                                                                #print("strmovieeditorswithoutaliases =",strmovieeditorswithoutaliases)
-                                                elif strmoviecrewdepartment == "Art":
-                                                    # Handling art credit
-                                                    #print(strmoviecrewname)
-                                                    strtmp = strsep + strmovieartwithoutaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in art so we can add it
-                                                        #print("Credit not found in art so we can add it")
-                                                        if len(strmovieartwithoutaliases + strsep + strmoviecrewname) <= lngmaxlengthart:
-                                                            # String is NOT too long, so we continue appending art credits
-                                                            if lngart < lngmaxart:
-                                                                # Adding this person id to the tag list for the current movie
-                                                                #print("Adding this person id to the tag list for the current movie")
-                                                                strtags += " " + "p" + str(lngmoviecrewid)
-                                                                f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                # Adding this art credit
-                                                                lngart += 1
-                                                                if strmovieartwithoutaliases != "":
-                                                                    strmovieartwithoutaliases += strsep
-                                                                strmovieartwithoutaliases += strmoviecrewname
-                                                                #print("strmovieartwithoutaliases =",strmovieartwithoutaliases)
-                                                elif strmoviecrewdepartment == "Camera":
-                                                    # Handling camera credit
-                                                    #print(strmoviecrewname)
-                                                    strtmp = strsep + strmoviecamerawithoutaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in camera so we can add it
-                                                        #print("Credit not found in camera so we can add it")
-                                                        if len(strmoviecamerawithoutaliases + strsep + strmoviecrewname) <= lngmaxlengthcamera:
-                                                            # String is NOT too long, so we continue appending camera credits
-                                                            if lngcamera < lngmaxcamera:
-                                                                # Adding this person id to the tag list for the current movie
-                                                                #print("Adding this person id to the tag list for the current movie")
-                                                                strtags += " " + "p" + str(lngmoviecrewid)
-                                                                f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                # Adding this camera credit
-                                                                lngcamera += 1
-                                                                if strmoviecamerawithoutaliases != "":
-                                                                    strmoviecamerawithoutaliases += strsep
-                                                                strmoviecamerawithoutaliases += strmoviecrewname
-                                                                #print("strmoviecamerawithoutaliases =",strmoviecamerawithoutaliases)
-                                                elif strmoviecrewdepartment == "Lightning":
-                                                    # Handling lightning credit
-                                                    #print(strmoviecrewname)
-                                                    strtmp = strsep + strmovielightningwithoutaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in lightning so we can add it
-                                                        #print("Credit not found in lightning so we can add it")
-                                                        if len(strmovielightningwithoutaliases + strsep + strmoviecrewname) <= lngmaxlengthlightning:
-                                                            # String is NOT too long, so we continue appending lightning credits
-                                                            if lnglightning < lngmaxlightning:
-                                                                # Adding this person id to the tag list for the current movie
-                                                                #print("Adding this person id to the tag list for the current movie")
-                                                                strtags += " " + "p" + str(lngmoviecrewid)
-                                                                f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                # Adding this lightning credit
-                                                                lnglightning += 1
-                                                                if strmovielightningwithoutaliases != "":
-                                                                    strmovielightningwithoutaliases += strsep
-                                                                strmovielightningwithoutaliases += strmoviecrewname
-                                                                #print("strmovielightningwithoutaliases =",strmovielightningwithoutaliases)
-                                                elif strmoviecrewdepartment == "Sound":
-                                                    # Handling sound credit
-                                                    #print(strmoviecrewname)
-                                                    strtmp = strsep + strmoviesoundwithoutaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in sound so we can add it
-                                                        #print("Credit not found in sound so we can add it")
-                                                        if len(strmoviesoundwithoutaliases + strsep + strmoviecrewname) <= lngmaxlengthsound:
-                                                            # String is NOT too long, so we continue appending sound credits
-                                                            if lngsound < lngmaxsound:
-                                                                # Adding this person id to the tag list for the current movie
-                                                                #print("Adding this person id to the tag list for the current movie")
-                                                                strtags += " " + "p" + str(lngmoviecrewid)
-                                                                f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                # Adding this sound credit
-                                                                lngsound += 1
-                                                                if strmoviesoundwithoutaliases != "":
-                                                                    strmoviesoundwithoutaliases += strsep
-                                                                strmoviesoundwithoutaliases += strmoviecrewname
-                                                                #print("strmoviesoundwithoutaliases =",strmoviesoundwithoutaliases)
-                                                elif strmoviecrewdepartment == "Costume & Make-Up":
-                                                    # Handling costumemakeup credit
-                                                    #print(strmoviecrewname)
-                                                    strtmp = strsep + strmoviecostumemakeupwithoutaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in costumemakeup so we can add it
-                                                        #print("Credit not found in costumemakeup so we can add it")
-                                                        if len(strmoviecostumemakeupwithoutaliases + strsep + strmoviecrewname) <= lngmaxlengthcostumemakeup:
-                                                            # String is NOT too long, so we continue appending costumemakeup credits
-                                                            if lngcostumemakeup < lngmaxcostumemakeup:
-                                                                # Adding this person id to the tag list for the current movie
-                                                                #print("Adding this person id to the tag list for the current movie")
-                                                                strtags += " " + "p" + str(lngmoviecrewid)
-                                                                f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                # Adding this costumemakeup credit
-                                                                lngcostumemakeup += 1
-                                                                if strmoviecostumemakeupwithoutaliases != "":
-                                                                    strmoviecostumemakeupwithoutaliases += strsep
-                                                                strmoviecostumemakeupwithoutaliases += strmoviecrewname
-                                                                #print("strmoviecostumemakeupwithoutaliases =",strmoviecostumemakeupwithoutaliases)
-                                                elif strmoviecrewdepartment == "Visual Effects":
-                                                    # Handling visualeffects credit
-                                                    #print(strmoviecrewname)
-                                                    strtmp = strsep + strmovievisualeffectswithoutaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in visualeffects so we can add it
-                                                        #print("Credit not found in visualeffects so we can add it")
-                                                        if len(strmovievisualeffectswithoutaliases + strsep + strmoviecrewname) <= lngmaxlengthvisualeffects:
-                                                            # String is NOT too long, so we continue appending visualeffects credits
-                                                            if lngvisualeffects < lngmaxvisualeffects:
-                                                                # Adding this person id to the tag list for the current movie
-                                                                #print("Adding this person id to the tag list for the current movie")
-                                                                strtags += " " + "p" + str(lngmoviecrewid)
-                                                                f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                # Adding this visualeffects credit
-                                                                lngvisualeffects += 1
-                                                                if strmovievisualeffectswithoutaliases != "":
-                                                                    strmovievisualeffectswithoutaliases += strsep
-                                                                strmovievisualeffectswithoutaliases += strmoviecrewname
-                                                                #print("strmovievisualeffectswithoutaliases =",strmovievisualeffectswithoutaliases)
-                                                else:
-                                                    # Handling other crew credits
-                                                    strtmp = strsep + strmoviecrewswithaliases + strsep
-                                                    lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                    if lngpos == -1:
-                                                        # Credit not found in crew so we can add it
-                                                        strtmp = strsep + strmoviewriterswithaliases + strsep
-                                                        lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                        if lngpos == -1 or intallowpersonmultiplecredit:
-                                                            # Credit not found in writers so we can add it
-                                                            strtmp = strsep + strmoviedirectorswithaliases + strsep
-                                                            lngpos = strtmp.find(strsep + strmoviecrewname + strsep)
-                                                            if lngpos == -1 or intallowpersonmultiplecredit:
-                                                                # Credit not found in directors so we can add it
-                                                                if len(strmoviecrewswithaliases + strsep + strmoviecrewname) <= lngmaxlengthcrewswithaliases:
-                                                                    # String is NOT too long, so we continue appending crew credits
-                                                                    if lngcrew < lngmaxcrews:
-                                                                        # Adding this person id to the tag list for the current movie
-                                                                        strtags += " " + "p" + str(lngmoviecrewid)
-                                                                        f_tmdbpersonsetusedfortags(lngmoviecrewid)
-                                                                        # Adding this crew credit
-                                                                        lngcrew += 1
-                                                                        if strmoviecrewswithaliases != "":
-                                                                            strmoviecrewswithaliases += strsep
-                                                                        strmoviecrewswithaliases += strmoviecrewname
-                                                                        if strmoviecrewswithoutaliases != "":
-                                                                            strmoviecrewswithoutaliases += strsep
-                                                                        strmoviecrewswithoutaliases += strmoviecrewname
-                                                                        if strmoviecrewaliases:
-                                                                            if strmoviecrewaliases != "":
-                                                                                strmoviecrewswithaliases += " " + strmoviecrewaliases
-                                            
-                                            # Finishing tags processing
-                                            if strtags[0] == " ":
-                                                strtags = strtags[1:]
-                                            #print(lngmovieid,stryearrelease,strmovieidimdb,dblimdbrating,strmoviegenres,strmoviekeywords)
-                                            
-                                            strtextdocfr = ""
-                                            strtextsbertfr = ""
-                                            if intdocumentary:
-                                                if strlang == "fr":
-                                                    strmovietype = "documentaire"
-                                                elif strlang == "en":
-                                                    strmovietype = "documentary"
-                                            else:
-                                                if strlang == "fr":
-                                                    strmovietype = "film"
-                                                elif strlang == "en":
-                                                    strmovietype = "movie"
-                                            
-                                            if strmovietitle:
-                                                if strmovietitle != "":
-                                                    strtextdocfr += " " + strmovietitle
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " \"" + strmovietitle + "\" est un " + strmovietype + " de " + stryearrelease
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " \"" + strmovietitle + "\" is a " + stryearrelease + " " + strmovietype
-                                                    strmovietitlelemma = f_getlemma(strmovietitle)
-                                                    if strmovietitlelemma != "" and strmovietitlelemma != strmovietitle:
-                                                        strtextdocfr += " " + strmovietitlelemma
-                                            if strmovieoriginaltitle:
-                                                if strmovietitle:
-                                                    if strmovieoriginaltitle != "" and strmovieoriginaltitle != strmovietitle:
-                                                        strtextdocfr += " " + strmovieoriginaltitle
-                                                        if strlang == "fr":
-                                                            strtextsbertfr += " dont la langue et le titre original en " + stroriginallanguagename + " est \"" + strmovieoriginaltitle + "\""
-                                                        elif strlang == "en":
-                                                            strtextsbertfr += " whose language and original title in " + stroriginallanguagename + " is \"" + strmovieoriginaltitle + "\""
-                                                    else:
-                                                        if strlang == "fr":
-                                                            strtextsbertfr += " dont la langue originale est " + stroriginallanguagename
-                                                        elif strlang == "en":
-                                                            strtextsbertfr += " whose original language is " + stroriginallanguagename
-                                            strtextsbertfr += "."
-                                            
-                                            if strmovietitlealt:
-                                                if strmovietitle:
-                                                    if strmovieoriginaltitle:
-                                                        if strmovietitlealt != "" and strmovietitlealt != strmovietitle and strmovietitlealt != strmovieoriginaltitle:
-                                                            strtextdocfr += " " + strmovietitlealt
-                                                            if strlang == "fr":
-                                                                strtextsbertfr += " Son titre en anglais est \"" + strmovietitlealt + "\"."
-                                            
-                                            if strmoviealiases:
-                                                if strmoviealiases != "":
-                                                    strmoviealiases = strmoviealiases.replace("|" + strmovietitle + "|","|")
-                                                    strmoviealiases = strmoviealiases.replace("|" + strmovieoriginaltitle + "|","|")
-                                                    strmoviealiases = strmoviealiases.replace("|" + strmovietitlealt + "|","|")
-                                                    #strmoviealiases = strmoviealiases.replace("|"," ").strip()
-                                                    if strmoviealiases != "":
-                                                        strtextdocfr += " " + strmoviealiases.replace("|"," ").strip()
-                                                        strmoviealiasestmp = strmoviealiases.replace("|",", ")
-                                                        strmoviealiasestmp = strmoviealiasestmp[2:]
-                                                        strmoviealiasestmp = strmoviealiasestmp[:-2]
-                                                        if strmoviealiasestmp != "," and strmoviealiasestmp != "":
-                                                            if strlang == "fr":
-                                                                strtextsbertfr += " Les autres titres sont: " + strmoviealiasestmp + "."
-                                                            elif strlang == "en":
-                                                                strtextsbertfr += " The other titles are: " + strmoviealiasestmp + "."
-                                            
-                                            if stryearrelease:
-                                                if stryearrelease != "":
-                                                    strtextdocfr += " " + stryearrelease
-                                                    #strtextsbertfr += " Le film est sorti en " + stryearrelease + "."
-                                            """
-                                            if strmovieidimdb:
-                                                if strmovieidimdb != "":
-                                                    strtextsbertfr += " L'identifiant IMDb est "
-                                                    strtextsbertfr += strmovieidimdb + "."
-                                            if dblimdbrating:
-                                                if dblimdbrating > 0:
-                                                    strtextsbertfr += " La note IMDb est "
-                                                    strtextsbertfr += str(dblimdbrating) + "."
-                                            """
-                                            if stroriginallanguagename:
-                                                if stroriginallanguagename != "":
-                                                    strtextdocfr += " " + stroriginallanguagename
-                                                    #strtextsbertfr += " La langue originale du film est " + stroriginallanguagename + "."
-                                            
-                                            if not intdocumentary:
-                                                # This is not a documentary but a movie
-                                                strtextdocfr += " Film fiction"
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " C'est une fiction."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " This is a fiction."
-                                            if strmoviegenres:
-                                                if strmoviegenres != "":
-                                                    strtextdocfr += " " + strmoviegenres.replace(",", "")
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Les genres du " + strmovietype + " sont : " + strmoviegenres
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " " + strmovietype + " genres are: " + strmoviegenres
-                                                    if strwikidatagenrestext != "":
-                                                        strtextsbertfr += ", " + strwikidatagenrestext
-                                                    strtextsbertfr += "."
-                                            
-                                            if lngmovieruntime:
-                                                if lngmovieruntime > 0:
-                                                    if lngmovieruntime > 58:
-                                                        if strlang == "fr":
-                                                            strtextdocfr += " Long métrage"
-                                                            strtextsbertfr += " C'est un long métrage de " + str(lngmovieruntime) + " minutes."
-                                                        elif strlang == "en":
-                                                            strtextdocfr += " Feature film"
-                                                            strtextsbertfr += " This is a " + str(lngmovieruntime) + " minutes feature film."
-                                                    else:
-                                                        if strlang == "fr":
-                                                            strtextdocfr += " Court métrage"
-                                                            strtextsbertfr += " C'est un court métrage de " + str(lngmovieruntime) + " minutes."
-                                                        elif strlang == "en":
-                                                            strtextdocfr += " short film"
-                                                            strtextsbertfr += " This is a " + str(lngmovieruntime) + " minutes short film."
-                                            
-                                            if strmoviekeywords:
-                                                if strmoviekeywords != "":
-                                                    strtextdocfr += " " + strmoviekeywordslemma
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Les mots-clés du " + strmovietype + " sont : " + strmoviekeywords + "."
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " " + strmovietype + " keywords are: " + strmoviekeywords + "."
-                                            
-                                            if strcollectionname:
-                                                if strcollectionname != "":
-                                                    strtextdocfr += " " + strcollectionname
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Ce " + strmovietype + " fait partie de la collection \"" + strcollectionname + "\""
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " This " + strmovietype + " is a part of the \"" + strcollectionname + "\" collection"
-                                            if strmovielists:
-                                                if strmovielists != "":
-                                                    strtextdocfr += " " + strmovielistslemma
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " et il fait partie des listes suivantes : " + strmovielists + ""
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " and also part of the following lists: " + strmovielists + ""
-                                            strtextsbertfr += "."
-                                            
-                                            if lngmovieidcriterion > 0:
-                                                strcriteriontext = "Criterion Collection"
-                                                if strlang == "fr":
-                                                    strtextsbertfr + " Il fait partie de la Collection Criterion"
-                                                elif strlang == "en":
-                                                    strtextsbertfr + " It is in the Criterion Collection"
-                                                if lngmovieidcriterionspine > 0:
-                                                    strcriteriontext += " spine " + str(lngmovieidcriterionspine)
-                                                    strtextsbertfr + " spine " + str(lngmovieidcriterionspine)
-                                                strtextsbertfr += "."
-                                                strtextdocfr += " " + strcriteriontext
-                                            
-                                            if strmoviecompanies:
-                                                if strmoviecompanies != "":
-                                                    strtextdocfr += " " + strmoviecompanies
-                                                    #strtextdocfr += " " + strmoviecompanieslemma
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Les sociétés de production du " + strmovietype + " sont : " + strmoviecompanies + "."
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " Production companies of this " + strmovietype + " are: " + strmoviecompanies + "."
-                                            
-                                            if strmoviecolortech:   
-                                                if strmoviecolortech != "":
-                                                    strtextdocfr += " " + strmoviecolortech.replace(",", "")
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Les technologies de couleur du " + strmovietype + " sont : " + strmoviecolortech + "."
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " Color technologies of this " + strmovietype + " are: " + strmoviecolortech + "."
-                                            if strmoviefilmtech:
-                                                if strmoviefilmtech != "":
-                                                    strtextdocfr += " " + strmoviefilmtech.replace(",", "")
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Les technologies cinématographiques du " + strmovietype + " sont : " + strmoviefilmtech + "."
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " Cinematographic technologies of this " + strmovietype + " are: " + strmoviefilmtech + "."
-                                            if strmoviesoundsystem:
-                                                if strmoviesoundsystem != "":
-                                                    strtextdocfr += " " + strmoviesoundsystem.replace(",", "")
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Les systèmes sonores du " + strmovietype + " sont : " + strmoviesoundsystem + "."
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " Sound systems of this " + strmovietype + " are: " + strmoviesoundsystem + "."
-                                            if strmoviesoundtech:
-                                                if strmoviesoundtech != "":
-                                                    strtextdocfr += " " + strmoviesoundtech.replace(",", "")
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Les technologies sonores du " + strmovietype + " sont : " + strmoviesoundtech + "."
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " Sound technologies of this " + strmovietype + " are: " + strmoviesoundtech + "."
-                                            
-                                            if intincludepersonaliases:
-                                                if strmoviedirectorswithaliases:
-                                                    if strmoviedirectorswithaliases != "":
-                                                        strtextdocfr += " " + strmoviedirectorswithaliases.replace(",", "")
-                                            else:
-                                                if strmoviedirectorswithoutaliases:
-                                                    if strmoviedirectorswithoutaliases != "":
-                                                        strtextdocfr += " " + strmoviedirectorswithoutaliases.replace(",", "")
-                                            if strmoviedirectorswithoutaliases:
-                                                if strmoviedirectorswithoutaliases != "":
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Le " + strmovietype + " a été réalisé par " + strmoviedirectorswithoutaliases + ""
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " This " + strmovietype + " was directed by " + strmoviedirectorswithoutaliases + ""
-                                            
-                                            if intincludepersonaliases:
-                                                if strmoviewriterswithaliases:
-                                                    if strmoviewriterswithaliases != "":
-                                                        strtextdocfr += " " + strmoviewriterswithaliases.replace(",", "")
-                                            else:
-                                                if strmoviewriterswithoutaliases:
-                                                    if strmoviewriterswithoutaliases != "":
-                                                        strtextdocfr += " " + strmoviewriterswithoutaliases.replace(",", "")
-                                            if strmoviewriterswithoutaliases:
-                                                if strmoviewriterswithoutaliases != "":
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " et il a été écrit par " + strmoviewriterswithoutaliases + ""
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " and written by " + strmoviewriterswithoutaliases + ""
-                                            
-                                            if intincludepersonaliases:
-                                                if strmovieproducerswithaliases:
-                                                    if strmovieproducerswithaliases != "":
-                                                        strtextdocfr += " " + strmovieproducerswithaliases.replace(",", "")
-                                            else:
-                                                if strmovieproducerswithoutaliases:
-                                                    if strmovieproducerswithoutaliases != "":
-                                                        strtextdocfr += " " + strmovieproducerswithoutaliases.replace(",", "")
-                                            if strmovieproducerswithoutaliases:
-                                                if strmovieproducerswithoutaliases != "":
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " et il a été produit par " + strmovieproducerswithoutaliases + ""
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " and produced by " + strmovieproducerswithoutaliases + ""
-                                            strtextsbertfr += "."
-                                            
-                                            if intincludepersonaliases:
-                                                if strmoviecastswithaliases:
-                                                    if strmoviecastswithaliases != "":
-                                                        strtextdocfr += " " + strmoviecastswithaliases.replace(",", "")
-                                            else:
-                                                if strmoviecastswithoutaliases:
-                                                    if strmoviecastswithoutaliases != "":
-                                                        strtextdocfr += " " + strmoviecastswithoutaliases.replace(",", "")
-                                            if strmoviecastswithoutaliases:
-                                                if strmoviecastswithoutaliases != "":
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " La distribution principale est la suivante : " + strmoviecastswithoutaliases + "."
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " Main cast is with " + strmoviecastswithoutaliases + "."
-                                            """
-                                            if intincludepersonaliases:
-                                                if strmoviecrewswithaliases:
-                                                    if strmoviecrewswithaliases != "":
-                                                        strtextdocfr += " " + strmoviecrewswithaliases.replace(",", "")
-                                            else:
-                                                if strmoviecrewswithoutaliases:
-                                                    if strmoviecrewswithoutaliases != "":
-                                                        strtextdocfr += " " + strmoviecrewswithoutaliases.replace(",", "")
-                                            if strmoviecrewswithoutaliases:
-                                                if strmoviecrewswithoutaliases != "":
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " L'équipe technique est la suivante : " + strmoviecrewswithoutaliases + "."
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " Crew is: " + strmoviecrewswithoutaliases + "."
-                                            """
-                                            if strmovieoverview:
-                                                if strmovieoverview != "":
-                                                    strtextdocfr += " " + strmovieoverviewlemma
-                                                    if strlang == "fr":
-                                                        strtextsbertfr += " Voici le résumé du " + strmovietype + " : " + strmovieoverview
-                                                    elif strlang == "en":
-                                                        strtextsbertfr += " Here is the " + strmovietype + " overview: " + strmovieoverview
-                                            
-                                            if strwikidatainstanceoftext != "":
-                                                strtextdocfr += " " + strwikidatainstanceoftext
-                                            if strwikidataformofcreativeworktext != "":
-                                                strtextdocfr += " " + strwikidataformofcreativeworktext
-                                            if strwikidatagenrestext != "":
-                                                strtextdocfr += " " + strwikidatagenrestext
-                                            if strwikidatadepictstext != "":
-                                                strtextdocfr += " " + strwikidatadepictstext
-                                            """
-                                            if strwikidatacolortext != "":
-                                                strtextdocfr += " " + strwikidatacolortext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Le " + strmovietype + " est en " + strwikidatacolortext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " The " + strmovietype + " is in " + strwikidatacolortext + "."
-                                            if strwikidataaspectratiotext != "":
-                                                strtextdocfr += " " + strwikidataaspectratiotext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Le " + strmovietype + " est en format " + strwikidataaspectratiotext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " The " + strmovietype + " is in " + strwikidataaspectratiotext + " format."
-                                            if strwikidataoriginalfilmformattext != "":
-                                                strtextdocfr += " " + strwikidataoriginalfilmformattext
-                                            if strwikidatafabricationmethodtext != "":
-                                                strtextdocfr += " " + strwikidatafabricationmethodtext
-                                            if strwikidatadistributedbytext != "":
-                                                strtextdocfr += " " + strwikidatadistributedbytext
-                                            if strwikidataproductioncompanytext != "":
-                                                strtextdocfr += " " + strwikidataproductioncompanytext
-                                            """
-                                            if strwikidatamainsubjecttext != "":
-                                                strtextdocfr += " " + strwikidatamainsubjecttext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Le sujet principal est " + strwikidatamainsubjecttext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " The main subject is " + strwikidatamainsubjecttext + "."
-                                            if strwikidatanarrativelocationtext != "":
-                                                strtextdocfr += " " + strwikidatanarrativelocationtext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Il se passe à " + strwikidatanarrativelocationtext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " Narrative location is in " + strwikidatanarrativelocationtext + "."
-                                            if strwikidatafilminglocationtext != "":
-                                                strtextdocfr += " " + strwikidatafilminglocationtext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Il a été tourné à " + strwikidatafilminglocationtext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " Filming location is in " + strwikidatafilminglocationtext + "."
-                                            if strwikidatacharacterstext != "":
-                                                strtextdocfr += " " + strwikidatacharacterstext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Les personnages du " + strmovietype + " sont " + strwikidatacharacterstext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " Characters of the " + strmovietype + " are " + strwikidatacharacterstext + "."
-                                            if strwikidatacasttext != "":
-                                                strtextdocfr += " " + strwikidatacasttext
-                                            #if strwikidatanominatedfortext != "":
-                                            #    strtextdocfr += " " + strwikidatanominatedfortext
-                                            if strwikidataawardreceivedtext != "":
-                                                strtextdocfr += " " + strwikidataawardreceivedtext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Il a reçu les prix suivants : " + strwikidataawardreceivedtext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " It received the following awards: " + strwikidataawardreceivedtext + "."
-                                            if strwikidatabasedontext != "":
-                                                strtextdocfr += " " + strwikidatabasedontext
-                                            if strwikidatainspiredbytext != "":
-                                                strtextdocfr += " " + strwikidatainspiredbytext
-                                            if strwikidataderivativeworktext != "":
-                                                strtextdocfr += " " + strwikidataderivativeworktext
-                                            if strwikidatamovementtext != "":
-                                                strtextdocfr += " " + strwikidatamovementtext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Il fait partie du mouvement " + strwikidatamovementtext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " It is part of the " + strwikidatamovementtext + " movement."
-                                            if strwikidatasetinenvironmenttext != "":
-                                                strtextdocfr += " " + strwikidatasetinenvironmenttext
-                                            if strwikidatatakesplaceinfictionaluniversetext != "":
-                                                strtextdocfr += " " + strwikidatatakesplaceinfictionaluniversetext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Il a lieu dans l'univers " + strwikidatatakesplaceinfictionaluniversetext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " It happens in the " + strwikidatatakesplaceinfictionaluniversetext + " universe."
-                                            if strwikidatacountryoforigintext != "":
-                                                strtextdocfr += " " + strwikidatacountryoforigintext
-                                            if strwikidatapartoftext != "":
-                                                strtextdocfr += " " + strwikidatapartoftext
-                                            if strwikidatapartoftheseriestext != "":
-                                                strtextdocfr += " " + strwikidatapartoftheseriestext
-                                            if strwikidatadescribedbysourcetext != "":
-                                                strtextdocfr += " " + strwikidatadescribedbysourcetext
-                                            if strwikidatacollectiontext != "":
-                                                strtextdocfr += " " + strwikidatacollectiontext
-                                            if strwikidatamediafranchisetext != "":
-                                                strtextdocfr += " " + strwikidatamediafranchisetext
-                                            if strwikidatacncfilmratingfrancetext != "":
-                                                strtextdocfr += " " + strwikidatacncfilmratingfrancetext
-                                            if strwikidatainternetarchiveidtext != "":
-                                                strtextdocfr += " " + strwikidatainternetarchiveidtext
-                                            if strwikidatasetinperiodtext != "":
-                                                strtextdocfr += " " + strwikidatasetinperiodtext
-                                            if strwikidatasetduringrecurringeventtext != "":
-                                                strtextdocfr += " " + strwikidatasetduringrecurringeventtext
-                                                if strlang == "fr":
-                                                    strtextsbertfr += " Il a lieu pendant " + strwikidatasetduringrecurringeventtext + "."
-                                                elif strlang == "en":
-                                                    strtextsbertfr += " It is set during " + strwikidatasetduringrecurringeventtext + " recurring event."
-                                            
-                                            if strtextdocfr != "":
-                                                strtextdocfr = strtextdocfr[1:]
-                                                # Remove duplicate keywords while preserving order
-                                                keywords = strtextdocfr.split()
-                                                seen = set()
-                                                unique_keywords = []
-                                                for keyword in keywords:
-                                                    if keyword not in seen:
-                                                        seen.add(keyword)
-                                                        unique_keywords.append(keyword)
-                                                strtextdocfr = " ".join(unique_keywords)
-                                            
-                                            if strtextsbertfr != "":
-                                                strtextsbertfr = strtextsbertfr[1:]
-
-                                            # Storing pre processed data
-                                            arrmoviecouples = {}
-                                            arrmoviecouples["ID_MOVIE"] = lngmovieid
-                                            arrmoviecouples["LANG"] = strlang
-                                            arrmoviecouples["YEAR_RELEASE"] = stryearrelease
-                                            arrmoviecouples["GENRES"] = strmoviegenres
-                                            arrmoviecouples["KEYWORDS"] = strmoviekeywords
-                                            arrmoviecouples["IMDB_RATING"] = dblimdbrating
-                                            arrmoviecouples["COLLECTION"] = strcollectionname
-                                            arrmoviecouples["LISTS"] = strmovielists
-                                            arrmoviecouples["CAST_TOP"] = strmoviecastswithoutaliases
-                                            arrmoviecouples["CREW_TOP"] = strmoviecrewswithoutaliases
-                                            arrmoviecouples["DIRECTORS"] = strmoviedirectorswithoutaliases
-                                            arrmoviecouples["WRITERS"] = strmoviewriterswithoutaliases
-                                            arrmoviecouples["PRODUCERS"] = strmovieproducerswithoutaliases
-                                            arrmoviecouples["EDITORS"] = strmovieeditorswithoutaliases
-                                            arrmoviecouples["ART"] = strmovieartwithoutaliases
-                                            arrmoviecouples["CAMERA"] = strmoviecamerawithoutaliases
-                                            arrmoviecouples["LIGHTNING"] = strmovielightningwithoutaliases
-                                            arrmoviecouples["SOUND"] = strmoviesoundwithoutaliases
-                                            arrmoviecouples["COSTUME_MAKEUP"] = strmoviecostumemakeupwithoutaliases
-                                            arrmoviecouples["VISUAL_EFFECTS"] = strmovievisualeffectswithoutaliases
-                                            arrmoviecouples["ORIGINAL_LANGUAGE"] = stroriginallanguagename
-                                            arrmoviecouples["TAGS"] = strtags
-                                            arrmoviecouples["OVERVIEW_LEMMA"] = strmovieoverviewlemma
-                                            arrmoviecouples["KEYWORDS_LEMMA"] = strmoviekeywordslemma
-                                            arrmoviecouples["LISTS_LEMMA"] = strmovielistslemma
-                                            arrmoviecouples["TEXT_DOC"] = strtextdocfr
-                                            arrmoviecouples["TEXT_SBERT"] = strtextsbertfr
-                                            # INSERT/UPDATE this record
-                                            strsqltablename = "T_WC_TMDB_MOVIE_LANG_META"
-                                            strsqlupdatecondition = f"ID_MOVIE = {lngmovieid} AND LANG = '{strlang}' "
-                                            lngresult = cp.f_sqlupdatearray(strsqltablename,arrmoviecouples,strsqlupdatecondition,1)
-                                            
-                                    
-                                    strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
-                                    cp.f_setservervariable("strtmdbmoviepreprocessdatetime",strnow,"Date and time of the last preprocessed record in the TMDb database",0)
-                                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentvalue",str(lngmovieid),"Current value while preprocessing data",0)
-                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentvalue","","Current value while preprocessing data",0)
             print("------------------------------------------")
             strcurrentprocess = ""
             cp.f_setservervariable("strtmdbmoviepreprocesscurrentprocess",strcurrentprocess,"Current process in the TMDb database preprocess",0)

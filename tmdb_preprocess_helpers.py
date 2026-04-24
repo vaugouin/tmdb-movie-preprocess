@@ -1,9 +1,13 @@
 import time
+import html
 import pymysql.cursors
+import requests
 import citizenphil as cp
 import pandas as pd
 import psutil
 import re
+import unicodedata
+from difflib import SequenceMatcher
 
 MYSQL_RETRYABLE_ERROR_CODES = {1205, 1213}
 nlp = None
@@ -129,6 +133,266 @@ def f_buildcustomaggregatequery(arrsqlsources, stridfield, strscorefield, intsor
         strsql += strorderby
         return strsql
     return arrsqlsources[0] + strorderby
+
+def f_getwikidataimagepath(strwikidataid):
+    if not strwikidataid:
+        return ""
+    cursor2 = cp.connectioncp.cursor()
+    arrtables = [
+        ("T_WC_WIKIDATA_ITEM_V1", "WIKIPEDIA_IMAGE_PATH"),
+        ("T_WC_WIKIDATA_MOVIE_V1", "WIKIPEDIA_POSTER_PATH"),
+        ("T_WC_WIKIDATA_SERIE_V1", "WIKIPEDIA_POSTER_PATH"),
+        ("T_WC_WIKIDATA_PERSON_V1", "WIKIPEDIA_PROFILE_PATH"),
+    ]
+    for strtable, strfieldname in arrtables:
+        strsql = f"""
+SELECT {strfieldname} AS WIKIPEDIA_IMAGE_PATH
+FROM {strtable}
+WHERE ID_WIKIDATA = %s
+  AND {strfieldname} IS NOT NULL
+  AND {strfieldname} <> ''
+LIMIT 1
+"""
+        cursor2.execute(strsql, (strwikidataid,))
+        row = cursor2.fetchone()
+        if row and row.get('WIKIPEDIA_IMAGE_PATH'):
+            return row['WIKIPEDIA_IMAGE_PATH']
+    return ""
+
+def f_normalizewikidatalinkingtext(strtext):
+    if not strtext:
+        return ""
+    strtext = html.unescape(str(strtext))
+    strtext = unicodedata.normalize("NFKD", strtext)
+    strtext = "".join(char for char in strtext if not unicodedata.combining(char))
+    strtext = strtext.lower()
+    strtext = re.sub(r"[_\-]+", " ", strtext)
+    strtext = re.sub(r"[^\w\s]", " ", strtext)
+    strtext = re.sub(r"\s+", " ", strtext).strip()
+    return strtext
+
+def f_topiclinkingvariants(strtext):
+    strnormalized = f_normalizewikidatalinkingtext(strtext)
+    if not strnormalized:
+        return set()
+    arrvariants = {strnormalized}
+    arrwords = strnormalized.split()
+    if arrwords:
+        strlastword = arrwords[-1]
+        if strlastword.endswith("ies") and len(strlastword) > 3:
+            arrvariants.add(" ".join(arrwords[:-1] + [strlastword[:-3] + "y"]))
+        if strlastword.endswith("es") and len(strlastword) > 2:
+            arrvariants.add(" ".join(arrwords[:-1] + [strlastword[:-2]]))
+        if strlastword.endswith("s") and not strlastword.endswith("ss") and len(strlastword) > 1:
+            arrvariants.add(" ".join(arrwords[:-1] + [strlastword[:-1]]))
+        elif len(strlastword) > 1:
+            arrvariants.add(" ".join(arrwords[:-1] + [strlastword + "s"]))
+    return {strvariant for strvariant in arrvariants if strvariant}
+
+def f_topiclinkingtitlescore(strinput, strtitle, strsnippet):
+    strnormalizedinput = f_normalizewikidatalinkingtext(strinput)
+    strnormalizedtitle = f_normalizewikidatalinkingtext(strtitle)
+    strnormalizedsnippet = f_normalizewikidatalinkingtext(strsnippet)
+    if not strnormalizedinput or not strnormalizedtitle:
+        return 0.0
+    dblscore = SequenceMatcher(None, strnormalizedinput, strnormalizedtitle).ratio()
+    arrinputtokens = set(strnormalizedinput.split())
+    arrtitletokens = set(strnormalizedtitle.split())
+    if arrinputtokens and arrtitletokens:
+        dbltokenoverlap = len(arrinputtokens & arrtitletokens) / max(len(arrinputtokens), 1)
+        dblscore = max(dblscore, dbltokenoverlap)
+    if strnormalizedinput in strnormalizedtitle or strnormalizedtitle in strnormalizedinput:
+        dblscore = max(dblscore, 0.9)
+    if strnormalizedinput in strnormalizedsnippet:
+        dblscore = min(1.0, dblscore + 0.05)
+    if re.search(r"\((film|movie|album|song|tv series|television series|novel|book|video game)\)", str(strtitle).lower()):
+        dblscore = max(0.0, dblscore - 0.1)
+    return dblscore
+
+def f_wikimediarequest(session, strurl, arrparams):
+    dblrequestdelayseconds = float(getattr(session, "wikimedia_request_delay_seconds", 0.25))
+    dblbackoffseconds = float(getattr(session, "wikimedia_backoff_seconds", 1.0))
+    intmaxretries = int(getattr(session, "wikimedia_max_retries", 4))
+    dbltimeoutseconds = float(getattr(session, "wikimedia_timeout_seconds", 20.0))
+    dblnow = time.monotonic()
+    dbllastrequesttimestamp = getattr(session, "wikimedia_last_request_timestamp", None)
+    if dbllastrequesttimestamp is not None and dblrequestdelayseconds > 0:
+        dblwaitseconds = dblrequestdelayseconds - (dblnow - dbllastrequesttimestamp)
+        if dblwaitseconds > 0:
+            time.sleep(dblwaitseconds)
+    for intattempt in range(intmaxretries + 1):
+        response = session.get(strurl, params=arrparams, timeout=dbltimeoutseconds)
+        session.wikimedia_last_request_timestamp = time.monotonic()
+        if response.status_code != 429:
+            response.raise_for_status()
+            return response
+        if intattempt >= intmaxretries:
+            response.raise_for_status()
+        strretryafter = response.headers.get("Retry-After")
+        try:
+            dblretryafterseconds = float(strretryafter) if strretryafter else 0.0
+        except (TypeError, ValueError):
+            dblretryafterseconds = 0.0
+        dblsleepseconds = max(dblretryafterseconds, dblbackoffseconds * (2 ** intattempt))
+        print(f"Wikimedia API rate limit reached (429). Retrying in {dblsleepseconds:.2f} seconds (attempt {intattempt + 1}/{intmaxretries + 1}).")
+        time.sleep(dblsleepseconds)
+    raise RuntimeError("Wikimedia request retry loop exited unexpectedly")
+
+def f_wikipediasearchcandidates(session, strquery, intlimit=5):
+    strurl = "https://en.wikipedia.org/w/api.php"
+    arrparams = {
+        "action": "query",
+        "list": "search",
+        "srsearch": strquery,
+        "srlimit": intlimit,
+        "srprop": "snippet",
+        "format": "json",
+        "utf8": 1,
+    }
+    response = f_wikimediarequest(session, strurl, arrparams)
+    arrdata = response.json()
+    return arrdata.get("query", {}).get("search", [])
+
+def f_wikipediaresolvepage(session, strtitle):
+    strurl = "https://en.wikipedia.org/w/api.php"
+    arrparams = {
+        "action": "query",
+        "titles": strtitle,
+        "redirects": 1,
+        "prop": "pageprops",
+        "ppprop": "wikibase_item",
+        "format": "json",
+        "utf8": 1,
+    }
+    response = f_wikimediarequest(session, strurl, arrparams)
+    arrdata = response.json()
+    arrpages = arrdata.get("query", {}).get("pages", {})
+    for arrpage in arrpages.values():
+        if "missing" in arrpage:
+            continue
+        arrpageprops = arrpage.get("pageprops", {})
+        return {
+            "title": arrpage.get("title", ""),
+            "wikibase_item": arrpageprops.get("wikibase_item", ""),
+            "is_disambiguation": "disambiguation" in arrpageprops,
+        }
+    return None
+
+def f_wikidataentitysummary(session, strwikidataid, arrentitytypecache):
+    if not strwikidataid:
+        return {"accepted": False, "label": ""}
+    if strwikidataid in arrentitytypecache:
+        return arrentitytypecache[strwikidataid]
+    strurl = "https://www.wikidata.org/w/api.php"
+    arrparams = {
+        "action": "wbgetentities",
+        "ids": strwikidataid,
+        "props": "labels|claims",
+        "format": "json",
+        "languages": "en",
+    }
+    response = f_wikimediarequest(session, strurl, arrparams)
+    arrdata = response.json()
+    arrentity = arrdata.get("entities", {}).get(strwikidataid, {})
+    arrclaims = arrentity.get("claims", {})
+    arrp31 = arrclaims.get("P31", [])
+    arrblockedtypes = {
+        "Q571",
+        "Q7725634",
+        "Q11424",
+        "Q15416",
+        "Q5398426",
+        "Q482994",
+        "Q7366",
+        "Q2188189",
+        "Q7889",
+    }
+    # Removed "Q5" (human) from blocked types
+    arrblockedtypes.discard("Q5")
+    arrinstanceofids = set()
+    for arrclaim in arrp31:
+        arrmainsnak = arrclaim.get("mainsnak", {})
+        arrdatavalue = arrmainsnak.get("datavalue", {})
+        arrvalue = arrdatavalue.get("value", {})
+        strinstanceofid = arrvalue.get("id")
+        if strinstanceofid:
+            arrinstanceofids.add(strinstanceofid)
+    boolaccepted = not bool(arrinstanceofids & arrblockedtypes)
+    strlabel = arrentity.get("labels", {}).get("en", {}).get("value", "")
+    arrsummary = {
+        "accepted": boolaccepted,
+        "label": strlabel,
+    }
+    arrentitytypecache[strwikidataid] = arrsummary
+    return arrsummary
+
+def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arrentitytypecache):
+    if not strsearchquery:
+        return None
+    arrinputvariants = f_topiclinkingvariants(strscoreinput)
+    if not arrinputvariants:
+        return None
+    arrcandidates = f_wikipediasearchcandidates(session, strsearchquery)
+    if not arrcandidates:
+        return None
+    for arrcandidate in arrcandidates:
+        strcandidatetitle = arrcandidate.get("title", "")
+        if f_normalizewikidatalinkingtext(strcandidatetitle) in arrinputvariants:
+            arrresolved = f_wikipediaresolvepage(session, strcandidatetitle)
+            if arrresolved and not arrresolved.get("is_disambiguation") and arrresolved.get("wikibase_item"):
+                arrentitysummary = f_wikidataentitysummary(session, arrresolved["wikibase_item"], arrentitytypecache)
+                if arrentitysummary.get("accepted"):
+                    arrresolved["wikidata_label"] = arrentitysummary.get("label", "")
+                    arrresolved["confidence"] = 1.0
+                    return arrresolved
+    arrtopcandidate = arrcandidates[0]
+    arrresolvedtop = f_wikipediaresolvepage(session, arrtopcandidate.get("title", ""))
+    if arrresolvedtop and not arrresolvedtop.get("is_disambiguation") and arrresolvedtop.get("wikibase_item"):
+        if f_normalizewikidatalinkingtext(arrresolvedtop.get("title", "")) in arrinputvariants:
+            arrentitysummary = f_wikidataentitysummary(session, arrresolvedtop["wikibase_item"], arrentitytypecache)
+            if arrentitysummary.get("accepted"):
+                arrresolvedtop["wikidata_label"] = arrentitysummary.get("label", "")
+                arrresolvedtop["confidence"] = 0.95
+                return arrresolvedtop
+    arrbestmatch = None
+    dblbestscore = 0.0
+    for arrcandidate in arrcandidates[:3]:
+        strcandidatetitle = arrcandidate.get("title", "")
+        strcandidatesnippet = re.sub(r"<[^>]+>", " ", arrcandidate.get("snippet", ""))
+        dblscore = f_topiclinkingtitlescore(strscoreinput, strcandidatetitle, strcandidatesnippet)
+        if dblscore < 0.92:
+            continue
+        arrresolved = f_wikipediaresolvepage(session, strcandidatetitle)
+        if not arrresolved or arrresolved.get("is_disambiguation") or not arrresolved.get("wikibase_item"):
+            continue
+        arrentitysummary = f_wikidataentitysummary(session, arrresolved["wikibase_item"], arrentitytypecache)
+        if not arrentitysummary.get("accepted"):
+            continue
+        if dblscore > dblbestscore:
+            dblbestscore = dblscore
+            arrbestmatch = arrresolved
+            arrbestmatch["wikidata_label"] = arrentitysummary.get("label", "")
+            arrbestmatch["confidence"] = dblscore
+    return arrbestmatch
+
+def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache):
+    if not strkeywordname:
+        return None
+    arrqueryattempts = [strkeywordname]
+    if "," in strkeywordname:
+        strbeforecomma = strkeywordname.split(",", 1)[0].strip()
+        if strbeforecomma and strbeforecomma not in arrqueryattempts:
+            arrqueryattempts.append(strbeforecomma)
+    arrparenthesismatches = re.findall(r"\(([^()]+)\)", strkeywordname)
+    for strparenthesismatch in arrparenthesismatches:
+        strinsideparentheses = strparenthesismatch.strip()
+        if strinsideparentheses and strinsideparentheses not in arrqueryattempts:
+            arrqueryattempts.append(strinsideparentheses)
+    for strqueryattempt in arrqueryattempts:
+        arrmatch = f_linktmdbkeywordtowikidataquery(session, strqueryattempt, strqueryattempt, arrentitytypecache)
+        if arrmatch:
+            return arrmatch
+    return None
 
 def extract_color_technology(text):
     # Extract color technology information
