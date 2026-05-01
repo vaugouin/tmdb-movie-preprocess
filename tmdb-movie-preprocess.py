@@ -328,7 +328,7 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                     strsqlkeywords += "WHERE NAME IS NOT NULL AND NAME <> '' "
                     #strsqlkeywords += "AND (ID_WIKIDATA IS NULL OR ID_WIKIDATA = '') "
                     # I may include the following condition so that only keywords that are topics will be processed
-                    #strsqlkeywords += "AND USED_FOR_T2S_TOPIC = 1 "
+                    strsqlkeywords += "AND USED_FOR_T2S_TOPIC = 1 "
                     strsqlkeywords += "ORDER BY TIM_WIKIPEDIA_SEARCH ASC, ID_KEYWORD ASC "
                     strsqlkeywords += "LIMIT 3000 "
                     # The LIMIT is for processing 3000 keywords a day so 90000 for 30 days (full keyword list)
@@ -529,7 +529,7 @@ ORDER BY COMPTE DESC """
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strtopic,"Current sub process in the TMDb database movie preprocess",0)
                         if inttopic == 5:
                             strcurrentprocess = f"{inttopic}: Copying from TMDB_KEYWORD to T2S_TOPIC"
-                            strsql += "SELECT 'keyword' AS TOPIC_SOURCE, 'keyword' AS TOPIC_TYPE, T_WC_TMDB_KEYWORD.ID_KEYWORD AS ID_RECORD, T_WC_TMDB_KEYWORD.NAME, '' AS OVERVIEW, 'en' AS LANG, '' AS POSTER_PATH, NULL AS ID_WIKIDATA "
+                            strsql += "SELECT 'keyword' AS TOPIC_SOURCE, 'keyword' AS TOPIC_TYPE, T_WC_TMDB_KEYWORD.ID_KEYWORD AS ID_RECORD, T_WC_TMDB_KEYWORD.NAME, '' AS OVERVIEW, 'en' AS LANG, '' AS POSTER_PATH, T_WC_TMDB_KEYWORD.ID_WIKIDATA "
                             strsql += "FROM T_WC_TMDB_KEYWORD "
                             strsql += "WHERE T_WC_TMDB_KEYWORD.USED_FOR_T2S_TOPIC > 0 "
                             strsql += "OR T_WC_TMDB_KEYWORD.USE_FOR_TAGGING > 0 "
