@@ -1,5 +1,7 @@
 import time
 import html
+import json
+import os
 import pymysql.cursors
 import requests
 import citizenphil as cp
@@ -10,6 +12,7 @@ import unicodedata
 from difflib import SequenceMatcher
 
 MYSQL_RETRYABLE_ERROR_CODES = {1205, 1213}
+CLOSED_VOCABULARIES_CACHE = None
 nlp = None
 
 
@@ -48,6 +51,7 @@ def f_getlemma(sentence):
     lemmas = [(token.lemma_) for token in doc if token.pos_ in ["NOUN", "PROPN", "VERB", "ADJ", "X", "NUM"]]
     return " ".join(lemmas)
 
+
 def f_tmdbpersonsetusedfortags(lngpersonid):
     if lngpersonid > 0:
         cursor2 = cp.connectioncp.cursor()
@@ -57,16 +61,17 @@ def f_tmdbpersonsetusedfortags(lngpersonid):
         # Commit the changes to the database
         cp.connectioncp.commit()
 
-def f_wikidataitemproperties(strlang,stritemidwikidata,strpropertyid,strsep):
+
+def f_wikidataitemproperties(strlang, stritemidwikidata, strpropertyid, strsep):
     strsql = ""
     strsql += "SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM, T_WC_WIKIDATA_ITEM_V1.LABEL, T_WC_WIKIDATA_ITEM_V1.ALIASES, T_WC_WIKIDATA_ITEM_V1.DESCRIPTION, T_WC_WIKIDATA_ITEM_V1.LANG "
     strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
     strsql += "LEFT JOIN T_WC_WIKIDATA_ITEM_V1 ON T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = T_WC_WIKIDATA_ITEM_V1.ID_WIKIDATA "
     strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA = '" + stritemidwikidata + "' "
-    #strsql += "AND T_WC_WIKIDATA_ITEM_V1.LANG = '" + strlang + "' "
+    # strsql += "AND T_WC_WIKIDATA_ITEM_V1.LANG = '" + strlang + "' "
     strsql += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strpropertyid + "' "
     strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.DISPLAY_ORDER "
-    #print(strsql)
+    # print(strsql)
     strwikidatatext = ""
     strwikidatatextlang = ""
     stritemlabelsadded = "|"
@@ -93,6 +98,7 @@ def f_wikidataitemproperties(strlang,stritemidwikidata,strpropertyid,strsep):
     else:
         return strwikidatatext
 
+
 def check_memory():
     """Check and display system memory information"""
     memory_info = psutil.virtual_memory()
@@ -103,11 +109,13 @@ def check_memory():
     print(f"Memory Usage: {memory_info.percent}%")
     return memory_info.available / (1024 ** 3)
 
+
 def f_getcustomsortby(row, intdefaultsortby):
     intsortby = row['SORT_BY'] if 'SORT_BY' in row else None
     if intsortby in [1, 2, 3, 4, 5, 6]:
         return intsortby
     return intdefaultsortby
+
 
 def f_buildcustomorderbyclause(intsortby, strscorefield, stridfield):
     if intsortby == 1:
@@ -122,6 +130,7 @@ def f_buildcustomorderbyclause(intsortby, strscorefield, stridfield):
         return f"ORDER BY CASE WHEN SORT_DATE IS NULL THEN 1 ELSE 0 END, SORT_DATE DESC, {stridfield} ASC "
     return f"ORDER BY CASE WHEN {strscorefield} IS NULL THEN 1 ELSE 0 END, {strscorefield} DESC, {stridfield} ASC "
 
+
 def f_buildcustomaggregatequery(arrsqlsources, stridfield, strscorefield, intsortby):
     if not arrsqlsources:
         return ""
@@ -133,6 +142,7 @@ def f_buildcustomaggregatequery(arrsqlsources, stridfield, strscorefield, intsor
         strsql += strorderby
         return strsql
     return arrsqlsources[0] + strorderby
+
 
 def f_getwikidataimagepath(strwikidataid):
     if not strwikidataid:
@@ -159,6 +169,7 @@ LIMIT 1
             return row['WIKIPEDIA_IMAGE_PATH']
     return ""
 
+
 def f_normalizewikidatalinkingtext(strtext):
     if not strtext:
         return ""
@@ -170,6 +181,7 @@ def f_normalizewikidatalinkingtext(strtext):
     strtext = re.sub(r"[^\w\s]", " ", strtext)
     strtext = re.sub(r"\s+", " ", strtext).strip()
     return strtext
+
 
 def f_topiclinkingvariants(strtext):
     strnormalized = f_normalizewikidatalinkingtext(strtext)
@@ -188,6 +200,7 @@ def f_topiclinkingvariants(strtext):
         elif len(strlastword) > 1:
             arrvariants.add(" ".join(arrwords[:-1] + [strlastword + "s"]))
     return {strvariant for strvariant in arrvariants if strvariant}
+
 
 def f_topiclinkingtitlescore(strinput, strtitle, strsnippet):
     strnormalizedinput = f_normalizewikidatalinkingtext(strinput)
@@ -208,6 +221,7 @@ def f_topiclinkingtitlescore(strinput, strtitle, strsnippet):
     if re.search(r"\((film|movie|album|song|tv series|television series|novel|book|video game)\)", str(strtitle).lower()):
         dblscore = max(0.0, dblscore - 0.1)
     return dblscore
+
 
 def f_wikimediarequest(session, strurl, arrparams):
     dblrequestdelayseconds = float(getattr(session, "wikimedia_request_delay_seconds", 0.25))
@@ -238,6 +252,7 @@ def f_wikimediarequest(session, strurl, arrparams):
         time.sleep(dblsleepseconds)
     raise RuntimeError("Wikimedia request retry loop exited unexpectedly")
 
+
 def f_wikipediasearchcandidates(session, strquery, intlimit=5):
     strurl = "https://en.wikipedia.org/w/api.php"
     arrparams = {
@@ -252,6 +267,7 @@ def f_wikipediasearchcandidates(session, strquery, intlimit=5):
     response = f_wikimediarequest(session, strurl, arrparams)
     arrdata = response.json()
     return arrdata.get("query", {}).get("search", [])
+
 
 def f_wikipediaresolvepage(session, strtitle):
     strurl = "https://en.wikipedia.org/w/api.php"
@@ -277,6 +293,7 @@ def f_wikipediaresolvepage(session, strtitle):
             "is_disambiguation": "disambiguation" in arrpageprops,
         }
     return None
+
 
 def f_wikidataentitysummary(session, strwikidataid, arrentitytypecache):
     if not strwikidataid:
@@ -325,6 +342,7 @@ def f_wikidataentitysummary(session, strwikidataid, arrentitytypecache):
     }
     arrentitytypecache[strwikidataid] = arrsummary
     return arrsummary
+
 
 def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arrentitytypecache):
     if not strsearchquery:
@@ -375,6 +393,7 @@ def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arr
             arrbestmatch["confidence"] = dblscore
     return arrbestmatch
 
+
 def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache):
     if not strkeywordname:
         return None
@@ -394,6 +413,7 @@ def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache):
             return arrmatch
     return None
 
+
 def extract_color_technology(text):
     # Extract color technology information
     text_lower = text.lower()
@@ -409,7 +429,7 @@ def extract_color_technology(text):
         'warnercolor': ['warnercolor'],
         'trucolor': ['trucolor'],
         'anscocolor': ['anscocolor'],
-        'cinecolor': ['cinecolor','cinécolor'],
+        'cinecolor': ['cinecolor', 'cinécolor'],
         'colorfilm': ['colorfilm'],
         'gasparcolor': ['gasparcolor'],
         'sovcolor': ['sovcolor'],
@@ -420,13 +440,14 @@ def extract_color_technology(text):
     for tech, variants in color_technologies.items():
         if any(variant in text_lower for variant in variants):
             found_technologies.append(tech)
-    #return '|'.join(sorted(found_technologies)) if found_technologies else ""
+    # return '|'.join(sorted(found_technologies)) if found_technologies else ""
     if found_technologies:
         strcolortechnologies = '|'.join(sorted(found_technologies))
         strcolortechnologies = "|" + strcolortechnologies + "|"
     else:
         strcolortechnologies = ""
     return strcolortechnologies
+
 
 def extract_film_technology(text):
     # Extract film technology information like Super 35, Panavision, etc
@@ -459,7 +480,7 @@ def extract_film_technology(text):
         if any(variant in text_lower for variant in variants):
             if tech != 'is_3d':  # Handle is_3d separately
                 found_tech.append(tech)
-    #return ', '.join(sorted(found_tech)) if found_tech else None
+    # return ', '.join(sorted(found_tech)) if found_tech else None
     if found_tech:
         strfilmtechnologies = '|'.join(sorted(found_tech))
         strfilmtechnologies = "|" + strfilmtechnologies + "|"
@@ -467,15 +488,16 @@ def extract_film_technology(text):
         strfilmtechnologies = ""
     return strfilmtechnologies
 
+
 def extract_sound_technology(text):
     """Extract detailed sound technology information"""
     text_lower = text.lower()
-    
+
     # Track patterns
     track_pattern = r'(\d+)[\s-]track'
     track_match = re.search(track_pattern, text_lower)
     num_tracks = track_match.group(1) if track_match else None
-    
+
     # Sound systems
     sound_technologies = {
         'western_electric': [
@@ -483,7 +505,7 @@ def extract_sound_technology(text):
             'western electric mirrophonic',
             'western electric noiseless',
             'western electric sound',
-            'westrex'  # Successor to Western Electric
+            'westrex'
         ],
         'tobis_klangfilm': ['tobis-klangfilm', 'tobis klangfilm'],
         'vitaphone': ['vitaphone'],
@@ -494,18 +516,72 @@ def extract_sound_technology(text):
         'photophone': ['photophone', 'rca photophone'],
         'westrex': ['westrex recording', 'westrex sound']
     }
-    
+
     found_technologies = []
     for technology, variants in sound_technologies.items():
         if any(variant in text_lower for variant in variants):
             found_technologies.append(technology)
-    
+
     if found_technologies:
         strsoundtechnologies = '|'.join(sorted(found_technologies))
         strsoundtechnologies = "|" + strsoundtechnologies + "|"
     else:
         strsoundtechnologies = ""
     return strsoundtechnologies
+
+
+def load_closed_vocabularies():
+    global CLOSED_VOCABULARIES_CACHE
+    if CLOSED_VOCABULARIES_CACHE is not None:
+        return CLOSED_VOCABULARIES_CACHE
+    strbasepath = os.path.dirname(os.path.abspath(__file__))
+    strvocabpath = os.path.join(strbasepath, 'data', 'closed_vocabularies.json')
+    with open(strvocabpath, 'r', encoding='utf-8') as handle:
+        CLOSED_VOCABULARIES_CACHE = json.load(handle)
+    return CLOSED_VOCABULARIES_CACHE
+
+
+def get_closed_vocabulary_aliases(strentityname):
+    arrclosedvocabularies = load_closed_vocabularies()
+    arrentity = arrclosedvocabularies.get(strentityname, {})
+    arraliases = arrentity.get('aliases', {})
+    if not isinstance(arraliases, dict):
+        return {}
+    return arraliases
+
+
+def normalize_aspect_ratio(value):
+    if value is None:
+        return None
+    strvalue = str(value).strip().lower()
+    if strvalue == '':
+        return None
+    arraspectratioaliases = get_closed_vocabulary_aliases('Aspect_ratio')
+    if strvalue in arraspectratioaliases:
+        return arraspectratioaliases[strvalue]
+    if re.fullmatch(r'\d+,\d+', strvalue):
+        return strvalue
+    return None
+
+
+def normalize_field_value(strfieldname, value):
+    if strfieldname == 'ASPECT_RATIO':
+        return normalize_aspect_ratio(value)
+    return value
+
+
+def normalize_component_dict(arrcomponents):
+    if not isinstance(arrcomponents, dict):
+        return arrcomponents
+    arrnormalizedcomponents = dict(arrcomponents)
+    for strfieldname, value in arrcomponents.items():
+        arrnormalizedcomponents[strfieldname] = normalize_field_value(strfieldname, value)
+    return arrnormalizedcomponents
+
+
+def normalize_extracted_components(arrcomponents):
+    return normalize_component_dict(arrcomponents)
+
 
 def extract_format_components(text):
     """Extract format components from a format line."""
