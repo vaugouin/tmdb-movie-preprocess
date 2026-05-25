@@ -559,7 +559,8 @@ def normalize_aspect_ratio(value):
     arraspectratioaliases = get_closed_vocabulary_aliases('Aspect_ratio')
     if strvalue in arraspectratioaliases:
         return arraspectratioaliases[strvalue]
-    if re.fullmatch(r'\d+,\d+', strvalue):
+    # Already a dot-decimal canonical (post-2026-05-20 convention).
+    if re.fullmatch(r'\d+\.\d+', strvalue):
         return strvalue
     return None
 
@@ -583,11 +584,77 @@ def normalize_extracted_components(arrcomponents):
     return normalize_component_dict(arrcomponents)
 
 
+_ASPECT_RATIO_LOOKUP_CACHE = None
+
+
+def _build_aspect_ratio_lookup():
+    """Lowercase alias -> dot-decimal canonical. Includes self-mappings."""
+    global _ASPECT_RATIO_LOOKUP_CACHE
+    if _ASPECT_RATIO_LOOKUP_CACHE is not None:
+        return _ASPECT_RATIO_LOOKUP_CACHE
+    arraliases = get_closed_vocabulary_aliases('Aspect_ratio')
+    arrlookup = {}
+    for stralias, strcanonical in arraliases.items():
+        arrlookup[str(stralias).lower()] = str(strcanonical)
+        arrlookup[str(strcanonical).lower()] = str(strcanonical)
+    _ASPECT_RATIO_LOOKUP_CACHE = arrlookup
+    return arrlookup
+
+
+def extract_aspect_ratios_from_text(text):
+    """Return an ordered, de-duplicated list of dot-decimal canonical aspect
+    ratios found in the (already cleaned) format line. Scans for every alias
+    in data/closed_vocabularies.json's Aspect_ratio block, longest-first to
+    avoid substring conflicts, anchoring with word boundaries where the alias
+    starts/ends with an alphanumeric character."""
+    if not isinstance(text, str) or text == '':
+        return []
+    strtextlower = text.lower()
+    arrlookup = _build_aspect_ratio_lookup()
+    arrhits = []
+    arrconsumedranges = []
+
+    def overlaps(start, end):
+        for cstart, cend in arrconsumedranges:
+            if not (end <= cstart or start >= cend):
+                return True
+        return False
+
+    arraliasessorted = sorted(arrlookup.keys(), key=len, reverse=True)
+    for stralias in arraliasessorted:
+        if stralias == '':
+            continue
+        strpattern = re.escape(stralias)
+        if re.match(r'\w', stralias[0]):
+            strpattern = r'\b' + strpattern
+        if re.match(r'\w', stralias[-1]):
+            strpattern = strpattern + r'\b'
+        try:
+            for objmatch in re.finditer(strpattern, strtextlower):
+                intstart, intend = objmatch.span()
+                if overlaps(intstart, intend):
+                    continue
+                arrhits.append((intstart, arrlookup[stralias]))
+                arrconsumedranges.append((intstart, intend))
+        except re.error:
+            continue
+
+    arrhits.sort(key=lambda x: x[0])
+    arrfound = []
+    arrseen = set()
+    for _, strcanonical in arrhits:
+        if strcanonical not in arrseen:
+            arrseen.add(strcanonical)
+            arrfound.append(strcanonical)
+    return arrfound
+
+
 def extract_format_components(text):
     """Extract format components from a format line."""
     components = {
         'SOUND_SYSTEM': None,
         'ASPECT_RATIO': None,
+        'ASPECT_RATIO_LIST': [],
         'FILM_FORMAT': None,
         'IS_COLOR': False,
         'IS_BLACK_AND_WHITE': False,
@@ -600,29 +667,16 @@ def extract_format_components(text):
         'NUM_AUDIO_TRACKS': None,
         'HAS_AUDIO': False
     }
-    
+
     if not isinstance(text, str):
         return components
-    
+
     text = text.lower()
-    
-    # Extract aspect ratio
-    aspect_ratio_patterns = [
-        r'(\d+,\d+):1',  # e.g., 2,39:1
-        r'(\d+\.\d+):1',  # e.g., 2.39:1
-        r'(\d+:\d+)',     # e.g., 16:9
-        r'(\d+/\d+)'      # e.g., 16/9 or 4/3
-    ]
-    
-    for pattern in aspect_ratio_patterns:
-        match = re.search(pattern, text)
-        if match:
-            ratio = match.group(1)
-            # Convert dots to commas in decimal ratios
-            if '.' in ratio and ':1' in text:
-                ratio = ratio.replace('.', ',')
-            components['ASPECT_RATIO'] = ratio
-            break
+
+    # Extract aspect ratios (multi-ratio aware, dot-decimal canonicals).
+    arraspectratios = extract_aspect_ratios_from_text(text)
+    components['ASPECT_RATIO_LIST'] = arraspectratios
+    components['ASPECT_RATIO'] = arraspectratios[0] if arraspectratios else None
     
     # Extract sound systems
     sound_systems = []
@@ -913,5 +967,196 @@ def batch_update_data(connection, df, batch_size=1000):
         # Update progress
         progress = ((i + len(batch_df)) / total_rows) * 100
         print(f"Progress: {progress:.2f}% - Updated {rows_updated} rows, Failed {rows_failed}", end='\r')
-    
+
     print(f"\nData update completed: {rows_updated} rows updated successfully, {rows_failed} rows failed")
+
+
+def load_technical_ids(cursor):
+    """Resolve the medium_format + aspect_ratio rows in T_WC_T2S_TECHNICAL by
+    (DESCRIPTION, TECHNICAL_TYPE) so IDs are never hardcoded. Returns
+    (classification_id, aspect_ratio_id) as two dicts. Fails loudly if any of
+    the 4 classification keys are missing — that signals the §12.2 migration
+    is incomplete."""
+    strsql = (
+        "SELECT DESCRIPTION, ID_TECHNICAL, TECHNICAL_TYPE "
+        "FROM T_WC_T2S_TECHNICAL "
+        "WHERE TECHNICAL_TYPE IN ('medium_format', 'aspect_ratio') "
+        "AND (DELETED = 0 OR DELETED IS NULL)"
+    )
+    cursor.execute(strsql)
+    arrclassificationid = {}
+    arraspectratioid = {}
+    for row in cursor.fetchall():
+        strdescription = row['DESCRIPTION']
+        lngid = row['ID_TECHNICAL']
+        strtype = row['TECHNICAL_TYPE']
+        if not strdescription:
+            continue
+        if strtype == 'medium_format':
+            arrclassificationid[strdescription] = lngid
+        elif strtype == 'aspect_ratio':
+            arraspectratioid[strdescription] = lngid
+
+    arrrequired = ['color_movie', 'black_and_white_movie', 'silent_movie', '3d_movie']
+    arrmissing = [strkey for strkey in arrrequired if strkey not in arrclassificationid]
+    if arrmissing:
+        raise RuntimeError(
+            "T_WC_T2S_TECHNICAL is missing required medium_format rows: "
+            + ", ".join(arrmissing)
+            + ". Apply EXTEND_T2S_TECHNICAL.md §12.2 before running this pre-process step."
+        )
+
+    print(
+        "Loaded technical IDs: medium_format=" + str(len(arrclassificationid))
+        + " (color_movie=" + str(arrclassificationid['color_movie'])
+        + ", black_and_white_movie=" + str(arrclassificationid['black_and_white_movie'])
+        + ", silent_movie=" + str(arrclassificationid['silent_movie'])
+        + ", 3d_movie=" + str(arrclassificationid['3d_movie']) + ")"
+        + ", aspect_ratio=" + str(len(arraspectratioid))
+    )
+    arrniche = [s for s in ['1.77', '1.89', '1.90'] if s not in arraspectratioid]
+    if arrniche:
+        print(
+            "Note: aspect_ratio canonicals not seeded (will be logged and skipped if seen in source data): "
+            + ", ".join(arrniche)
+        )
+    return arrclassificationid, arraspectratioid
+
+
+def _movie_technical_target_rows(row, arrclassificationid, arraspectratioid, arrunmapped):
+    """Return list of (id_technical, display_order) tuples to write for one
+    movie, given its parsed flags + ASPECT_RATIO_LIST. Aspect-ratio canonicals
+    that have no matching DB row (e.g. 1.77/1.89/1.90 per §12.5.4) are appended
+    to arrunmapped for caller-side logging and skipped."""
+    arrrows = []
+
+    arrclassifications = [
+        ('IS_COLOR', 'color_movie', 1),
+        ('IS_BLACK_AND_WHITE', 'black_and_white_movie', 2),
+        ('IS_SILENT', 'silent_movie', 3),
+        ('IS_3D', '3d_movie', 4),
+    ]
+    for strflag, strkey, intdisplayorder in arrclassifications:
+        intvalue = row.get(strflag) if hasattr(row, 'get') else row[strflag]
+        try:
+            intvalue = int(intvalue) if intvalue is not None and not pd.isna(intvalue) else 0
+        except (TypeError, ValueError):
+            intvalue = 0
+        if intvalue == 1:
+            arrrows.append((arrclassificationid[strkey], intdisplayorder))
+
+    arraspectlist = row.get('ASPECT_RATIO_LIST') if hasattr(row, 'get') else row['ASPECT_RATIO_LIST']
+    if isinstance(arraspectlist, (list, tuple)):
+        intaspectorder = 0
+        arrseen = set()
+        for strcanonical in arraspectlist:
+            if not strcanonical or strcanonical in arrseen:
+                continue
+            arrseen.add(strcanonical)
+            if strcanonical in arraspectratioid:
+                intaspectorder += 1
+                arrrows.append((arraspectratioid[strcanonical], intaspectorder))
+            else:
+                arrunmapped.append((row['ID_MOVIE'], strcanonical))
+
+    return arrrows
+
+
+def write_movie_technical_junction(connection, df, arrclassificationid, arraspectratioid):
+    """Populate T_WC_T2S_MOVIE_TECHNICAL with medium_format and aspect_ratio
+    rows for every movie in `df`. Uses scoped delete-then-insert (§12.5.5) so
+    sibling-type rows (color_technology / film_technology / sound_system /
+    sound_technology / film_format) owned by op 2 are not touched. Returns a
+    summary dict for logging (§12.5.7)."""
+    cursor = connection.cursor()
+    arrsummary = {
+        'color': 0,
+        'bw': 0,
+        'silent': 0,
+        '3d': 0,
+        'aspect_total': 0,
+        'aspect_movies': 0,
+        'multi_ratio_movies': 0,
+        'unmapped': [],
+        'movies_processed': 0,
+    }
+    strclassdelete = (
+        "DELETE FROM T_WC_T2S_MOVIE_TECHNICAL "
+        "WHERE ID_MOVIE = %s "
+        "AND ID_TECHNICAL IN ("
+        "  SELECT ID_TECHNICAL FROM T_WC_T2S_TECHNICAL "
+        "  WHERE TECHNICAL_TYPE = 'medium_format'"
+        ")"
+    )
+    strratiodelete = (
+        "DELETE FROM T_WC_T2S_MOVIE_TECHNICAL "
+        "WHERE ID_MOVIE = %s "
+        "AND ID_TECHNICAL IN ("
+        "  SELECT ID_TECHNICAL FROM T_WC_T2S_TECHNICAL "
+        "  WHERE TECHNICAL_TYPE = 'aspect_ratio'"
+        ")"
+    )
+
+    lngrowstotal = len(df)
+    lngcommitevery = 200
+    for inti, (_, row) in enumerate(df.iterrows()):
+        lngmovieid = int(row['ID_MOVIE'])
+        arrtargets = _movie_technical_target_rows(
+            row, arrclassificationid, arraspectratioid, arrsummary['unmapped']
+        )
+
+        cursor.execute(strclassdelete, (lngmovieid,))
+        cursor.execute(strratiodelete, (lngmovieid,))
+
+        intaspectcountmovie = 0
+        for lngidtechnical, intdisplayorder in arrtargets:
+            arrcouples = {
+                'ID_MOVIE': lngmovieid,
+                'ID_TECHNICAL': lngidtechnical,
+                'DISPLAY_ORDER': intdisplayorder,
+            }
+            strcondition = "ID_MOVIE = " + str(lngmovieid) + " AND ID_TECHNICAL = " + str(lngidtechnical)
+            cp.f_sqlupdatearray("T_WC_T2S_MOVIE_TECHNICAL", arrcouples, strcondition, 1)
+            if lngidtechnical == arrclassificationid['color_movie']:
+                arrsummary['color'] += 1
+            elif lngidtechnical == arrclassificationid['black_and_white_movie']:
+                arrsummary['bw'] += 1
+            elif lngidtechnical == arrclassificationid['silent_movie']:
+                arrsummary['silent'] += 1
+            elif lngidtechnical == arrclassificationid['3d_movie']:
+                arrsummary['3d'] += 1
+            else:
+                intaspectcountmovie += 1
+        if intaspectcountmovie > 0:
+            arrsummary['aspect_total'] += intaspectcountmovie
+            arrsummary['aspect_movies'] += 1
+            if intaspectcountmovie >= 2:
+                arrsummary['multi_ratio_movies'] += 1
+
+        arrsummary['movies_processed'] += 1
+        if (inti + 1) % lngcommitevery == 0:
+            connection.commit()
+            print(
+                "  junction progress: " + str(inti + 1) + "/" + str(lngrowstotal)
+                + " movies (multi-ratio so far: " + str(arrsummary['multi_ratio_movies']) + ")",
+                end='\r'
+            )
+    connection.commit()
+    arrsummary['unmapped_count'] = len(arrsummary['unmapped'])
+    return arrsummary
+
+
+def refresh_technical_movie_count(connection):
+    """Recompute MOVIE_COUNT for every medium_format + aspect_ratio row in
+    T_WC_T2S_TECHNICAL. Drives the /technicals/{id} siblings ordering."""
+    cursor = connection.cursor()
+    strsql = (
+        "UPDATE T_WC_T2S_TECHNICAL t "
+        "SET MOVIE_COUNT = ("
+        "  SELECT COUNT(*) FROM T_WC_T2S_MOVIE_TECHNICAL mt "
+        "  WHERE mt.ID_TECHNICAL = t.ID_TECHNICAL"
+        ") "
+        "WHERE TECHNICAL_TYPE IN ('medium_format', 'aspect_ratio')"
+    )
+    cursor.execute(strsql)
+    connection.commit()

@@ -1,0 +1,22 @@
+# Secrets — never bake into image
+.env
+.env.*
+!.env.example
+
+# VCS
+.git
+.gitignore
+
+# Python build artefacts
+__pycache__
+*.pyc
+*.pyo
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+
+# Project local files not needed in the image
+*.md
+!README.md
