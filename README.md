@@ -14,13 +14,49 @@ for intindex, strdesc in arrprocessscope.items():
     ...
 ```
 
-The current default scope runs processes: **1, 2, 60, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 40**.
+The current default scope runs processes: **1, 2, 62, 60, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40**.
 
 Progress is tracked server-side via `cp.f_setservervariable()`. Multiple cursor objects (`cursor`, `cursor2` … `cursor5`) allow parallel DB operations within a single process.
 
 Recent performance-sensitive T2S rebuilds now use a **staging-table rebuild + atomic rename swap** pattern instead of chunked upsert/delete synchronization. In those branches, the script builds a full `*_BUILD` table, validates it where needed, atomically swaps it into place with `RENAME TABLE`, and then drops the previous `*_OLD` table automatically after a successful swap.
 
 Wikimedia API calls used by process `60` support the following environment variables: `WIKIMEDIA_USER_AGENT`, `WIKIMEDIA_REQUEST_DELAY_SECONDS`, `WIKIMEDIA_BACKOFF_SECONDS`, `WIKIMEDIA_MAX_RETRIES`, and `WIKIMEDIA_TIMEOUT_SECONDS`.
+
+---
+
+## Docker
+
+The project ships a `Dockerfile` and a launcher script (`tmdb-movie-preprocess.sh`) for running the pipeline in a container.
+
+### Secrets handling
+
+Secrets (DB credentials, user agents, etc.) are **never baked into the image**. They are injected at runtime from a host-managed env file via Docker's `--env-file` flag.
+
+- `.env` is listed in `.dockerignore` so it is excluded from the build context and cannot end up in image layers, build cache, or registries.
+- The `Dockerfile` does **not** `COPY .env` and does **not** declare secrets in `ENV` lines. Only non-sensitive defaults belong in the image.
+- The runtime env file is expected to live **outside the application source tree**, e.g. `/home/debian/docker/tmdb-movie-preprocess/.env`, owned and permissioned by the host operator.
+
+### Build
+
+```bash
+docker build -t tmdb-movie-preprocess-python-app .
+```
+
+### Run
+
+Pass secrets from a host-managed env file with `--env-file`:
+
+```bash
+docker run -d --rm \
+    --network="host" \
+    --env-file /home/debian/docker/tmdb-movie-preprocess/.env \
+    --name tmdb-movie-preprocess \
+    tmdb-movie-preprocess-python-app
+```
+
+Adjust the path after `--env-file` to wherever the host operator stores the runtime env file for this project. Use `.env.example` as a template for the variables that must be defined.
+
+The included `tmdb-movie-preprocess.sh` wraps build + run and already uses `--env-file` with the host path above; update that path if your deployment layout differs.
 
 ---
 
@@ -376,6 +412,112 @@ Copies serie videos into the T2S layer.
 
 ---
 
+### Process 27 — T2S_SEASON
+
+Copies TV season records from `T_WC_TMDB_SEASON` into the T2S layer, gated by membership of the parent series in `T_WC_T2S_SERIE`.
+
+**Reads:** `T_WC_TMDB_SEASON`, `T_WC_T2S_SERIE`, `T_WC_IMDB_MOVIE_RATING_IMPORT`
+**Writes:** `T_WC_T2S_SEASON`
+
+**Filter:** `ID_SERIE` exists in `T_WC_T2S_SERIE`
+
+**Operations:**
+- Processes in chunks of 1000 records by `ID_SEASON` range.
+- `INSERT … ON DUPLICATE KEY UPDATE` for ~22 fields (renames `TITLE` → `SEASON_TITLE`; drops crawler-only `TIM_*_COMPLETED` flags).
+- Enriches `IMDB_RATING` and `IMDB_RATING_WEIGHTED` from `T_WC_IMDB_MOVIE_RATING_IMPORT` via `ID_IMDB` join when the season carries an IMDb id.
+- Deletes records within the processed range that no longer exist in source (or whose parent series dropped out of T2S).
+
+---
+
+### Process 28 — T2S_EPISODE
+
+Copies TV episode records from `T_WC_TMDB_EPISODE` into the T2S layer, gated by membership of the parent series and season.
+
+**Reads:** `T_WC_TMDB_EPISODE`, `T_WC_T2S_SERIE`, `T_WC_T2S_SEASON`, `T_WC_IMDB_MOVIE_RATING_IMPORT`
+**Writes:** `T_WC_T2S_EPISODE`
+
+**Filter:** `ID_SERIE` exists in `T_WC_T2S_SERIE` AND `ID_SEASON` exists in `T_WC_T2S_SEASON`
+
+**Operations:**
+- Processes in chunks of 1000 records by `ID_EPISODE` range.
+- `INSERT … ON DUPLICATE KEY UPDATE` for ~27 fields (renames `TITLE` → `EPISODE_TITLE`; drops crawler-only `TIM_*_COMPLETED` flags).
+- Enriches `IMDB_RATING` and `IMDB_RATING_WEIGHTED` from `T_WC_IMDB_MOVIE_RATING_IMPORT` (most episodes lack an `ID_IMDB`, so this populates a sparse minority).
+- Deletes records within the processed range that no longer exist in source.
+
+---
+
+### Process 29 — T2S_PERSON_SEASON
+
+Links persons to seasons in the T2S layer (cast, crew, aggregate-credits roles), validating that person, series, and season all exist in T2S.
+
+**Reads:** `T_WC_TMDB_PERSON_SEASON`, `T_WC_T2S_PERSON`, `T_WC_T2S_SERIE`, `T_WC_T2S_SEASON`
+**Writes:** `T_WC_T2S_PERSON_SEASON`
+
+**Operations:**
+- Processes in chunks of 1000 records by `ID_TMDB_PERSON_SEASON` range.
+- `INSERT … ON DUPLICATE KEY UPDATE` for credit fields: type, character, department, job, `TOTAL_EPISODE_COUNT`, display order.
+- The target row id is the source `ID_TMDB_PERSON_SEASON` (same convention as Processes 9 / 10).
+- Deletes stale records within processed ranges.
+
+---
+
+### Process 31 — T2S_PERSON_EPISODE
+
+Links persons to episodes in the T2S layer (cast, crew, guest stars), validating that person, series, season, and episode all exist in T2S.
+
+**Reads:** `T_WC_TMDB_PERSON_EPISODE`, `T_WC_T2S_PERSON`, `T_WC_T2S_SERIE`, `T_WC_T2S_SEASON`, `T_WC_T2S_EPISODE`
+**Writes:** `T_WC_T2S_PERSON_EPISODE`
+
+**Operations:**
+- Same pattern as Process 29, with the four-way FK existence gate.
+- Carries `CREDIT_TYPE ∈ {cast, crew, guest}`.
+
+---
+
+### Process 32 — T2S_SEASON_IMAGE
+
+Copies season images (posters, backdrops) into the T2S layer.
+
+**Reads:** `T_WC_TMDB_SEASON_IMAGE`, `T_WC_T2S_SEASON`
+**Writes:** `T_WC_T2S_SEASON_IMAGE`
+
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_SEASON` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
+
+---
+
+### Process 33 — T2S_EPISODE_IMAGE
+
+Copies episode stills into the T2S layer.
+
+**Reads:** `T_WC_TMDB_EPISODE_IMAGE`, `T_WC_T2S_EPISODE`
+**Writes:** `T_WC_T2S_EPISODE_IMAGE`
+
+**Operations:** Same as Process 32 but for episodes; validates `ID_EPISODE` exists in T2S.
+
+---
+
+### Process 34 — T2S_SEASON_VIDEO
+
+Copies season videos (trailers, clips) into the T2S layer.
+
+**Reads:** `T_WC_TMDB_SEASON_VIDEO`, `T_WC_T2S_SEASON`
+**Writes:** `T_WC_T2S_SEASON_VIDEO`
+
+**Operations:** Full staging-table rebuild with atomic swap; validates `ID_SEASON` exists in T2S; automatically drops the previous `_OLD` table after a successful swap.
+
+---
+
+### Process 35 — T2S_EPISODE_VIDEO
+
+Copies episode videos into the T2S layer.
+
+**Reads:** `T_WC_TMDB_EPISODE_VIDEO`, `T_WC_T2S_EPISODE`
+**Writes:** `T_WC_T2S_EPISODE_VIDEO`
+
+**Operations:** Same as Process 34 but for episodes; validates `ID_EPISODE` exists in T2S.
+
+---
+
 ### Process 60 — Link Wikidata items to topics
 
 Links TMDb keywords to Wikidata items before process `3` builds `T_WC_T2S_TOPIC`, and spreads the work over rolling daily batches.
@@ -401,6 +543,42 @@ Links TMDb keywords to Wikidata items before process `3` builds `T_WC_T2S_TOPIC`
 - `WIKIDATA_LABEL`
 - `CONFIDENCE`
 - `TIM_WIKIPEDIA_SEARCH`
+
+---
+
+### Process 62 — Link Wikidata items to T2S technical
+
+Backfills `ID_WIKIDATA` on `T_WC_T2S_TECHNICAL` by searching Wikipedia for each technical entity's `DESCRIPTION` and resolving the matched page to a Wikidata item. Also enriches rows whose `ID_WIKIDATA` was set manually (or by a legacy process) but whose `WIKIDATA_LABEL` is still empty. Runs immediately after process `2` so downstream consumers see fresh Wikidata IDs within the same run.
+
+**Reads:** `T_WC_T2S_TECHNICAL`, Wikipedia API, Wikidata API
+**Writes:** `T_WC_T2S_TECHNICAL`
+
+**Selection strategy:**
+- Selects rows where `DESCRIPTION` is not null/empty and `DELETED` is null or `0`, and either
+    - `ID_WIKIDATA` is null/empty (linking branch), or
+    - `ID_WIKIDATA` is set but `WIKIDATA_LABEL` is null/empty (enrichment branch for pre-existing manual links).
+- Orders by `TIM_WIKIPEDIA_SEARCH ASC, ID_TECHNICAL ASC` so never-checked and oldest-checked rows are processed first.
+- Updates `TIM_WIKIPEDIA_SEARCH` for matched, unmatched, and exception cases so no-match rows do not block the queue on retry.
+
+**Operations:**
+- **Linking branch** (`ID_WIKIDATA` empty) — reuses the topic-linking helper (`f_linktmdbkeywordtowikidata`) so the candidate search, page resolution, and `P31` blocked-types filter behave identically to Process 60. Stores the matched Wikidata ID, English Wikidata label, and match confidence (the fuzzy score returned by the helper).
+- **Enrichment branch** (`ID_WIKIDATA` already set) — trusts the existing QID, skips the Wikipedia search, and calls `f_wikidataentitysummary` directly to fetch the English label. Stores `WIKIDATA_LABEL` and `CONFIDENCE = 1.0` (trusted manual link). The `P31` blocked-types filter is intentionally bypassed for these rows because a human chose the QID on purpose.
+- Persists the last attempted search timestamp in `TIM_WIKIPEDIA_SEARCH` even when no label is resolved or a request fails.
+- Uses the shared throttled Wikimedia request wrapper with retry/backoff on HTTP `429` responses.
+
+**Updated columns on `T_WC_T2S_TECHNICAL`:**
+- `ID_WIKIDATA`
+- `WIKIDATA_LABEL`
+- `CONFIDENCE`
+- `TIM_WIKIPEDIA_SEARCH`
+
+> If you are upgrading an existing database, run:
+> ```sql
+> ALTER TABLE T_WC_T2S_TECHNICAL
+>   ADD COLUMN WIKIDATA_LABEL varchar(255) DEFAULT NULL AFTER ID_WIKIDATA,
+>   ADD COLUMN CONFIDENCE double DEFAULT NULL AFTER WIKIDATA_LABEL,
+>   ADD COLUMN TIM_WIKIPEDIA_SEARCH datetime DEFAULT NULL AFTER CONFIDENCE;
+> ```
 
 ---
 
@@ -614,7 +792,7 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 |---------|-------------|
 | Chunk processing | Most copy processes iterate over source IDs in batches of 1000 to avoid memory pressure. |
 | `INSERT … ON DUPLICATE KEY UPDATE` | Idempotent upsert — safe to re-run without duplicating data. |
-| Staging rebuild + atomic swap | Processes 7, 8, 11–26, and 40 rebuild eligible targets into `*_BUILD`, atomically swap with `RENAME TABLE`, and automatically drop `*_OLD` after success. |
+| Staging rebuild + atomic swap | Processes 7, 8, 11–26, 32–35, and 40 rebuild eligible targets into `*_BUILD`, atomically swap with `RENAME TABLE`, and automatically drop `*_OLD` after success. |
 | `cp.f_sqlupdatearray()` | Generic upsert helper from the `citizenphil` module. |
 | Multi-mechanism element resolution | Processes 41 (custom-collection), 42, and 45 combine multiple sources with `UNION ALL` + `GROUP BY`. |
 | Wikidata filter | Any movie or serie written to a T2S junction table must satisfy `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`. |
@@ -651,6 +829,14 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 | T_WC_TMDB_SERIE_IMAGE | T_WC_T2S_SERIE_IMAGE |
 | T_WC_TMDB_MOVIE_VIDEO | T_WC_T2S_MOVIE_VIDEO |
 | T_WC_TMDB_SERIE_VIDEO | T_WC_T2S_SERIE_VIDEO |
+| T_WC_TMDB_SEASON | T_WC_T2S_SEASON |
+| T_WC_TMDB_EPISODE | T_WC_T2S_EPISODE |
+| T_WC_TMDB_PERSON_SEASON | T_WC_T2S_PERSON_SEASON |
+| T_WC_TMDB_PERSON_EPISODE | T_WC_T2S_PERSON_EPISODE |
+| T_WC_TMDB_SEASON_IMAGE | T_WC_T2S_SEASON_IMAGE |
+| T_WC_TMDB_EPISODE_IMAGE | T_WC_T2S_EPISODE_IMAGE |
+| T_WC_TMDB_SEASON_VIDEO | T_WC_T2S_SEASON_VIDEO |
+| T_WC_TMDB_EPISODE_VIDEO | T_WC_T2S_EPISODE_VIDEO |
 | T_WC_TMDB_LIST / T_WC_CUSTOM_LIST (TARGET_TABLE=1) | T_WC_T2S_LIST, T_WC_T2S_MOVIE_LIST, T_WC_T2S_SERIE_LIST |
 | T_WC_TMDB_COLLECTION / T_WC_CUSTOM_LIST (TARGET_TABLE=2) | T_WC_T2S_COLLECTION, T_WC_T2S_MOVIE_COLLECTION, T_WC_T2S_SERIE_COLLECTION |
 | T_WC_TMDB_KEYWORD / T_WC_TMDB_LIST / T_WC_TMDB_COLLECTION | T_WC_T2S_TOPIC |
