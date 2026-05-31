@@ -4,6 +4,7 @@ import requests
 import pymysql.cursors
 #from pymysql import Error
 import json
+import html
 import citizenphil as cp
 from datetime import datetime, timedelta
 import gzip
@@ -103,7 +104,7 @@ try:
             #arrprocessscope = {6: 'T2S_PERSON'}
             #arrprocessscope = {4: 'T2S_MOVIE'}
             #arrprocessscope = {5: 'T2S_SERIE'}
-            arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 60: 'Link Wikidata items to topics', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM'}
+            arrprocessscope = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 60: 'Link Wikidata items to topics', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM'}
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
@@ -118,14 +119,66 @@ try:
             #arrprocessscope = {41: 'T2S_COLLECTION', 42: 'T2S_LIST'}
             #arrprocessscope = {3: 'T2S_TOPIC'}
             #arrprocessscope = {43: 'T2S_GROUP'}
-            #if strnow.startswith("2026-05-24"):
-            #    arrprocessscope = {21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM'}
+            #if strnow.startswith("2026-05-31"):
+            #    arrprocessscope = {0: 'T_WC_CUSTOM_LIST_UNESCAPE'}
             for intindex, strdesc in arrprocessscope.items():
                 strprocessesexecuted += str(intindex) + ", "
                 cp.f_setservervariable("strtmdbmoviepreprocessprocessesexecuted",strprocessesexecuted,strprocessesexecuteddesc,0)
                 cp.f_setservervariable("strtmdbmoviepreprocesscurrentprocess",strdesc,"Current process in the TMDb database preprocess",0)
                 cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","","Current sub process in the TMDb database preprocess",0)
-                if intindex == 1:
+                if intindex == 0:
+                    #----------------------------------------------------
+                    # Decode HTML-escaped characters (e.g. &#039;, &amp;, &quot;)
+                    # in the T_WC_CUSTOM_LIST source table so that downstream
+                    # copies to T2S collections, lists, movements, groups, etc.
+                    # display clean labels (e.g. "Time Magazine's All-TIME Movies"
+                    # instead of "Time Magazine&#039;s All-TIME Movies").
+                    print("T_WC_CUSTOM_LIST_UNESCAPE processing")
+                    start_time = time.time()
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","T_WC_CUSTOM_LIST HTML unescape","Current sub process in the TMDb database preprocess",0)
+
+                    # Text columns of T_WC_CUSTOM_LIST that may hold HTML-escaped
+                    # characters; html.unescape() is a no-op on already-clean values.
+                    arrcustomlisttextcolumns = [
+                        "LIST_NAME",
+                        "LIST_NAME_FR",
+                        "OVERVIEW",
+                        "WIKIDATA_PROPERTIES",
+                        "ID_IMDB_LIST",
+                        "TMDB_ELEMENTS",
+                        "TMDB_TARGET_RECORD",
+                        "POSTER_PATH",
+                        "WIKIPEDIA_IMAGE_PATH",
+                    ]
+                    strcolumns = ", ".join(arrcustomlisttextcolumns)
+                    query = f"SELECT ID_CUSTOM_LIST, {strcolumns} FROM T_WC_CUSTOM_LIST "
+                    print(query)
+                    cursor2.execute(query)
+                    results = cursor2.fetchall()
+                    print(f"Loaded {len(results)} rows of T_WC_CUSTOM_LIST")
+
+                    lngrowsupdated = 0
+                    for row in results:
+                        arrchanged = {}
+                        for strcolumn in arrcustomlisttextcolumns:
+                            strvalue = row[strcolumn]
+                            if strvalue is None:
+                                continue
+                            strunescaped = html.unescape(strvalue)
+                            if strunescaped != strvalue:
+                                arrchanged[strcolumn] = strunescaped
+                        if arrchanged:
+                            strsetclause = ", ".join(f"{strcolumn} = %s" for strcolumn in arrchanged)
+                            arrparams = list(arrchanged.values())
+                            arrparams.append(row["ID_CUSTOM_LIST"])
+                            strupdate = f"UPDATE T_WC_CUSTOM_LIST SET {strsetclause} WHERE ID_CUSTOM_LIST = %s "
+                            cursor2.execute(strupdate, arrparams)
+                            lngrowsupdated += 1
+                            print(f"  ID_CUSTOM_LIST {row['ID_CUSTOM_LIST']}: unescaped {list(arrchanged.keys())}")
+                    cp.connectioncp.commit()
+                    print(f"T_WC_CUSTOM_LIST_UNESCAPE complete: {lngrowsupdated} row(s) updated")
+                    print(f"Elapsed time: {time.time() - start_time:.2f} seconds")
+                elif intindex == 1:
                     #----------------------------------------------------
                     print("WIKIPEDIA_FORMAT_LINE processing")
                     start_time = time.time()

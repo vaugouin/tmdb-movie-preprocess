@@ -2,3 +2,4 @@ citizenphilsecrets.py
 *.pyc
 data/*
 .env
+archive/
