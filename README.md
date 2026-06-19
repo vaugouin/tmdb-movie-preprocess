@@ -66,14 +66,31 @@ The included `tmdb-movie-preprocess.sh` wraps build + run and already uses `--en
 
 Parses the `WIKIPEDIA_FORMAT_LINE` field on `T_WC_TMDB_MOVIE` to extract technical presentation metadata.
 
-**Reads:** `T_WC_TMDB_MOVIE.WIKIPEDIA_FORMAT_LINE`
-**Writes:** `T_WC_TMDB_MOVIE` (technical flag columns)
+**Reads:** `T_WC_TMDB_MOVIE.WIKIPEDIA_FORMAT_LINE`, `T_WC_TMDB_MOVIE.DAT_WIKIPEDIA_FORMAT_LINE`
+**Writes:** `T_WC_TMDB_MOVIE` (technical flag columns), `T_WC_T2S_MOVIE_TECHNICAL` (medium_format + aspect_ratio junction, §12.5)
+
+**Incremental selection (watermark).** Rather than re-parsing every movie that has a format line on every run, Process 1 only processes movies whose `WIKIPEDIA_FORMAT_LINE` was (re)stamped since the **last successful run**. The upstream crawler sets `DAT_WIKIPEDIA_FORMAT_LINE` (a `datetime`, indexed) whenever it writes `WIKIPEDIA_FORMAT_LINE`, so that column is the change marker:
+
+```sql
+SELECT ID_MOVIE, WIKIPEDIA_FORMAT_LINE FROM T_WC_TMDB_MOVIE
+WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL AND WIKIPEDIA_FORMAT_LINE <> ''
+  AND DAT_WIKIPEDIA_FORMAT_LINE >= DATE_SUB('<last_run>', INTERVAL 60 MINUTE)
+ORDER BY ID_MOVIE ASC
+```
+
+- The watermark is the **start time of the previous successful run**, stored in the server variable `strtmdbmoviepreprocesswikipediaformatlinelastrun` and written **only after the run completes** (so a crash leaves the old watermark and the failed window is retried).
+- On the **first run** (watermark empty) it falls back to a **full scan** to backfill everything.
+- A configurable look-back buffer (`lngformatlinelookbackminutes`, default **60 min**) is subtracted from the watermark to absorb clock skew between the crawler host and this process, so a row stamped near the boundary is never missed (re-processing is idempotent).
+- If no rows changed since the last run, the parse/junction work is skipped entirely and only the watermark is re-stamped.
 
 **Operations:**
 - Normalises the format line string (lowercase, cleaning).
 - Extracts: colour/B&W flag, silent flag, 3D flag, colour technology, film technology, aspect ratio, film format, sound system, sound technology, number of audio tracks.
 - Validates the resulting format line and sets `IS_VALID_FORMAT`.
 - Batch-updates the source table in place.
+- Rebuilds the `medium_format` + `aspect_ratio` junction rows in `T_WC_T2S_MOVIE_TECHNICAL` for the processed movies (per-movie, scoped re-sync — see §12.5), then refreshes `MOVIE_COUNT` on `T_WC_T2S_TECHNICAL`.
+
+> **Note:** selection is keyed on `DAT_WIKIPEDIA_FORMAT_LINE`, and the **`wikipedia-crawler` repo is the guarantor** of that marker: it writes `WIKIPEDIA_FORMAT_LINE` and `DAT_WIKIPEDIA_FORMAT_LINE = NOW()` (`Europe/Paris`) in the same upsert (`wikipedia_crawler.py`, `arrcouples` write of `T_WC_TMDB_MOVIE`), so the date always advances whenever the format line changes — and in the same timezone this process stamps its watermark. To force a full re-parse, clear the watermark (set `strtmdbmoviepreprocesswikipediaformatlinelastrun` to empty / delete the row).
 
 ---
 
@@ -96,17 +113,48 @@ Creates and links `T2S_TECHNICAL` dimension records from the technical fields po
 
 ### Process 3 — T2S_TOPIC
 
-Populates the `T_WC_T2S_TOPIC` dimension from TMDb lists, collections, and keywords.
+Populates the `T_WC_T2S_TOPIC` dimension from TMDb keywords.
 
-**Reads:** `T_WC_TMDB_LIST`, `T_WC_TMDB_LIST_LANG`, `T_WC_TMDB_COLLECTION`, `T_WC_TMDB_COLLECTION_LANG`, `T_WC_TMDB_KEYWORD`, `T_WC_TMDB_PERSON`
-**Writes:** `T_WC_TMDB_KEYWORD` (counts), `T_WC_T2S_TOPIC`
+**Reads:** `T_WC_TMDB_KEYWORD`, `T_WC_TMDB_PERSON`, `T_WC_TMDB_MOVIE_KEYWORD`, `T_WC_TMDB_SERIE_KEYWORD`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`
+**Writes:** `T_WC_TMDB_KEYWORD` (counts + KPIs), `T_WC_T2S_TOPIC`, `T_WC_T2S_MOVIE_TOPIC`, `T_WC_T2S_SERIE_TOPIC`
 
-**Subprocesses:** `en-list`, `fr-list`, `en-collection`, `fr-collection`, `en-keyword`
+**Subprocesses:** `en-keyword`
+
+> **Note:** Only the `en-keyword` subprocess is active. The list/collection subprocesses (`en-list`, `fr-list`, `en-collection`, `fr-collection`) are retired — lists and collections are no longer copied into `T_WC_T2S_TOPIC` (they live in `T_WC_T2S_LIST` / `T_WC_T2S_COLLECTION` via Processes 42 / 41). The leftover `list`- and `collection`-sourced rows are unconditionally purged at the end of this process.
 
 **Operations:**
-- Computes `MOVIE_COUNT` and `SERIE_COUNT` per keyword; updates `T_WC_TMDB_KEYWORD`.
-- Computes per-keyword KPIs: `NAME_WORD_COUNT`, `IS_PERSON` (keyword matches a person name), `IS_EMPTY` (total count < 2).
-- Copies TMDb lists (English + French), collections (English + French), and keywords into `T_WC_T2S_TOPIC`.
+
+**Rolling refresh batch (selection strategy).** Rather than reprocessing every qualifying keyword on every run, Process 3 rotates through them over a configurable cycle (default **30 days**) using the `TIM_T2S_TOPIC_REFRESH` timestamp on `T_WC_TMDB_KEYWORD` — the same pattern as the Wikidata linker in Processes 60/62. At the top of the process a single batch is selected:
+
+```sql
+SELECT ID_KEYWORD FROM T_WC_TMDB_KEYWORD
+WHERE (USED_FOR_T2S_TOPIC > 0 OR USE_FOR_TAGGING > 0)
+  AND (TIM_T2S_TOPIC_REFRESH IS NULL OR TIM_T2S_TOPIC_REFRESH < (NOW() - INTERVAL 30 DAY))
+ORDER BY CASE WHEN TIM_T2S_TOPIC_REFRESH IS NULL THEN 0 ELSE 1 END,
+         TIM_T2S_TOPIC_REFRESH ASC, ID_KEYWORD ASC
+LIMIT <batch_size>
+```
+
+- The selection is restricted to keywords flagged `USED_FOR_T2S_TOPIC > 0` **OR** `USE_FOR_TAGGING > 0` (not the entire keyword table), and only those never refreshed or last refreshed more than `lngrefreshcycledays` (30) days ago.
+- `LIMIT` is **auto-sized** to `ceil(qualifying_count × 1.3 / cycle_days)` so the whole qualifying set rotates within the cycle with ~30% headroom; never-refreshed rows (NULL) are processed first. The first run spreads the initial NULL backlog across the cycle instead of doing all of it at once.
+- **The MOVIE_COUNT, SERIE_COUNT, KPI, and topic-build passes are all scoped to this single batch** so each keyword's counts, KPIs and topic rows are rebuilt together and stay mutually consistent.
+- **Stamping (stamp-then-skip):** each keyword in the batch has `TIM_T2S_TOPIC_REFRESH` set to the current time up-front, before its topic is built. If the keyword errors out mid-processing it has already rotated out of the batch and is not retried until the next cycle.
+
+The per-keyword work for the selected batch:
+- Resets `MOVIE_COUNT`/`SERIE_COUNT` to 0 for the batch, then recomputes `MOVIE_COUNT` (from `T_WC_T2S_MOVIE`) and `SERIE_COUNT` (from `T_WC_T2S_SERIE`); updates `T_WC_TMDB_KEYWORD`.
+- Computes per-keyword KPIs: `NAME_WORD_COUNT`, `IS_PERSON` (keyword name matches a `T_WC_TMDB_PERSON.NAME`), `IS_EMPTY` (total movie+serie count < 2).
+- For each selected keyword, queries linked movies (`T_WC_TMDB_MOVIE_KEYWORD` ⋈ `T_WC_T2S_MOVIE`) and series (`T_WC_TMDB_SERIE_KEYWORD` ⋈ `T_WC_T2S_SERIE`), both filtered to `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''` and ordered by `IMDB_RATING_WEIGHTED DESC`.
+- Upserts the keyword into `T_WC_T2S_TOPIC` **only when it resolves to ≥ 2 elements** (movies + series). Topics resolving to 0 or 1 element are deleted if they already exist. On upsert, the `T_WC_T2S_MOVIE_TOPIC` / `T_WC_T2S_SERIE_TOPIC` junction rows are deleted and rebuilt with sequential `DISPLAY_ORDER`.
+- **Stale delete:** removes `T_WC_T2S_TOPIC` rows with `TOPIC_TYPE IS NULL`, all `list`/`collection`-sourced rows, and `keyword`-sourced rows whose `ID_RECORD` is no longer in `T_WC_TMDB_KEYWORD WHERE USED_FOR_T2S_TOPIC > 0 OR USE_FOR_TAGGING > 0`.
+- Post-processing: refreshes `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, `POPULARITY` on `T_WC_T2S_TOPIC` (keyword topics) by averaging across linked movies, then series. The stale-delete and rating post-pass below run over the **full** `T_WC_T2S_TOPIC` table on every run, independent of the rolling batch, so keywords that lose their qualifying flag are cleaned up promptly.
+
+> **Migration (rolling-refresh batch).** The batch rotation requires one new column on `T_WC_TMDB_KEYWORD`. If you are upgrading an existing database, run:
+> ```sql
+> ALTER TABLE T_WC_TMDB_KEYWORD
+>   ADD COLUMN TIM_T2S_TOPIC_REFRESH datetime DEFAULT NULL AFTER TIM_WIKIPEDIA_SEARCH,
+>   ADD INDEX TIM_T2S_TOPIC_REFRESH (TIM_T2S_TOPIC_REFRESH);
+> ```
+> On first run every keyword has `TIM_T2S_TOPIC_REFRESH = NULL` and is therefore "due"; the auto-sized `LIMIT` spreads this initial backlog across the cycle. To force an immediate full refresh of a keyword, set its `TIM_T2S_TOPIC_REFRESH` back to `NULL`.
 
 ---
 
@@ -593,7 +641,7 @@ Generates language-specific, NLP-preprocessed metadata for movies. Runs daily or
 
 **Operations:**
 - For each movie, retrieves localised title and overview.
-- Lemmatises keywords and overview text using the French spaCy model (`fr_core_news_lg`).
+- Lemmatised keywords and overview text using the French spaCy model (`fr_core_news_lg`). _(Removed — the spaCy dependency is no longer part of this project.)_
 - Processes format line technical specs.
 - Inserts normalised, language-specific records into `T_WC_TMDB_MOVIE_LANG_META`.
 - Inserts preprocessed text into `T_WC_TMDB_MOVIE_LANG_PREPROCESSED` for similarity analysis.
