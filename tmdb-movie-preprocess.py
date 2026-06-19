@@ -16,6 +16,7 @@ import re
 import sys
 
 from tmdb_preprocess_helpers import (
+    EntityTelemetry,
     batch_update_data,
     check_memory,
     clean_format_line,
@@ -28,7 +29,6 @@ from tmdb_preprocess_helpers import (
     f_buildcustomorderbyclause,
     f_getcustomsortby,
     f_getwikidataimagepath,
-    f_getlemma,
     f_linktmdbkeywordtowikidata,
     f_tmdbpersonsetusedfortags,
     f_wikidataentitysummary,
@@ -98,7 +98,6 @@ try:
             strtotalruntime = "RUNNING"
             cp.f_setservervariable("strtmdbmoviepreprocesstotalruntime",strtotalruntime,strtotalruntimedesc,0)
 
-            #arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 20: 'TMDB_KEYWORD', 30: 'TMDB_MOVIE_LANG_META'}
             #arrprocessscope = {2: 'T2S_MOVIE_TECHNICAL'}
             #arrprocessscope = {20: 'TMDB_KEYWORD'}
             #arrprocessscope = {6: 'T2S_PERSON'}
@@ -113,7 +112,6 @@ try:
             #arrprocessscope = {8: 'T2S_NETWORK'}
             #arrprocessscope = {3: 'T2S_TOPIC', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {1: 'WIKIPEDIA_FORMAT_LINE'}
-            #arrprocessscope = {30: 'TMDB_MOVIE_LANG_META'}
             #arrprocessscope = {40: 'T2S_ITEM'}
             #arrprocessscope = {41: 'T2S_COLLECTION'}
             #arrprocessscope = {41: 'T2S_COLLECTION', 42: 'T2S_LIST'}
@@ -121,11 +119,74 @@ try:
             #arrprocessscope = {43: 'T2S_GROUP'}
             #if strnow.startswith("2026-05-31"):
             #    arrprocessscope = {0: 'T_WC_CUSTOM_LIST_UNESCAPE'}
+            # Per-process run window (startdatetime/enddatetime/processedseconds)
+            # published via the shared EntityTelemetry helper (kind="copy") here in
+            # the loop wrapper (telcopy.begin() below, telcopy.finish() at the end of
+            # the loop body). Covers the bulk copy/rebuild steps (4-40) AND the
+            # utility / Wikidata-linking steps that have no bespoke telemetry of their
+            # own (0,1,2, the linking steps 60/61/62, and the alternate-character
+            # source 49). The richer dimension derivations (Topic 3, Collection 41,
+            # List 42, Group 43, Award 44, Movement 45, Death 46, Nomination 47,
+            # Character 48) self-instrument inside their own blocks (EntityTelemetry,
+            # or bespoke vars for 43/46) and are intentionally absent here so prefixes
+            # don't clash.
+            arrcopytelemetry = {
+                0: ("customlistunescape", "custom list HTML unescape"),
+                1: ("wikipediaformatline", "Wikipedia format-line cleanup"),
+                2: ("movietechnical", "movie technical"),
+                4: ("movie", "movie"),
+                5: ("serie", "serie"),
+                6: ("person", "person"),
+                7: ("company", "company"),
+                8: ("network", "network"),
+                9: ("personmovie", "person-movie link"),
+                10: ("personserie", "person-serie link"),
+                11: ("moviegenre", "movie-genre link"),
+                12: ("seriegenre", "serie-genre link"),
+                13: ("moviecompany", "movie-company link"),
+                14: ("seriecompany", "serie-company link"),
+                15: ("serienetwork", "serie-network link"),
+                16: ("movieproductioncountry", "movie production country"),
+                17: ("serieproductioncountry", "serie production country"),
+                18: ("moviespokenlanguage", "movie spoken language"),
+                19: ("seriespokenlanguage", "serie spoken language"),
+                20: ("companyimage", "company image"),
+                21: ("movieimage", "movie image"),
+                22: ("networkimage", "network image"),
+                23: ("personimage", "person image"),
+                24: ("serieimage", "serie image"),
+                25: ("movievideo", "movie video"),
+                26: ("serievideo", "serie video"),
+                27: ("season", "season"),
+                28: ("episode", "episode"),
+                29: ("personseason", "person-season link"),
+                31: ("personepisode", "person-episode link"),
+                32: ("seasonimage", "season image"),
+                33: ("episodeimage", "episode image"),
+                34: ("seasonvideo", "season video"),
+                35: ("episodevideo", "episode video"),
+                40: ("item", "item"),
+                49: ("characteralt", "character (alt) source build"),
+                60: ("topicwikidatalink", "topic Wikidata linking"),
+                61: ("collectionwikidatalink", "collection Wikidata linking"),
+                62: ("technicalwikidatalink", "technical Wikidata linking"),
+            }
+            # Uniform per-process wall-clock, measured centrally here in the loop
+            # wrapper so EVERY process is timed the same way regardless of whatever
+            # bespoke telemetry it emits internally. Drives the "longest first"
+            # ranking printed/published after the loop (optimization candidates).
+            arrprocessdurations = {}
             for intindex, strdesc in arrprocessscope.items():
                 strprocessesexecuted += str(intindex) + ", "
                 cp.f_setservervariable("strtmdbmoviepreprocessprocessesexecuted",strprocessesexecuted,strprocessesexecuteddesc,0)
                 cp.f_setservervariable("strtmdbmoviepreprocesscurrentprocess",strdesc,"Current process in the TMDb database preprocess",0)
                 cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","","Current sub process in the TMDb database preprocess",0)
+                dblprocessstarttime = time.time()
+                telcopy = None
+                if intindex in arrcopytelemetry:
+                    strcopyentity, strcopylabel = arrcopytelemetry[intindex]
+                    telcopy = EntityTelemetry(strcopyentity, intindex, strcopylabel, kind="copy")
+                    telcopy.begin()
                 if intindex == 0:
                     #----------------------------------------------------
                     # Decode HTML-escaped characters (e.g. &#039;, &amp;, &quot;)
@@ -186,115 +247,150 @@ try:
                     # Check memory
                     dblavailableram = check_memory()
                     
+                    lngformatlinelookbackminutes = 60
+                    strrunstart = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    strlastrun = cp.f_getservervariable("strtmdbmoviepreprocesswikipediaformatlinelastrun", 0)
+                    # Only (re)parse movies whose WIKIPEDIA_FORMAT_LINE was stamped since the last
+                    # SUCCESSFUL run. The upstream crawler sets DAT_WIKIPEDIA_FORMAT_LINE (datetime,
+                    # indexed) whenever it writes WIKIPEDIA_FORMAT_LINE, so that column is the change
+                    # marker. The watermark is the previous run start time, persisted only after this
+                    # run completes; the first run (empty watermark) falls back to a full scan. A
+                    # look-back buffer absorbs clock skew between the crawler host and this process.
+                    strincrementalfilter = ""
+                    if strlastrun:
+                        strincrementalfilter = (
+                            "AND DAT_WIKIPEDIA_FORMAT_LINE >= "
+                            "DATE_SUB('" + strlastrun + "', INTERVAL "
+                            + str(lngformatlinelookbackminutes) + " MINUTE) "
+                        )
+                        print(f"Incremental run: rows changed since {strlastrun} (minus {lngformatlinelookbackminutes} min buffer)")
+                    else:
+                        print("First run (no watermark): full scan of all WIKIPEDIA_FORMAT_LINE rows")
+                    
                     # Read data from database using fetchall()
-                    query = """
-SELECT ID_MOVIE, WIKIPEDIA_FORMAT_LINE 
-FROM T_WC_TMDB_MOVIE 
-WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL 
-AND WIKIPEDIA_FORMAT_LINE <> '' 
-ORDER BY ID_MOVIE ASC 
-                    """
+                    query = (
+                        "SELECT ID_MOVIE, WIKIPEDIA_FORMAT_LINE "
+                        "FROM T_WC_TMDB_MOVIE "
+                        "WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL "
+                        "AND WIKIPEDIA_FORMAT_LINE <> '' "
+                        + strincrementalfilter +
+                        "ORDER BY ID_MOVIE ASC "
+                    )
                     print(query)
                     cursor2.execute(query)
                     result = cursor2.fetchall()
                     # Convert the result to a pandas DataFrame
                     data = pd.DataFrame(result)
                     print(f"Loaded {len(data)} rows of data")
-                    print(data.head())
-                    #time.sleep(5)
+                    if telcopy is not None:
+                        telcopy.set_processed(len(data))
+                    if len(data) == 0:
+                        print("No changed WIKIPEDIA_FORMAT_LINE rows since last run; skipping parse/junction work.")
+                    else:
+                        print(data.head())
+                        #time.sleep(5)
 
-                    # Create backup of original data
-                    data['WIKIPEDIA_FORMAT_LINE'] = data['WIKIPEDIA_FORMAT_LINE'].astype(str)
-                    
-                    # Convert to lowercase and apply cleaning
-                    data['WIKIPEDIA_FORMAT_LINE'] = data['WIKIPEDIA_FORMAT_LINE'].str.lower()
-                    data['WIKIPEDIA_FORMAT_LINE'] = data['WIKIPEDIA_FORMAT_LINE'].apply(clean_format_line)
-                    #print(data['WIKIPEDIA_FORMAT_LINE'])
-                    
-                    # Apply transformations and extract components
-                    # Enumerate through dataframe and display WIKIPEDIA_FORMAT_LINE for each row
-                    #for index, row in data.iterrows():
-                    #    print(f"Row {index}: {row['WIKIPEDIA_FORMAT_LINE']}")
-                    
-                    format_components = data['WIKIPEDIA_FORMAT_LINE'].apply(extract_format_components)
-                    format_components = format_components.apply(normalize_extracted_components)
+                        # Create backup of original data
+                        data['WIKIPEDIA_FORMAT_LINE'] = data['WIKIPEDIA_FORMAT_LINE'].astype(str)
 
-                    print("\nAfter extract_format_components()")
-                    print(format_components.head())
-                    #time.sleep(5)
+                        # Convert to lowercase and apply cleaning
+                        data['WIKIPEDIA_FORMAT_LINE'] = data['WIKIPEDIA_FORMAT_LINE'].str.lower()
+                        data['WIKIPEDIA_FORMAT_LINE'] = data['WIKIPEDIA_FORMAT_LINE'].apply(clean_format_line)
+                        #print(data['WIKIPEDIA_FORMAT_LINE'])
 
-                    format_df = pd.DataFrame(format_components.tolist())
-                    
-                    # Add the extracted components to the main DataFrame
-                    data['IS_COLOR'] = format_df['IS_COLOR']
-                    data['IS_BLACK_AND_WHITE'] = format_df['IS_BLACK_AND_WHITE']
-                    data['IS_SILENT'] = format_df['IS_SILENT']
-                    data['IS_3D'] = format_df['IS_3D']
-                    data['COLOR_TECHNOLOGY'] = format_df['COLOR_TECHNOLOGY']
-                    data['FILM_TECHNOLOGY'] = format_df['FILM_TECHNOLOGY']
-                    data['ASPECT_RATIO'] = format_df['ASPECT_RATIO']
-                    data['ASPECT_RATIO_LIST'] = format_df['ASPECT_RATIO_LIST']
-                    data['FILM_FORMAT'] = format_df['FILM_FORMAT']
-                    data['SOUND_SYSTEM'] = format_df['SOUND_SYSTEM']
-                    data['SOUND_TECHNOLOGY'] = format_df['SOUND_TECHNOLOGY']
-                    data['NUM_AUDIO_TRACKS'] = format_df['NUM_AUDIO_TRACKS']
-                    
-                    # Validate format lines
-                    data['IS_VALID_FORMAT'] = data['WIKIPEDIA_FORMAT_LINE'].apply(validate_format_line)
-                    
-                    # Display sample of processed data
-                    print("\nSample of processed data:")
-                    print(data.head())
-                    #time.sleep(5)
-                    
-                    # Update data in batches
-                    print("Updating data in MariaDB...")
-                    batch_update_data(cp.connectioncp, data, 1)
+                        # Apply transformations and extract components
+                        # Enumerate through dataframe and display WIKIPEDIA_FORMAT_LINE for each row
+                        #for index, row in data.iterrows():
+                        #    print(f"Row {index}: {row['WIKIPEDIA_FORMAT_LINE']}")
 
-                    # Junction-table enrichment for medium_format + aspect_ratio (EXTEND_T2S_TECHNICAL.md §12.5).
-                    print("\nPopulating T_WC_T2S_MOVIE_TECHNICAL (medium_format + aspect_ratio)...")
-                    arrclassificationid, arraspectratioid = load_technical_ids(cursor)
-                    arrjunctionsummary = write_movie_technical_junction(
-                        cp.connectioncp, data, arrclassificationid, arraspectratioid
-                    )
-                    refresh_technical_movie_count(cp.connectioncp)
-                    print(
-                        "  medium_format rows: color=" + str(arrjunctionsummary['color'])
-                        + " bw=" + str(arrjunctionsummary['bw'])
-                        + " silent=" + str(arrjunctionsummary['silent'])
-                        + " 3d=" + str(arrjunctionsummary['3d'])
-                    )
-                    print(
-                        "  aspect_ratio rows: " + str(arrjunctionsummary['aspect_total'])
-                        + " across " + str(arrjunctionsummary['aspect_movies']) + " movies"
-                        + " (" + str(arrjunctionsummary['multi_ratio_movies']) + " with 2+ ratios)"
-                    )
-                    print(
-                        "  unmapped aspect-ratio canonicals (no T_WC_T2S_TECHNICAL row): "
-                        + str(arrjunctionsummary['unmapped_count'])
-                    )
-                    if arrjunctionsummary['unmapped_count'] > 0:
-                        arrsamples = arrjunctionsummary['unmapped'][:20]
-                        for lngmovieid, strcanonical in arrsamples:
-                            print("    ID_MOVIE=" + str(lngmovieid) + " -> " + str(strcanonical))
+                        format_components = data['WIKIPEDIA_FORMAT_LINE'].apply(extract_format_components)
+                        format_components = format_components.apply(normalize_extracted_components)
+
+                        print("\nAfter extract_format_components()")
+                        print(format_components.head())
+                        #time.sleep(5)
+
+                        format_df = pd.DataFrame(format_components.tolist())
+
+                        # Add the extracted components to the main DataFrame
+                        data['IS_COLOR'] = format_df['IS_COLOR']
+                        data['IS_BLACK_AND_WHITE'] = format_df['IS_BLACK_AND_WHITE']
+                        data['IS_SILENT'] = format_df['IS_SILENT']
+                        data['IS_3D'] = format_df['IS_3D']
+                        data['COLOR_TECHNOLOGY'] = format_df['COLOR_TECHNOLOGY']
+                        data['FILM_TECHNOLOGY'] = format_df['FILM_TECHNOLOGY']
+                        data['ASPECT_RATIO'] = format_df['ASPECT_RATIO']
+                        data['ASPECT_RATIO_LIST'] = format_df['ASPECT_RATIO_LIST']
+                        data['FILM_FORMAT'] = format_df['FILM_FORMAT']
+                        data['SOUND_SYSTEM'] = format_df['SOUND_SYSTEM']
+                        data['SOUND_TECHNOLOGY'] = format_df['SOUND_TECHNOLOGY']
+                        data['NUM_AUDIO_TRACKS'] = format_df['NUM_AUDIO_TRACKS']
+
+                        # Validate format lines
+                        data['IS_VALID_FORMAT'] = data['WIKIPEDIA_FORMAT_LINE'].apply(validate_format_line)
+
+                        # Display sample of processed data
+                        print("\nSample of processed data:")
+                        print(data.head())
+                        #time.sleep(5)
+
+                        # Update data in batches
+                        print("Updating data in MariaDB...")
+                        batch_update_data(cp.connectioncp, data, 1)
+
+                        # Junction-table enrichment for medium_format + aspect_ratio (EXTEND_T2S_TECHNICAL.md §12.5).
+                        print("\nPopulating T_WC_T2S_MOVIE_TECHNICAL (medium_format + aspect_ratio)...")
+                        arrclassificationid, arraspectratioid = load_technical_ids(cursor)
+                        arrjunctionsummary = write_movie_technical_junction(
+                            cp.connectioncp, data, arrclassificationid, arraspectratioid
+                        )
+                        refresh_technical_movie_count(cp.connectioncp)
+                        print(
+                            "  medium_format rows: color=" + str(arrjunctionsummary['color'])
+                            + " bw=" + str(arrjunctionsummary['bw'])
+                            + " silent=" + str(arrjunctionsummary['silent'])
+                            + " 3d=" + str(arrjunctionsummary['3d'])
+                        )
+                        print(
+                            "  aspect_ratio rows: " + str(arrjunctionsummary['aspect_total'])
+                            + " across " + str(arrjunctionsummary['aspect_movies']) + " movies"
+                            + " (" + str(arrjunctionsummary['multi_ratio_movies']) + " with 2+ ratios)"
+                        )
+                        print(
+                            "  unmapped aspect-ratio canonicals (no T_WC_T2S_TECHNICAL row): "
+                            + str(arrjunctionsummary['unmapped_count'])
+                        )
+                        if arrjunctionsummary['unmapped_count'] > 0:
+                            arrsamples = arrjunctionsummary['unmapped'][:20]
+                            for lngmovieid, strcanonical in arrsamples:
+                                print("    ID_MOVIE=" + str(lngmovieid) + " -> " + str(strcanonical))
+                        cp.f_setservervariable(
+                            "strtmdbmoviepreprocessmediumformatrowscount",
+                            str(arrjunctionsummary['color'] + arrjunctionsummary['bw']
+                                + arrjunctionsummary['silent'] + arrjunctionsummary['3d']),
+                            "Count of medium_format junction rows written in WIKIPEDIA_FORMAT_LINE step",
+                            0
+                        )
+                        cp.f_setservervariable(
+                            "strtmdbmoviepreprocessaspectratiorowscount",
+                            str(arrjunctionsummary['aspect_total']),
+                            "Count of aspect_ratio junction rows written in WIKIPEDIA_FORMAT_LINE step",
+                            0
+                        )
+                        cp.f_setservervariable(
+                            "strtmdbmoviepreprocessmultiratiomoviescount",
+                            str(arrjunctionsummary['multi_ratio_movies']),
+                            "Count of movies that received 2+ aspect_ratio junction rows",
+                            0
+                        )
+                    # Persist the watermark only after a successful run (full, incremental, or even a
+                    # no-op run with zero changed rows) so the next run starts here. An exception
+                    # earlier aborts before this line, leaving the previous watermark for retry.
                     cp.f_setservervariable(
-                        "strtmdbmoviepreprocessmediumformatrowscount",
-                        str(arrjunctionsummary['color'] + arrjunctionsummary['bw']
-                            + arrjunctionsummary['silent'] + arrjunctionsummary['3d']),
-                        "Count of medium_format junction rows written in WIKIPEDIA_FORMAT_LINE step",
-                        0
-                    )
-                    cp.f_setservervariable(
-                        "strtmdbmoviepreprocessaspectratiorowscount",
-                        str(arrjunctionsummary['aspect_total']),
-                        "Count of aspect_ratio junction rows written in WIKIPEDIA_FORMAT_LINE step",
-                        0
-                    )
-                    cp.f_setservervariable(
-                        "strtmdbmoviepreprocessmultiratiomoviescount",
-                        str(arrjunctionsummary['multi_ratio_movies']),
-                        "Count of movies that received 2+ aspect_ratio junction rows",
-                        0
+                        "strtmdbmoviepreprocesswikipediaformatlinelastrun",
+                        strrunstart,
+                        "Start datetime of the last successful WIKIPEDIA_FORMAT_LINE run; incremental watermark on DAT_WIKIPEDIA_FORMAT_LINE",
+                        0,
                     )
 
                     # Calculate and display execution time
@@ -631,16 +727,56 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                 elif intindex == 3:
                     #----------------------------------------------------
                     print("T2S_TOPIC processing")
+                    teltopic = EntityTelemetry("topic", 3, "topic")
+                    teltopic.begin()
+                    # ------------------------------------------------------------------
+                    # Rolling refresh batch selection.
+                    # Instead of reprocessing every qualifying keyword on every run, we
+                    # rotate through them over a ~30-day cycle using TIM_T2S_TOPIC_REFRESH
+                    # (same pattern as the Wikidata linker in processes 60/62). The
+                    # MOVIE_COUNT / SERIE_COUNT / KPI / topic-build passes below are all
+                    # scoped to this single batch so each keyword's counts, KPIs and topic
+                    # rows are rebuilt together and stay mutually consistent.
+                    # ------------------------------------------------------------------
+                    lngrefreshcycledays = 30
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Select keyword refresh batch","Current sub process in the TMDb database movie preprocess",0)
+                    cursor.execute("SELECT COUNT(*) AS N FROM T_WC_TMDB_KEYWORD WHERE USED_FOR_T2S_TOPIC > 0 OR USE_FOR_TAGGING > 0")
+                    lngqualifying = cursor.fetchone()['N']
+                    # Size the daily batch so the whole qualifying set rotates within the
+                    # cycle, with +30% headroom for growth and missed runs. ceil(N*1.3/days).
+                    lngtopicrefreshbatchsize = max(1, -(-(lngqualifying * 13) // (lngrefreshcycledays * 10)))
+                    strsqlbatch = ""
+                    strsqlbatch += "SELECT ID_KEYWORD FROM T_WC_TMDB_KEYWORD "
+                    strsqlbatch += "WHERE (USED_FOR_T2S_TOPIC > 0 OR USE_FOR_TAGGING > 0) "
+                    strsqlbatch += "AND (TIM_T2S_TOPIC_REFRESH IS NULL OR TIM_T2S_TOPIC_REFRESH < (NOW() - INTERVAL " + str(lngrefreshcycledays) + " DAY)) "
+                    strsqlbatch += "ORDER BY CASE WHEN TIM_T2S_TOPIC_REFRESH IS NULL THEN 0 ELSE 1 END, TIM_T2S_TOPIC_REFRESH ASC, ID_KEYWORD ASC "
+                    strsqlbatch += "LIMIT " + str(lngtopicrefreshbatchsize) + " "
+                    print(strsqlbatch)
+                    cursor.execute(strsqlbatch)
+                    arrbatchkeywordids = [row['ID_KEYWORD'] for row in cursor.fetchall()]
+                    if arrbatchkeywordids:
+                        strkeywordinclause = "(" + ",".join(str(lngid) for lngid in arrbatchkeywordids) + ")"
+                    else:
+                        # No keyword is due: a sentinel that matches no real row keeps every
+                        # downstream "ID_KEYWORD IN <clause>" valid and turns the run into a no-op.
+                        strkeywordinclause = "(-1)"
+                    print(f"Keyword refresh batch: {len(arrbatchkeywordids)} of {lngqualifying} qualifying keyword(s) (cycle {lngrefreshcycledays} days, batch size {lngtopicrefreshbatchsize})")
                     if 1:
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Compute MOVIE_COUNT for KEYWORD","Current sub process in the TMDb database movie preprocess",0)
+                        # Reset counts for the batch first, so keywords that have lost all of
+                        # their movie/serie links settle to 0 (otherwise the GROUP-BY passes
+                        # below, which only return keywords WITH links, would leave stale counts
+                        # and a wrong IS_EMPTY KPI).
+                        cursor2.execute("UPDATE T_WC_TMDB_KEYWORD SET MOVIE_COUNT = 0, SERIE_COUNT = 0 WHERE ID_KEYWORD IN " + strkeywordinclause)
                         # Compute MOVIE_COUNT for KEYWORD
                         print("Compute MOVIE_COUNT for KEYWORD")
-                        strsqlcompanies = """
-SELECT COUNT(DISTINCT T_WC_T2S_MOVIE.ID_MOVIE) AS COMPTE, T_WC_TMDB_KEYWORD.NAME, T_WC_TMDB_KEYWORD.ID_KEYWORD 
-FROM T_WC_T2S_MOVIE 
-JOIN T_WC_TMDB_MOVIE_KEYWORD ON T_WC_T2S_MOVIE.ID_MOVIE = T_WC_TMDB_MOVIE_KEYWORD.ID_MOVIE 
-JOIN T_WC_TMDB_KEYWORD ON T_WC_TMDB_MOVIE_KEYWORD.ID_KEYWORD = T_WC_TMDB_KEYWORD.ID_KEYWORD 
-GROUP BY T_WC_TMDB_KEYWORD.NAME 
+                        strsqlcompanies = f"""
+SELECT COUNT(DISTINCT T_WC_T2S_MOVIE.ID_MOVIE) AS COMPTE, T_WC_TMDB_KEYWORD.NAME, T_WC_TMDB_KEYWORD.ID_KEYWORD
+FROM T_WC_T2S_MOVIE
+JOIN T_WC_TMDB_MOVIE_KEYWORD ON T_WC_T2S_MOVIE.ID_MOVIE = T_WC_TMDB_MOVIE_KEYWORD.ID_MOVIE
+JOIN T_WC_TMDB_KEYWORD ON T_WC_TMDB_MOVIE_KEYWORD.ID_KEYWORD = T_WC_TMDB_KEYWORD.ID_KEYWORD
+WHERE T_WC_TMDB_KEYWORD.ID_KEYWORD IN {strkeywordinclause}
+GROUP BY T_WC_TMDB_KEYWORD.NAME
 ORDER BY COMPTE DESC """
                         print(strsqlcompanies)
                         cursor2.execute(strsqlcompanies)
@@ -656,12 +792,13 @@ ORDER BY COMPTE DESC """
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Compute SERIE_COUNT for KEYWORD","Current sub process in the TMDb database movie preprocess",0)
                         # Compute SERIE_COUNT for KEYWORD
                         print("Compute SERIE_COUNT for KEYWORD")
-                        strsqlcompanies = """
-SELECT COUNT(DISTINCT T_WC_T2S_SERIE.ID_SERIE) AS COMPTE, T_WC_TMDB_KEYWORD.NAME, T_WC_TMDB_KEYWORD.ID_KEYWORD 
-FROM T_WC_T2S_SERIE 
-JOIN T_WC_TMDB_SERIE_KEYWORD ON T_WC_T2S_SERIE.ID_SERIE = T_WC_TMDB_SERIE_KEYWORD.ID_SERIE 
-JOIN T_WC_TMDB_KEYWORD ON T_WC_TMDB_SERIE_KEYWORD.ID_KEYWORD = T_WC_TMDB_KEYWORD.ID_KEYWORD 
-GROUP BY T_WC_TMDB_KEYWORD.NAME 
+                        strsqlcompanies = f"""
+SELECT COUNT(DISTINCT T_WC_T2S_SERIE.ID_SERIE) AS COMPTE, T_WC_TMDB_KEYWORD.NAME, T_WC_TMDB_KEYWORD.ID_KEYWORD
+FROM T_WC_T2S_SERIE
+JOIN T_WC_TMDB_SERIE_KEYWORD ON T_WC_T2S_SERIE.ID_SERIE = T_WC_TMDB_SERIE_KEYWORD.ID_SERIE
+JOIN T_WC_TMDB_KEYWORD ON T_WC_TMDB_SERIE_KEYWORD.ID_KEYWORD = T_WC_TMDB_KEYWORD.ID_KEYWORD
+WHERE T_WC_TMDB_KEYWORD.ID_KEYWORD IN {strkeywordinclause}
+GROUP BY T_WC_TMDB_KEYWORD.NAME
 ORDER BY COMPTE DESC """
                         print(strsqlcompanies)
                         cursor2.execute(strsqlcompanies)
@@ -678,6 +815,7 @@ ORDER BY COMPTE DESC """
                         print("Compute KPI for KEYWORD")
                         strsqlkeywords = ""
                         strsqlkeywords += "SELECT * FROM T_WC_TMDB_KEYWORD "
+                        strsqlkeywords += "WHERE ID_KEYWORD IN " + strkeywordinclause + " "
                         strsqlkeywords += "ORDER BY ID_KEYWORD ASC "
                         cursor2.execute(strsqlkeywords)
                         print("Number of rows: " + str(cursor2.rowcount))
@@ -734,8 +872,7 @@ ORDER BY COMPTE DESC """
                                 strcurrentprocess = f"{inttopic}: Copying from TMDB_KEYWORD to T2S_TOPIC"
                                 strsql += "SELECT 'keyword' AS TOPIC_SOURCE, 'keyword' AS TOPIC_TYPE, T_WC_TMDB_KEYWORD.ID_KEYWORD AS ID_RECORD, T_WC_TMDB_KEYWORD.NAME, '' AS OVERVIEW, 'en' AS LANG, '' AS POSTER_PATH, T_WC_TMDB_KEYWORD.ID_WIKIDATA "
                                 strsql += "FROM T_WC_TMDB_KEYWORD "
-                                strsql += "WHERE T_WC_TMDB_KEYWORD.USED_FOR_T2S_TOPIC > 0 "
-                                strsql += "OR T_WC_TMDB_KEYWORD.USE_FOR_TAGGING > 0 "
+                                strsql += "WHERE T_WC_TMDB_KEYWORD.ID_KEYWORD IN " + strkeywordinclause + " "
                                 strsql += "ORDER BY ID_RECORD ASC "
                                 #strsql += "LIMIT 10 "
                                 #strsql += "LIMIT 1000 "
@@ -754,6 +891,10 @@ ORDER BY COMPTE DESC """
                                     # print("------------------------------------------")
                                     lnglinesprocessed += 1
                                     lngrecordid = row['ID_RECORD']
+                                    # Stamp the refresh timestamp up-front (stamp-then-skip): even if
+                                    # this keyword errors out below and we `continue`, it has rotated
+                                    # out of the batch and will not be retried until the next cycle.
+                                    cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD", {"TIM_T2S_TOPIC_REFRESH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")}, "ID_KEYWORD = " + str(lngrecordid), 0)
                                     strrecordname = row['NAME']
                                     strrecordoverview = row['OVERVIEW']
                                     strrecordlang = row['LANG']
@@ -763,6 +904,7 @@ ORDER BY COMPTE DESC """
                                     strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
                                     strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordidwikidata)
                                     print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordtopicsource + ")")
+                                    teltopic.position(recordid=lngrecordid, currentvalue=strrecordname, currentprocess=strcurrentprocess)
                                     if target_field_name == "TOPIC_NAME":
                                         arrtopiccouples = {
                                             'ID_RECORD': lngrecordid,
@@ -832,6 +974,8 @@ ORDER BY COMPTE DESC """
                                                     print("Error: Failed to create/update topic - lngtopicid is None")
                                                     continue
                                                 lngtopicid = cursor3.fetchone()["ID_TOPIC"]
+                                            teltopic.created()
+                                            teltopic.set_entity_id(lngtopicid)
                                             if inttopic == 5:
                                                 strsqldelete = "DELETE FROM T_WC_T2S_MOVIE_TOPIC WHERE ID_TOPIC = " + str(lngtopicid)
                                                 cursor2.execute(strsqldelete)
@@ -878,12 +1022,14 @@ ORDER BY COMPTE DESC """
                                             strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
                                             print(strsqldelete)
                                             cursor2.execute(strsqldelete)
+                                            teltopic.deleted(cursor2.rowcount)
                                             #cursor2.commit()
                     if 1:
                         strsqltablename = "T_WC_T2S_TOPIC"
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE TOPIC_TYPE IS NULL "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        teltopic.deleted(cursor2.rowcount)
 
                         strsqldelete = ""
                         strsqldelete += "DELETE FROM T_WC_T2S_TOPIC "
@@ -905,6 +1051,7 @@ ORDER BY COMPTE DESC """
                         strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_KEYWORD FROM T_WC_TMDB_KEYWORD WHERE USED_FOR_T2S_TOPIC > 0 OR USE_FOR_TAGGING > 0) "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        teltopic.deleted(cursor2.rowcount)
                         
                         # Update T_WC_T2S_TOPIC ratings and popularity from movies
                         strsql = """UPDATE T_WC_T2S_TOPIC t
@@ -1161,11 +1308,15 @@ SET
                         cursor2.execute(strsqldelete)
                         #cursor2.commit()
 
+                    teltopic.finish()
+
                 elif intindex == 41:
                     #----------------------------------------------------
                     print("T2S_COLLECTION processing")
+                    telcollection = EntityTelemetry("collection", 41, "collection")
+                    telcollection.begin()
 
-                    arrcollections = {1: 'en-list', 2: 'fr-list', 3: 'en-collection', 4: 'fr-collection', 5: 'custom-collection'}    
+                    arrcollections = {1: 'en-list', 2: 'fr-list', 3: 'en-collection', 4: 'fr-collection', 5: 'custom-collection'}
                     #arrcollections = {1: 'en-list', 2: 'fr-list'}    
                     for intcollection, strcollection in arrcollections.items():
                         strsql = ""
@@ -1236,6 +1387,7 @@ SET
                                 strrecordposterpath = row['POSTER_PATH']
                                 strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
                                 print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordcollectionsource + ")")
+                                telcollection.position(recordid=lngrecordid, currentvalue=strrecordname, currentprocess=strcurrentprocess)
                                 if target_field_name == "COLLECTION_NAME":
                                     arrcollectioncouples = {
                                         'ID_RECORD': lngrecordid,
@@ -1381,6 +1533,8 @@ SET
                                                 print("Error: Failed to create/update collection - lngcollectionid is None")
                                                 continue
                                             lngcollectionid = cursor3.fetchone()["ID_T2S_COLLECTION"]
+                                        telcollection.created()
+                                        telcollection.set_entity_id(lngcollectionid)
                                         if intcollection == 1 or intcollection == 3 or intcollection == 5:
                                             # Retrieve all movies for this collection
                                             # Only processing when handling original English (records from T_WC_TMDB_LIST or T_WC_TMDB_COLLECTION) to avoid duplicates with the translated versions
@@ -1491,12 +1645,14 @@ SET
                                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
                                         print(strsqldelete)
                                         cursor2.execute(strsqldelete)
+                                        telcollection.deleted(cursor2.rowcount)
                                         #cursor2.commit()
                     if 1:
                         strsqltablename = "T_WC_T2S_COLLECTION"
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE COLLECTION_TYPE IS NULL "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telcollection.deleted(cursor2.rowcount)
 
                         strsqldelete = ""
                         strsqldelete += "DELETE FROM T_WC_T2S_COLLECTION "
@@ -1504,6 +1660,7 @@ SET
                         strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_LIST FROM T_WC_TMDB_LIST WHERE USED_FOR_T2S_COLLECTION > 0) "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telcollection.deleted(cursor2.rowcount)
 
                         strsqldelete = ""
                         strsqldelete += "DELETE FROM T_WC_T2S_COLLECTION "
@@ -1511,6 +1668,7 @@ SET
                         strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_COLLECTION FROM T_WC_TMDB_COLLECTION) "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telcollection.deleted(cursor2.rowcount)
 
                         strsqldelete = ""
                         strsqldelete += "DELETE FROM T_WC_T2S_COLLECTION "
@@ -1518,6 +1676,7 @@ SET
                         strsqldelete += "AND ID_RECORD NOT IN (SELECT ID_CUSTOM_LIST FROM T_WC_CUSTOM_LIST WHERE TARGET_TABLE = 2 AND DELETED = 0 AND (TMDB_TARGET_RECORD IS NULL OR TMDB_TARGET_RECORD = '')) "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telcollection.deleted(cursor2.rowcount)
                         
                         # Update T_WC_T2S_COLLECTION ratings and popularity from movies
                         strsql = """UPDATE T_WC_T2S_COLLECTION t
@@ -1580,11 +1739,15 @@ SET
                         cursor2.execute(strsqldelete)
                         #cursor2.commit()
 
+                    telcollection.finish()
+
                 elif intindex == 42:
                     #----------------------------------------------------
                     print("T2S_LIST processing")
+                    tellist = EntityTelemetry("list", 42, "list")
+                    tellist.begin()
 
-                    arrlists = {1: 'en-list', 2: 'fr-list', 3: 'custom-list', 4: 'list-delete'}    
+                    arrlists = {1: 'en-list', 2: 'fr-list', 3: 'custom-list', 4: 'list-delete'}
                     for intlist, strlist in arrlists.items():
                         strsql = ""
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess",strlist,"Current sub process in the TMDb database movie preprocess",0)
@@ -1622,11 +1785,13 @@ SET
                             strsqldelete += "DELETE FROM T_WC_T2S_LIST WHERE LIST_SOURCE = 'list' AND ID_RECORD NOT IN (SELECT ID_LIST FROM T_WC_TMDB_LIST WHERE T_WC_TMDB_LIST.USED_FOR_T2S_LIST > 0) "
                             print(strsqldelete)
                             cursor.execute(strsqldelete)
+                            tellist.deleted(cursor.rowcount)
                             #cursor.commit()
                             strsqldelete = ""
                             strsqldelete += "DELETE FROM T_WC_T2S_LIST WHERE LIST_SOURCE = 'custom' AND ID_RECORD NOT IN (SELECT ID_CUSTOM_LIST FROM T_WC_CUSTOM_LIST WHERE TARGET_TABLE = 1) "
                             print(strsqldelete)
                             cursor.execute(strsqldelete)
+                            tellist.deleted(cursor.rowcount)
                             #cursor.commit()
                             continue
                         if strsql != "":
@@ -1651,6 +1816,7 @@ SET
                                 strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
                                 strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordidwikidata)
                                 print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordlistsource + ")")
+                                tellist.position(recordid=lngrecordid, currentvalue=strrecordname, currentprocess=strcurrentprocess)
                                 if target_field_name == "LIST_NAME":
                                     arrlistcouples = {
                                         'ID_RECORD': lngrecordid,
@@ -1801,6 +1967,8 @@ SET
                                                 print("Error: Failed to create/update list - lnglistid is None")
                                                 continue
                                             lnglistid = cursor3.fetchone()["ID_T2S_LIST"]
+                                        tellist.created()
+                                        tellist.set_entity_id(lnglistid)
                                         if intlist == 1 or intlist == 3:
                                             # Retrieve all movies for this list
                                             # Only processing when handling original English (records from T_WC_TMDB_LIST or T_WC_TMDB_LIST) to avoid duplicates with the translated versions
@@ -1912,12 +2080,14 @@ SET
                                             strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
                                             print(strsqldelete)
                                             cursor2.execute(strsqldelete)
+                                            tellist.deleted(cursor2.rowcount)
                                         #cursor2.commit()
                     if 1:
                         strsqltablename = "T_WC_T2S_LIST"
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE LIST_TYPE IS NULL "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        tellist.deleted(cursor2.rowcount)
                         
                         # Update T_WC_T2S_LIST ratings and popularity from movies
                         strsql = """UPDATE T_WC_T2S_LIST t
@@ -1980,9 +2150,24 @@ SET
                         cursor2.execute(strsqldelete)
                         #cursor2.commit()
 
+                    tellist.finish()
+
                 elif intindex == 43:
                     #----------------------------------------------------
                     print("T2S_GROUP processing")
+
+                    # Group-derivation telemetry (process 43): publish start, running counts and the
+                    # current position as server variables so the run is observable from srvvar.inc.php.
+                    fltgroupprocessstart = time.time()
+                    strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    cp.f_setservervariable("strtmdbmoviepreprocessgroupstartdatetime",strnow,"Start datetime of the last T2S group derivation (process 43)",0)
+                    cp.f_setservervariable("strtmdbmoviepreprocessgroupenddatetime","","End datetime of the last T2S group derivation (process 43)",0)
+                    lnggroupprocessedcount = 0
+                    lnggroupcreatedcount = 0
+                    lnggroupdeletedcount = 0
+                    cp.f_setservervariable("strtmdbmoviepreprocessgroupprocessedcount","0","Number of group records examined by the T2S group derivation (process 43)",0)
+                    cp.f_setservervariable("strtmdbmoviepreprocessgroupcreatedcount","0","Number of groups created/updated by the T2S group derivation (process 43)",0)
+                    cp.f_setservervariable("strtmdbmoviepreprocessgroupdeletedcount","0","Number of singleton groups deleted by the T2S group derivation (process 43)",0)
 
                     arrgroups = {1: 'en-group', 2: 'en-employer', 3: 'sport-team', 4: 'custom-group'}    
                     for intgroup, strgroup in arrgroups.items():
@@ -2085,6 +2270,11 @@ SET
                                 strsqltablename = "T_WC_T2S_GROUP"
                                 strsqlupdatecondition = f"ID_WIKIDATA = '{strrecordid}' AND GROUP_SOURCE = '{strrecordgroupsource}'"
                                 cp.f_setservervariable("strtmdbmoviepreprocesscurrentrecord",str(strrecordid),"Current record in the TMDb database movie preprocess",0)
+                                lnggroupprocessedcount += 1
+                                cp.f_setservervariable("strtmdbmoviepreprocessgroupcurrentprocess",strcurrentprocess,"Current source/sub-process in the T2S group derivation (process 43)",0)
+                                cp.f_setservervariable("strtmdbmoviepreprocessgroupwikidataid",str(strrecordid),"Current Wikidata/record id in the T2S group derivation (process 43)",0)
+                                cp.f_setservervariable("strtmdbmoviepreprocessgroupcurrentvalue",strrecordname,"Current group name in the T2S group derivation (process 43)",0)
+                                cp.f_setservervariable("strtmdbmoviepreprocessgroupprocessedcount",str(lnggroupprocessedcount),"Number of group records examined by the T2S group derivation (process 43)",0)
                                 
                                 strsqlpersons = ""
                                 if intgroup == 4:
@@ -2155,6 +2345,8 @@ SET
                                                 print("Error: Failed to create/update group - lnggroupid is None")
                                                 continue
                                             lnggroupid = cursor3.fetchone()["ID_GROUP"]
+                                        lnggroupcreatedcount += 1
+                                        cp.f_setservervariable("strtmdbmoviepreprocessgroupid",str(lnggroupid),"Current group ID created/updated by the T2S group derivation (process 43)",0)
                                         if intgroup == 1 or intgroup == 2 or intgroup == 3 or intgroup == 4:
                                             # Retrieve all persons for this group
                                             # Only processing when handling original English (records from T_WC_TMDB_GROUP or T_WC_TMDB_GROUP) to avoid duplicates with the translated versions
@@ -2190,6 +2382,7 @@ SET
                                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
                                         print(strsqldelete)
                                         cursor2.execute(strsqldelete)
+                                        lnggroupdeletedcount += 1
                                         #cursor2.commit()
                     if 1:
                         strsqltablename = "T_WC_T2S_GROUP"
@@ -2243,9 +2436,18 @@ SET
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
 
+                        # Group-derivation telemetry (process 43): final run summary
+                        strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                        cp.f_setservervariable("strtmdbmoviepreprocessgroupenddatetime",strnow,"End datetime of the last T2S group derivation (process 43)",0)
+                        cp.f_setservervariable("strtmdbmoviepreprocessgroupcreatedcount",str(lnggroupcreatedcount),"Number of groups created/updated by the T2S group derivation (process 43)",0)
+                        cp.f_setservervariable("strtmdbmoviepreprocessgroupdeletedcount",str(lnggroupdeletedcount),"Number of singleton groups deleted by the T2S group derivation (process 43)",0)
+                        cp.f_setservervariable("strtmdbmoviepreprocessgroupprocessedseconds",f"{time.time() - fltgroupprocessstart:.2f}","Elapsed seconds of the last T2S group derivation (process 43)",0)
+
                 elif intindex == 44:
                     #----------------------------------------------------
                     print("T2S_AWARD processing")
+                    telaward = EntityTelemetry("award", 44, "award")
+                    telaward.begin()
 
                     strpropertyid = "P166"
                     strawardsource = strpropertyid
@@ -2300,6 +2502,7 @@ SET
                         strawardnamefr = arrvalues.get("strawardnamefr", "")
 
                         print("Processing record: " + str(strawardwikidataid) + ": " + strawardname + " (" + strawardsource + ")")
+                        telaward.position(recordid=strawardwikidataid, currentvalue=strawardname, currentprocess=f"{strpropertyid}: Copying from WIKIDATA to T2S_AWARD")
 
                         if target_field_name == "AWARD_NAME":
                             arrawardcouples = {
@@ -2323,6 +2526,8 @@ SET
                                 print("Error: Failed to create/update award - lngawardid is None")
                                 continue
                             lngawardid = cursor3.fetchone()["ID_AWARD"]
+                        telaward.created()
+                        telaward.set_entity_id(lngawardid)
 
                         # Link to movies
                         strsqlmovies = ""
@@ -2432,6 +2637,7 @@ SET
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE AWARD_TYPE IS NULL "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telaward.deleted(cursor2.rowcount)
 
                         strsqltablename = "T_WC_T2S_AWARD"
                         strsqldelete = """DELETE FROM T_WC_T2S_AWARD
@@ -2444,6 +2650,7 @@ WHERE NOT EXISTS (
                         """
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telaward.deleted(cursor2.rowcount)
 
                         # Update T_WC_T2S_AWARD.POPULARITY from persons
                         strsql = """UPDATE T_WC_T2S_AWARD t
@@ -2518,9 +2725,13 @@ SET
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
 
+                    telaward.finish()
+
                 elif intindex == 47:
                     #----------------------------------------------------
                     print("T2S_NOMINATION processing")
+                    telnomination = EntityTelemetry("nomination", 47, "nomination")
+                    telnomination.begin()
 
                     strpropertyid = "P1411"
                     strnominationsource = strpropertyid
@@ -2575,6 +2786,7 @@ SET
                         strnominationnamefr = arrvalues.get("strnominationnamefr", "")
 
                         print("Processing record: " + str(strnominationwikidataid) + ": " + strnominationname + " (" + strnominationsource + ")")
+                        telnomination.position(recordid=strnominationwikidataid, currentvalue=strnominationname, currentprocess=f"{strpropertyid}: Copying from WIKIDATA to T2S_NOMINATION")
 
                         if target_field_name == "NOMINATION_NAME":
                             arrnominationcouples = {
@@ -2598,6 +2810,8 @@ SET
                                 print("Error: Failed to create/update nomination - lngnominationid is None")
                                 continue
                             lngnominationid = cursor3.fetchone()["ID_NOMINATION"]
+                        telnomination.created()
+                        telnomination.set_entity_id(lngnominationid)
 
                         # Link to movies
                         strsqlmovies = ""
@@ -2707,6 +2921,7 @@ SET
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE NOMINATION_TYPE IS NULL "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telnomination.deleted(cursor2.rowcount)
 
                         strsqltablename = "T_WC_T2S_NOMINATION"
                         strsqldelete = """DELETE FROM T_WC_T2S_NOMINATION
@@ -2719,6 +2934,7 @@ WHERE NOT EXISTS (
                         """
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telnomination.deleted(cursor2.rowcount)
 
                         # Update T_WC_T2S_NOMINATION.POPULARITY from persons
                         strsql = """UPDATE T_WC_T2S_NOMINATION t
@@ -2793,9 +3009,13 @@ SET
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
 
+                    telnomination.finish()
+
                 elif intindex == 45:
                     #----------------------------------------------------
                     print("T2S_MOVEMENT processing")
+                    telmovement = EntityTelemetry("movement", 45, "movement")
+                    telmovement.begin()
 
                     arrlists = {1: 'custom-movement', 2: 'movement-delete'}
                     for intlist, strlist in arrlists.items():
@@ -2833,6 +3053,7 @@ SET
                                 strrecordidwikidata = row['ID_WIKIDATA'] if 'ID_WIKIDATA' in row else None
                                 strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordidwikidata)
                                 print("Processing record: " + str(lngrecordid) + ": " + strrecordname + " (" + strrecordmovementsource + ")")
+                                telmovement.position(recordid=lngrecordid, currentvalue=strrecordname, currentprocess=strcurrentprocess)
                                 arrlistcouples = {
                                     'ID_RECORD': lngrecordid,
                                     'MOVEMENT_NAME': strrecordname,
@@ -2909,6 +3130,8 @@ SET
                                                 print("Error: Failed to create/update movement - lngmovementid is None")
                                                 continue
                                             lngmovementid = cursor3.fetchone()["ID_MOVEMENT"]
+                                        telmovement.created()
+                                        telmovement.set_entity_id(lngmovementid)
                                         results_movies = cursor2.fetchall()
                                         lngdisplayorder = 0
                                         arrcurrentmovieids = []
@@ -2961,11 +3184,13 @@ SET
                                         strsqldeletemvt = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
                                         print(strsqldeletemvt)
                                         cursor2.execute(strsqldeletemvt)
+                                        telmovement.deleted(cursor2.rowcount)
                     if 1:
                         strsqltablename = "T_WC_T2S_MOVEMENT"
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE MOVEMENT_TYPE IS NULL "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+                        telmovement.deleted(cursor2.rowcount)
 
                         # Update T_WC_T2S_MOVEMENT ratings and popularity from movies
                         strsql = """UPDATE T_WC_T2S_MOVEMENT t
@@ -3027,9 +3252,24 @@ SET
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
 
+                    telmovement.finish()
+
                 elif intindex == 46:
                     #----------------------------------------------------
                     print("T2S_DEATH processing")
+
+                    # Death-derivation telemetry (process 46): publish start, running counts and the
+                    # current position as server variables so the run is observable from srvvar.inc.php.
+                    fltdeathprocessstart = time.time()
+                    strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    cp.f_setservervariable("strtmdbmoviepreprocessdeathstartdatetime",strnow,"Start datetime of the last T2S death derivation (process 46)",0)
+                    cp.f_setservervariable("strtmdbmoviepreprocessdeathenddatetime","","End datetime of the last T2S death derivation (process 46)",0)
+                    lngdeathprocessedcount = 0
+                    lngdeathcreatedcount = 0
+                    lngdeathdeletedcount = 0
+                    cp.f_setservervariable("strtmdbmoviepreprocessdeathprocessedcount","0","Number of death records examined by the T2S death derivation (process 46)",0)
+                    cp.f_setservervariable("strtmdbmoviepreprocessdeathcreatedcount","0","Number of deaths created/updated by the T2S death derivation (process 46)",0)
+                    cp.f_setservervariable("strtmdbmoviepreprocessdeathdeletedcount","0","Number of singleton deaths deleted by the T2S death derivation (process 46)",0)
 
                     arrp1196excludeditems = ["Q110999040", "Q6682074"]
                     strp1196excludeditems = "'" + "','".join(arrp1196excludeditems) + "'"
@@ -3098,6 +3338,11 @@ SET
 
                                 strrecorddeathtype = "death"
                                 print("Processing record: " + str(strrecordid) + ": " + strrecordname + " (" + strrecorddeathsource + ")")
+                                lngdeathprocessedcount += 1
+                                cp.f_setservervariable("strtmdbmoviepreprocessdeathcurrentprocess",strcurrentprocess,"Current source/sub-process in the T2S death derivation (process 46)",0)
+                                cp.f_setservervariable("strtmdbmoviepreprocessdeathwikidataid",str(strrecordid),"Current Wikidata/record id in the T2S death derivation (process 46)",0)
+                                cp.f_setservervariable("strtmdbmoviepreprocessdeathcurrentvalue",strrecordname,"Current death name in the T2S death derivation (process 46)",0)
+                                cp.f_setservervariable("strtmdbmoviepreprocessdeathprocessedcount",str(lngdeathprocessedcount),"Number of death records examined by the T2S death derivation (process 46)",0)
 
                                 if target_field_name == "DEATH_NAME":
                                     arrdeathcouples = {
@@ -3143,6 +3388,8 @@ SET
                                                 print("Error: Failed to create/update death - lngdeathid is None")
                                                 continue
                                             lngdeathid = cursor3.fetchone()["ID_DEATH"]
+                                        lngdeathcreatedcount += 1
+                                        cp.f_setservervariable("strtmdbmoviepreprocessdeathid",str(lngdeathid),"Current death ID created/updated by the T2S death derivation (process 46)",0)
                                         if intgroup == 1 or intgroup == 2:
                                             lngdisplayorder = 0
                                             arrcurrentpersonids = []
@@ -3173,6 +3420,7 @@ SET
                                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE " + strsqlupdatecondition
                                         print(strsqldelete)
                                         cursor2.execute(strsqldelete)
+                                        lngdeathdeletedcount += 1
 
                     if 1:
                         strsqltablename = "T_WC_T2S_DEATH"
@@ -3220,6 +3468,13 @@ SET
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_DEATH NOT IN (SELECT ID_DEATH FROM T_WC_T2S_DEATH) "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+
+                        # Death-derivation telemetry (process 46): final run summary
+                        strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                        cp.f_setservervariable("strtmdbmoviepreprocessdeathenddatetime",strnow,"End datetime of the last T2S death derivation (process 46)",0)
+                        cp.f_setservervariable("strtmdbmoviepreprocessdeathcreatedcount",str(lngdeathcreatedcount),"Number of deaths created/updated by the T2S death derivation (process 46)",0)
+                        cp.f_setservervariable("strtmdbmoviepreprocessdeathdeletedcount",str(lngdeathdeletedcount),"Number of singleton deaths deleted by the T2S death derivation (process 46)",0)
+                        cp.f_setservervariable("strtmdbmoviepreprocessdeathprocessedseconds",f"{time.time() - fltdeathprocessstart:.2f}","Elapsed seconds of the last T2S death derivation (process 46)",0)
 
                 elif intindex == 4:
                     #----------------------------------------------------
@@ -5378,6 +5633,8 @@ RENAME TABLE
                 elif intindex == 48:
                     #----------------------------------------------------
                     print("TMDB_CHARACTER processing")
+                    telcharacter = EntityTelemetry("character", 48, "character")
+                    telcharacter.begin()
                     if 1:
                         def f_printsqlprocess48(strsql):
                             print(datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S"))
@@ -5389,7 +5646,15 @@ RENAME TABLE
                             "Current sub process in the TMDb database movie preprocess",
                             0,
                         )
+                        telcharacter.position(currentprocess="Building character source tables and junctions", increment=False)
 
+                        # CAST_CHARACTER_KEY is pinned to utf8mb4_bin in T_WC_TMDB_CHARACTER /
+                        # T_WC_T2S_CHARACTER (byte-exact unique key; see tmdb-front
+                        # doc/db-collation/collation-migration-runbook.md). The temp source keys
+                        # below MUST carry COLLATE utf8mb4_bin so the GROUP BY / unique index dedup
+                        # byte-exactly (consistent with the pinned column) and the joins onto
+                        # T_WC_TMDB_CHARACTER.CAST_CHARACTER_KEY don't raise #1267 (illegal mix of
+                        # collations) now that the rest of the schema is utf8mb4_unicode_ci.
                         strsql = "DROP TEMPORARY TABLE IF EXISTS TMP_WC_TMDB_CHARACTER_SOURCE_MOVIE"
                         f_printsqlprocess48(strsql)
                         cursor2.execute(strsql)
@@ -5400,7 +5665,7 @@ SELECT
     ID_MOVIE,
     ID_PERSON,
     CAST_CHARACTER,
-    replace(trim(regexp_replace(lcase(regexp_replace(CAST_CHARACTER,'[^[:alnum:] ]',' ')),' +',' ')),' ','') AS CAST_CHARACTER_KEY
+    replace(trim(regexp_replace(lcase(regexp_replace(CAST_CHARACTER,'[^[:alnum:] ]',' ')),' +',' ')),' ','') COLLATE utf8mb4_bin AS CAST_CHARACTER_KEY
 FROM T_WC_T2S_PERSON_MOVIE
 WHERE CREDIT_TYPE = 'cast'
   AND (DELETED = 0 OR DELETED IS NULL)
@@ -5436,7 +5701,7 @@ SELECT
     ID_SERIE,
     ID_PERSON,
     CAST_CHARACTER,
-    replace(trim(regexp_replace(lcase(regexp_replace(CAST_CHARACTER,'[^[:alnum:] ]',' ')),' +',' ')),' ','') AS CAST_CHARACTER_KEY
+    replace(trim(regexp_replace(lcase(regexp_replace(CAST_CHARACTER,'[^[:alnum:] ]',' ')),' +',' ')),' ','') COLLATE utf8mb4_bin AS CAST_CHARACTER_KEY
 FROM T_WC_T2S_PERSON_SERIE
 WHERE CREDIT_TYPE = 'cast'
   AND (DELETED = 0 OR DELETED IS NULL)
@@ -5514,6 +5779,7 @@ WHERE c.ID_CHARACTER IS NULL
 """
                         f_printsqlprocess48(strsql)
                         cursor2.execute(strsql)
+                        telcharacter.created(cursor2.rowcount)
                         cp.connectioncp.commit()
 
                         strsql = "DROP TEMPORARY TABLE IF EXISTS TMP_WC_TMDB_MOVIE_CHARACTER_SOURCE"
@@ -5696,6 +5962,7 @@ WHERE src.ID_PERSON IS NULL
                         cursor2.execute(strsql)
                         cp.connectioncp.commit()
                     if 1:
+                        telcharacter.position(currentprocess="Updating character KPI (counts, ratings, popularity)", increment=False)
                         strsql = """UPDATE T_WC_TMDB_CHARACTER ch
 LEFT JOIN (
     SELECT ID_CHARACTER, COUNT(DISTINCT ID_MOVIE) AS MOVIE_COUNT
@@ -5765,6 +6032,7 @@ SET
                         cursor2.execute(strsql)
                         cp.connectioncp.commit()
                     if 1:
+                        telcharacter.position(currentprocess="Removing characters no longer referenced", increment=False)
                         strsql = "DROP TEMPORARY TABLE IF EXISTS TMP_WC_TMDB_CHARACTER_ACTIVE"
                         f_printsqlprocess48(strsql)
                         cursor2.execute(strsql)
@@ -5797,6 +6065,7 @@ WHERE a.ID_CHARACTER IS NULL
 """
                         f_printsqlprocess48(strsql)
                         cursor2.execute(strsql)
+                        telcharacter.deleted(cursor2.rowcount)
                         cp.connectioncp.commit()
 
                         strsql = "DELETE FROM T_WC_TMDB_MOVIE_CHARACTER WHERE ID_CHARACTER NOT IN (SELECT ID_CHARACTER FROM T_WC_TMDB_CHARACTER)"
@@ -5811,6 +6080,10 @@ WHERE a.ID_CHARACTER IS NULL
                         f_printsqlprocess48(strsql)
                         cursor2.execute(strsql)
                         cp.connectioncp.commit()
+
+                        cursor2.execute("SELECT COUNT(*) AS CHARACTER_COUNT FROM T_WC_TMDB_CHARACTER")
+                        telcharacter.set_processed(cursor2.fetchone()["CHARACTER_COUNT"])
+                    telcharacter.finish()
 
                 elif intindex == 49:
                     #----------------------------------------------------
@@ -5932,6 +6205,39 @@ ORDER BY COMPTE DESC
                             arrcharactercouples["IS_EMPTY"] = intisempty
                             arrcharactercouples["WORD_COUNT"] = lngwordcount
                             cp.f_sqlupdatearray("T_WC_TMDB_CHARACTER",arrcharactercouples,"ID_CHARACTER = " + str(lngcharacterid),0)
+
+                if telcopy is not None:
+                    telcopy.finish()
+                dblprocesselapsed = time.time() - dblprocessstarttime
+                arrprocessdurations[intindex] = (strdesc, dblprocesselapsed)
+                # Live per-process elapsed seconds (uniform name) for external monitoring.
+                cp.f_setservervariable(
+                    f"strtmdbmoviepreprocessprocesselapsedseconds{intindex}",
+                    f"{dblprocesselapsed:.2f}",
+                    f"Elapsed seconds of process {intindex} ({strdesc}) in the last run",
+                    0,
+                )
+
+            # ---- Per-process duration ranking (optimization candidates) ----
+            # Single consolidated, comparable view so the slowest processes are
+            # obvious without collecting ~45 differently-named per-entity vars.
+            if arrprocessdurations:
+                arrsortedprocessdurations = sorted(
+                    arrprocessdurations.items(), key=lambda kv: kv[1][1], reverse=True
+                )
+                print("=== Process duration ranking (longest first) ===")
+                arrrankingparts = []
+                for intidx, (strlabel, dblseconds) in arrsortedprocessdurations:
+                    strreadable = cp.convert_seconds_to_duration(int(dblseconds))
+                    print(f"  {dblseconds:10.2f}s  process {intidx:>3}  {strlabel}  ({strreadable})")
+                    arrrankingparts.append(f"{intidx}:{strlabel}={dblseconds:.2f}s")
+                strprocessdurationranking = " | ".join(arrrankingparts)
+                cp.f_setservervariable(
+                    "strtmdbmoviepreprocessprocessdurationranking",
+                    strprocessdurationranking,
+                    "Per-process elapsed seconds, longest first, for the last run (optimization candidates)",
+                    0,
+                )
 
             print("------------------------------------------")
             strcurrentprocess = ""

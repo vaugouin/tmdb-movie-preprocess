@@ -9,16 +9,104 @@ import pandas as pd
 import psutil
 import re
 import unicodedata
+from datetime import datetime
 from difflib import SequenceMatcher
 
 MYSQL_RETRYABLE_ERROR_CODES = {1205, 1213}
 CLOSED_VOCABULARIES_CACHE = None
-nlp = None
 
 
-def set_nlp(model):
-    global nlp
-    nlp = model
+class EntityTelemetry:
+    """Per-entity server-variable telemetry for a T2S preprocess step.
+
+    Publishes the same family of variables the group (process 43) and death
+    (process 46) derivations emit (see ``doc/server-variables.md``): a run
+    window (``startdatetime`` / ``enddatetime``), running counts
+    (``processedcount`` and, for derivations, ``createdcount`` /
+    ``deletedcount``), the current position (``currentprocess`` /
+    ``wikidataid`` / ``currentvalue`` / ``id``) and the elapsed
+    ``processedseconds``. Variable names follow the
+    ``str<repo><entity><field>`` convention with the repo prefix
+    ``strtmdbmoviepreprocess``.
+
+    ``kind='derivation'`` (the default) emits the full set including
+    created/deleted counts; ``kind='copy'`` emits only the run window,
+    processed count and elapsed seconds — appropriate for the bulk
+    copy/rebuild steps that do not track per-record create/delete tallies.
+    """
+
+    _PREFIX = "strtmdbmoviepreprocess"
+
+    def __init__(self, entity, intindex, label=None, kind="derivation"):
+        self.entity = entity
+        self.intindex = intindex
+        self.label = label or entity
+        self.kind = kind
+        self.processedcount = 0
+        self.createdcount = 0
+        self.deletedcount = 0
+        self._start = None
+        self._track_processed = (kind == "derivation")
+
+    def _set(self, field, value, desc):
+        cp.f_setservervariable(f"{self._PREFIX}{self.entity}{field}", str(value), desc, 0)
+
+    def _d(self, text):
+        return f"{text} the T2S {self.label} {self.kind} (process {self.intindex})"
+
+    def begin(self):
+        """Stamp the start datetime, blank the end datetime and seed counts to 0."""
+        self._start = time.time()
+        self.processedcount = 0
+        self.createdcount = 0
+        self.deletedcount = 0
+        strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+        self._set("startdatetime", strnow, self._d("Start datetime of the last run of"))
+        self._set("enddatetime", "", self._d("End datetime of the last run of"))
+        if self.kind == "derivation":
+            self._set("processedcount", 0, self._d("Number of records processed by"))
+            self._set("createdcount", 0, self._d("Number of records created/updated by"))
+            self._set("deletedcount", 0, self._d("Number of records deleted by"))
+
+    def position(self, recordid=None, currentvalue=None, currentprocess=None, increment=True):
+        """Publish the current record position; increments processedcount by default."""
+        if increment:
+            self.processedcount += 1
+        if currentprocess is not None:
+            self._set("currentprocess", currentprocess, self._d("Current source/sub-process in"))
+        if recordid is not None:
+            self._set("wikidataid", recordid, self._d("Current Wikidata/record id in"))
+        if currentvalue is not None:
+            self._set("currentvalue", currentvalue, self._d("Current record name in"))
+        self._set("processedcount", self.processedcount, self._d("Number of records processed by"))
+
+    def set_processed(self, n):
+        """Set processedcount to an externally known total (e.g. a chunk row count)."""
+        self.processedcount = n
+        self._track_processed = True
+        self._set("processedcount", n, self._d("Number of records processed by"))
+
+    def set_entity_id(self, entityid):
+        """Publish the id of the record currently created/updated."""
+        self._set("id", entityid, self._d("Current record ID processed by"))
+
+    def created(self, n=1):
+        self.createdcount += n
+
+    def deleted(self, n=1):
+        self.deletedcount += n
+
+    def finish(self):
+        """Stamp the end datetime, finalize counts and the elapsed seconds."""
+        strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+        self._set("enddatetime", strnow, self._d("End datetime of the last run of"))
+        if self._track_processed:
+            self._set("processedcount", self.processedcount, self._d("Number of records processed by"))
+        if self.kind == "derivation":
+            self._set("createdcount", self.createdcount, self._d("Number of records created/updated by"))
+            self._set("deletedcount", self.deletedcount, self._d("Number of records deleted by"))
+        elapsed = (time.time() - self._start) if self._start else 0.0
+        self._set("processedseconds", f"{elapsed:.2f}", self._d("Elapsed seconds of the last run of"))
 
 
 def execute_sql_with_retry(connection, cursor, sql, label, max_attempts=5, retry_delay_seconds=2.0):
@@ -42,14 +130,6 @@ def execute_sql_with_retry(connection, cursor, sql, label, max_attempts=5, retry
             time.sleep(wait_seconds)
     if last_error is not None:
         raise last_error
-
-
-def f_getlemma(sentence):
-    # Tokenize the sentence
-    doc = nlp(sentence)
-    # Return tokens and their POS tags only for NOUN, PROPN, VERB, or ADJ
-    lemmas = [(token.lemma_) for token in doc if token.pos_ in ["NOUN", "PROPN", "VERB", "ADJ", "X", "NUM"]]
-    return " ".join(lemmas)
 
 
 def f_tmdbpersonsetusedfortags(lngpersonid):
