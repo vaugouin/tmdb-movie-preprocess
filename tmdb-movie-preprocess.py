@@ -2195,9 +2195,20 @@ SET
                             strrecordgroupsource = "custom"
                         elif strpropertyid != "":
                             strcurrentprocess = f"{intgroup}: Copying from WIKIDATA {strpropertyid} to T2S_GROUP"
-                            strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                            # Pre-filter the driving set to only items that resolve to >= 2 linked
+                            # TMDb persons. This mirrors the per-item person query joins below
+                            # (T_WC_TMDB_PERSON -> T_WC_WIKIDATA_PERSON_V1 -> T_WC_WIKIDATA_ITEM_PROPERTY)
+                            # and the "lngpersoncount > 1" group-creation gate, so we no longer iterate
+                            # the hundreds of thousands of P463/P108/P54 items that would only ever be
+                            # deleted as singletons. Degraded groups (>=2 persons previously, <2 now)
+                            # are handled by the count-based stale delete at the end of this process.
+                            strsql += "SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
                             strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                            strsql += "INNER JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
+                            strsql += "INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
                             strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strpropertyid + "' "
+                            strsql += "GROUP BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                            strsql += "HAVING COUNT(DISTINCT T_WC_TMDB_PERSON.ID_PERSON) >= 2 "
                             strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
@@ -2391,14 +2402,23 @@ SET
                         cursor2.execute(strsqldelete)
 
                         strsqltablename = "T_WC_T2S_GROUP"
+                        # Count-based stale delete for Wikidata-sourced groups. Removes any non-custom
+                        # group whose item no longer resolves to >= 2 linked TMDb persons. This covers
+                        # both the "item gone entirely" case (count 0, the old NOT EXISTS behaviour) and
+                        # the "degraded from >=2 to <2 persons" case that the per-item singleton delete
+                        # used to handle before the driving query was pre-filtered. Mirrors the
+                        # pre-filter joins so iteration and cleanup stay consistent. Runs over the small
+                        # T_WC_T2S_GROUP table, so the correlated subquery executes only a few thousand times.
                         strsqldelete = """DELETE FROM T_WC_T2S_GROUP
 WHERE GROUP_SOURCE <> 'custom'
-  AND NOT EXISTS (
-    SELECT 1
+  AND (
+    SELECT COUNT(DISTINCT p.ID_PERSON)
     FROM T_WC_WIKIDATA_ITEM_PROPERTY w
+    INNER JOIN T_WC_TMDB_PERSON p ON p.ID_WIKIDATA = w.ID_WIKIDATA
+    INNER JOIN T_WC_WIKIDATA_PERSON_V1 wp ON p.ID_WIKIDATA = wp.ID_WIKIDATA
     WHERE w.ID_PROPERTY = T_WC_T2S_GROUP.GROUP_SOURCE
       AND w.ID_ITEM = T_WC_T2S_GROUP.ID_WIKIDATA
-);
+  ) < 2;
                         """
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
@@ -2455,9 +2475,19 @@ SET
                     target_field_name = "AWARD_NAME"
 
                     strsql = ""
+                    # Pre-filter the driving set to only items with >= 1 linked T2S entity (movie,
+                    # series or person). Awards whose recipients are not tracked in the T2S read model
+                    # produce zero links and are noise, so they are skipped here and removed by the
+                    # stale delete at the end of this process. Mirrors the per-item movie/series/person
+                    # link queries below (all join the property table to a T2S table on ID_WIKIDATA).
                     strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
                     strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
                     strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
+                    strsql += "AND ( "
+                    strsql += "EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND m.ID_WIKIDATA <> '') "
+                    strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND s.ID_WIKIDATA <> '') "
+                    strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') "
+                    strsql += ") "
                     strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
 
                     print(strsql)
@@ -2640,12 +2670,22 @@ SET
                         telaward.deleted(cursor2.rowcount)
 
                         strsqltablename = "T_WC_T2S_AWARD"
+                        # Stale delete, inverse of the driving pre-filter. Removes any award whose item
+                        # no longer has >= 1 linked T2S entity. Covers the "item gone" case (no property
+                        # row at all, the old NOT EXISTS behaviour) and the "now empty / degraded to zero
+                        # tracked recipients" case introduced by pre-filtering the driving query. Orphan
+                        # junction rows are cleaned up by the ID_AWARD NOT IN (...) deletes below.
                         strsqldelete = """DELETE FROM T_WC_T2S_AWARD
 WHERE NOT EXISTS (
     SELECT 1
     FROM T_WC_WIKIDATA_ITEM_PROPERTY w
     WHERE w.ID_PROPERTY = T_WC_T2S_AWARD.AWARD_SOURCE
       AND w.ID_ITEM = T_WC_T2S_AWARD.ID_WIKIDATA
+      AND (
+            EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = w.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
+         OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
+         OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '')
+      )
 );
                         """
                         print(strsqldelete)
@@ -2739,9 +2779,19 @@ SET
                     target_field_name = "NOMINATION_NAME"
 
                     strsql = ""
+                    # Pre-filter the driving set to only items with >= 1 linked T2S entity (movie,
+                    # series or person). Nominations whose recipients are not tracked in the T2S read
+                    # model produce zero links and are noise, so they are skipped here and removed by
+                    # the stale delete at the end of this process. Mirrors the per-item link queries
+                    # below (all join the property table to a T2S table on ID_WIKIDATA).
                     strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
                     strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
                     strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
+                    strsql += "AND ( "
+                    strsql += "EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND m.ID_WIKIDATA <> '') "
+                    strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND s.ID_WIKIDATA <> '') "
+                    strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') "
+                    strsql += ") "
                     strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
 
                     print(strsql)
@@ -2924,12 +2974,22 @@ SET
                         telnomination.deleted(cursor2.rowcount)
 
                         strsqltablename = "T_WC_T2S_NOMINATION"
+                        # Stale delete, inverse of the driving pre-filter. Removes any nomination whose
+                        # item no longer has >= 1 linked T2S entity. Covers the "item gone" case (no
+                        # property row at all, the old NOT EXISTS behaviour) and the "now empty / degraded
+                        # to zero tracked recipients" case introduced by pre-filtering the driving query.
+                        # Orphan junction rows are cleaned up by the ID_NOMINATION NOT IN (...) deletes below.
                         strsqldelete = """DELETE FROM T_WC_T2S_NOMINATION
 WHERE NOT EXISTS (
     SELECT 1
     FROM T_WC_WIKIDATA_ITEM_PROPERTY w
     WHERE w.ID_PROPERTY = T_WC_T2S_NOMINATION.NOMINATION_SOURCE
       AND w.ID_ITEM = T_WC_T2S_NOMINATION.ID_WIKIDATA
+      AND (
+            EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = w.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
+         OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
+         OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '')
+      )
 );
                         """
                         print(strsqldelete)
@@ -3286,11 +3346,22 @@ SET
                             strpropertyid = ""
                         if strpropertyid != "":
                             strcurrentprocess = f"{intgroup}: Copying from WIKIDATA {strpropertyid} to T2S_DEATH"
-                            strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                            # Pre-filter the driving set to only items that resolve to >= 2 linked
+                            # TMDb persons. Mirrors the per-item person query joins below
+                            # (T_WC_TMDB_PERSON -> T_WC_WIKIDATA_PERSON_V1 -> T_WC_WIKIDATA_ITEM_PROPERTY)
+                            # and the "lngpersoncount > 1" creation gate, so we no longer iterate the
+                            # P509/P1196 items that would only ever be deleted as singletons. Degraded
+                            # deaths (>=2 persons previously, <2 now) are handled by the count-based
+                            # stale delete at the end of this process.
+                            strsql += "SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
                             strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                            strsql += "INNER JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
+                            strsql += "INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
                             strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strpropertyid + "' "
                             if intgroup == 2:
                                 strsql += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM NOT IN (" + strp1196excludeditems + ") "
+                            strsql += "GROUP BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
+                            strsql += "HAVING COUNT(DISTINCT T_WC_TMDB_PERSON.ID_PERSON) >= 2 "
                             strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
                             target_field_name = "DEATH_NAME"
                         strrecorddeathsource = strpropertyid
@@ -3429,17 +3500,25 @@ SET
                         cursor2.execute(strsqldelete)
 
                         strsqltablename = "T_WC_T2S_DEATH"
+                        # Count-based stale delete. Removes any death whose item no longer resolves to
+                        # >= 2 linked TMDb persons. Covers both the "item gone / excluded" case (count 0,
+                        # the old NOT EXISTS behaviour incl. the P1196 exclusion) and the "degraded from
+                        # >=2 to <2 persons" case that the per-item singleton delete used to handle before
+                        # the driving query was pre-filtered. Mirrors the pre-filter joins so iteration
+                        # and cleanup stay consistent.
                         strsqldelete = """DELETE FROM T_WC_T2S_DEATH
-WHERE NOT EXISTS (
-    SELECT 1
+WHERE (
+    SELECT COUNT(DISTINCT p.ID_PERSON)
     FROM T_WC_WIKIDATA_ITEM_PROPERTY w
+    INNER JOIN T_WC_TMDB_PERSON p ON p.ID_WIKIDATA = w.ID_WIKIDATA
+    INNER JOIN T_WC_WIKIDATA_PERSON_V1 wp ON p.ID_WIKIDATA = wp.ID_WIKIDATA
     WHERE w.ID_PROPERTY = T_WC_T2S_DEATH.DEATH_SOURCE
       AND w.ID_ITEM = T_WC_T2S_DEATH.ID_WIKIDATA
       AND NOT (
           w.ID_PROPERTY = 'P1196'
           AND w.ID_ITEM IN (""" + strp1196excludeditems + """ )
       )
-);
+) < 2;
                         """
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
