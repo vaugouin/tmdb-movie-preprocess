@@ -740,6 +740,21 @@ Builds person groups from Wikidata membership, employment, and sports-team relat
 - `en-sports-team` → P54 (member of sports team)
 - `custom-group` → `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3)
 
+**Selection strategy (pre-filter).** The Wikidata sub-processes (`en-group`/P463, `en-employer`/P108, `en-sports-team`/P54) do **not** iterate every distinct item value of the property. `T_WC_WIKIDATA_ITEM_PROPERTY` holds ~11M rows and P463 ("member of") alone resolves to hundreds of thousands of distinct items, the overwhelming majority of which link to 0 or 1 tracked TMDb person and would only be deleted as singletons. The driving query therefore pre-filters to **items that resolve to ≥ 2 linked TMDb persons**, mirroring the per-item person join (`T_WC_TMDB_PERSON ⋈ T_WC_WIKIDATA_PERSON_V1 ⋈ T_WC_WIKIDATA_ITEM_PROPERTY`) and the group-creation gate:
+
+```sql
+SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM
+FROM T_WC_WIKIDATA_ITEM_PROPERTY
+INNER JOIN T_WC_TMDB_PERSON      ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA
+INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA
+WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '<P463|P108|P54>'
+GROUP BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM
+HAVING COUNT(DISTINCT T_WC_TMDB_PERSON.ID_PERSON) >= 2
+ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC
+```
+
+This is a pure performance change — the output set is unchanged because the previous per-item code already deleted any group resolving to < 2 persons. The pre-filter is fastest with a composite index on `T_WC_WIKIDATA_ITEM_PROPERTY (ID_PROPERTY, ID_WIKIDATA)`.
+
 **Operations:**
 - For each Wikidata property/item pair, retrieves the item's English and French labels and description; `WIKIPEDIA_IMAGE_PATH` is resolved through the shared helper lookup.
 - Inserts/updates `T_WC_T2S_GROUP`.
@@ -753,7 +768,7 @@ Builds person groups from Wikidata membership, employment, and sports-team relat
   - `4` = `IMDB_RATING`/`POPULARITY` descending
   - `5` = `DAT_RELEASE`/`BIRTHDAY` ascending
   - `6` = `DAT_RELEASE`/`BIRTHDAY` descending
-- Full stale delete: removes custom groups whose source record no longer exists in `T_WC_CUSTOM_LIST`.
+- Full stale delete: removes custom groups whose source record no longer exists in `T_WC_CUSTOM_LIST`, and removes Wikidata-sourced groups whose item no longer resolves to ≥ 2 linked TMDb persons (a count-based delete that is the inverse of the pre-filter, so it also cleans up groups that degraded from ≥ 2 to < 2 persons since the last run).
 
 ---
 
@@ -764,11 +779,26 @@ Builds award records from the Wikidata "award received" property (P166).
 **Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
 **Writes:** `T_WC_T2S_AWARD`, `T_WC_T2S_MOVIE_AWARD`, `T_WC_T2S_SERIE_AWARD`, `T_WC_T2S_PERSON_AWARD`
 
+**Selection strategy (pre-filter).** The driving query selects only P166 items that have **≥ 1 linked T2S movie, series, or person** — not every distinct item value of the property. Items whose award recipients are not tracked in the T2S read model would produce an award row with zero links (pure noise), so they are skipped via three OR'd `EXISTS` probes against `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` / `T_WC_T2S_PERSON` (all `ID_WIKIDATA`-indexed), mirroring the per-item link queries:
+
+```sql
+SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM
+FROM T_WC_WIKIDATA_ITEM_PROPERTY
+WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = 'P166'
+  AND (   EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
+       OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
+       OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND pe.ID_WIKIDATA <> ''))
+ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC
+```
+
+> Unlike Processes 43/46, this **changes the output**: awards with no tracked recipients are no longer created, and the stale delete below removes any that already exist. On the first run after this change, expect a one-time deletion of all previously-created empty award rows.
+
 **Operations:**
-- Selects all distinct Wikidata items used as values of property P166.
+- Selects the qualifying P166 items (per the pre-filter above).
 - For each award item, retrieves English/French label and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_AWARD`.
 - Links movies and series that received the award in `IMDB_RATING_WEIGHTED DESC` order, and links persons in their existing person ordering, into the respective junction tables with incremental display order.
+- Stale delete (inverse of the pre-filter): removes any award whose item no longer has ≥ 1 linked T2S entity (covers items gone from Wikidata, now-empty awards, and awards degraded to zero tracked recipients); orphan junction rows are then cleaned via `ID_AWARD NOT IN (SELECT ID_AWARD FROM T_WC_T2S_AWARD)` on each junction table.
 - Post-processing: updates average `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `POPULARITY` on `T_WC_T2S_AWARD` from linked entities.
 
 ---
@@ -811,10 +841,12 @@ Builds death-related dimension records from Wikidata death properties.
 - `en-cause-of-death` → P509
 - `en-manner-of-death` → P1196
 
+**Selection strategy (pre-filter).** Like Process 43, the driving query pre-filters to **items that resolve to ≥ 2 linked TMDb persons** (same `T_WC_TMDB_PERSON ⋈ T_WC_WIKIDATA_PERSON_V1 ⋈ T_WC_WIKIDATA_ITEM_PROPERTY` join + `HAVING COUNT(DISTINCT ID_PERSON) >= 2`) rather than iterating every P509/P1196 item. The P1196 excluded-items list is preserved inside the pre-filter. This is a pure performance change — the per-item code already deleted any death resolving to < 2 persons.
+
 **Operations:**
 - For each Wikidata item used as a value of P509/P1196, retrieves English/French labels and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_DEATH` and links persons into `T_WC_T2S_PERSON_DEATH` ordered by person popularity.
-- Full stale delete: removes `T_WC_T2S_DEATH` rows no longer present in `T_WC_WIKIDATA_ITEM_PROPERTY` for the corresponding property.
+- Full stale delete (count-based, inverse of the pre-filter): removes `T_WC_T2S_DEATH` rows whose item no longer resolves to ≥ 2 linked TMDb persons — covering items gone from `T_WC_WIKIDATA_ITEM_PROPERTY`, P1196-excluded items, and deaths degraded from ≥ 2 to < 2 persons.
 
 ---
 
@@ -825,12 +857,16 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 **Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
 **Writes:** `T_WC_T2S_NOMINATION`, `T_WC_T2S_MOVIE_NOMINATION`, `T_WC_T2S_SERIE_NOMINATION`, `T_WC_T2S_PERSON_NOMINATION`
 
+**Selection strategy (pre-filter).** Like Process 44, the driving query selects only P1411 items that have **≥ 1 linked T2S movie, series, or person** (three OR'd `EXISTS` probes against `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` / `T_WC_T2S_PERSON`), skipping nominations whose recipients are not tracked in the read model.
+
+> Like Process 44, this **changes the output**: nominations with no tracked recipients are no longer created, and the stale delete below removes any that already exist. On the first run after this change, expect a one-time deletion of all previously-created empty nomination rows.
+
 **Operations:**
-- Selects all distinct Wikidata items used as values of property P1411.
+- Selects the qualifying P1411 items (per the pre-filter above).
 - For each nomination item, retrieves English/French label and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_NOMINATION`.
 - Links movies, series, and persons that have the nomination (via Wikidata property join) into the respective junction tables with incremental display order.
-- Full stale delete: removes `T_WC_T2S_NOMINATION` rows no longer present in `T_WC_WIKIDATA_ITEM_PROPERTY` for P1411.
+- Stale delete (inverse of the pre-filter): removes any nomination whose item no longer has ≥ 1 linked T2S entity (items gone from `T_WC_WIKIDATA_ITEM_PROPERTY`, now-empty, or degraded to zero tracked recipients); orphan junction rows are then cleaned via `ID_NOMINATION NOT IN (SELECT ID_NOMINATION FROM T_WC_T2S_NOMINATION)` on each junction table.
 
 ---
 
@@ -846,6 +882,7 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 | Wikidata filter | Any movie or serie written to a T2S junction table must satisfy `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`. |
 | Shared Wikidata image lookup | `f_getwikidataimagepath()` resolves the first non-empty `WIKIPEDIA_IMAGE_PATH` from `T_WC_WIKIDATA_ITEM_V1`, `T_WC_WIKIDATA_MOVIE_V1`, `T_WC_WIKIDATA_SERIE_V1`, then `T_WC_WIKIDATA_PERSON_V1`. |
 | Full stale delete | Some dimension processes delete parent rows whose source record (TMDb list/collection/custom list or Wikidata property) no longer exists, in addition to orphan link cleanup. |
+| Wikidata-property driving pre-filter | Processes 43, 44, 46, and 47 do not iterate every distinct `T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM` value of a property. Group/death (43/46) pre-filter to items with ≥ 2 linked TMDb persons (`GROUP BY … HAVING COUNT(DISTINCT ID_PERSON) >= 2`); award/nomination (44/47) pre-filter to items with ≥ 1 linked T2S movie/series/person (OR'd `EXISTS`). Each end-of-process stale delete is the exact inverse of its pre-filter. Benefits from a composite index on `(ID_PROPERTY, ID_WIKIDATA)`. |
 | Server variables | `cp.f_setservervariable()` persists the current process/record for external monitoring. |
 
 ---
