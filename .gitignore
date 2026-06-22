@@ -3,3 +3,5 @@ citizenphilsecrets.py
 data/*
 .env
 archive/
+*.log
+.claude/settings.local.json

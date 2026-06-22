@@ -103,7 +103,23 @@ try:
             #arrprocessscope = {6: 'T2S_PERSON'}
             #arrprocessscope = {4: 'T2S_MOVIE'}
             #arrprocessscope = {5: 'T2S_SERIE'}
-            arrprocessscope = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 60: 'Link Wikidata items to topics', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM'}
+            # --- Process scope selection (env-driven) --------------------------------------
+            # The network-bound, rate-limited Wikidata keyword linker (Process 60, ~3h45m) is
+            # DECOUPLED from the main DB ETL so it can run on its own schedule (its own cron /
+            # `docker run` with TMDB_PREPROCESS_SCOPE=wikidata-topics) instead of blocking it.
+            # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
+            # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
+            # run in the same invocation. The default scope ("main") excludes Process 60.
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM'}
+            arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
+            strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
+            if strprocessscope == "wikidata-topics":
+                arrprocessscope = arrprocessscopewikidatatopics
+            else:
+                strprocessscope = "main"
+                arrprocessscope = arrprocessscopemain
+            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics)", 0)
+            print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
             #arrprocessscope = {9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE'}
@@ -176,6 +192,41 @@ try:
             # bespoke telemetry it emits internally. Drives the "longest first"
             # ranking printed/published after the loop (optimization candidates).
             arrprocessdurations = {}
+            # Refresh optimizer statistics on the bulk-loaded tables before any per-record
+            # Wikidata-link query plans its joins. After a bulk rebuild the InnoDB stats go
+            # stale and the optimizer can pick a full-table-scan plan instead of driving from
+            # the selective side -- which turned the GROUP/AWARD derivations into ~16h runs,
+            # and slows the text-to-SQL API's location/award/etc. queries the same way.
+            # ANALYZE only samples index pages, so it is cheap.
+            #
+            # The whole T2S read model (every T_WC_T2S_* table the text-to-SQL prompt can
+            # query, doc tmdb-front/.../groups-multi-repo-management.md §9.17) is discovered
+            # dynamically so the list never drifts from the prompt schema; the shared
+            # Wikidata/TMDB join tables are appended explicitly. Belt-and-suspenders: the
+            # preprocess link queries also pin their join order with STRAIGHT_JOIN.
+            try:
+                cursoranalyze = cp.connectioncp.cursor()
+                cursoranalyze.execute(
+                    "SELECT TABLE_NAME FROM information_schema.TABLES "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' "
+                    "AND TABLE_NAME LIKE 'T\\_WC\\_T2S\\_%'"
+                )
+                arranalyzetables = [row["TABLE_NAME"] for row in cursoranalyze.fetchall()]
+                arranalyzetables += [
+                    "T_WC_WIKIDATA_ITEM_PROPERTY", "T_WC_WIKIDATA_ITEM_V1",
+                    "T_WC_WIKIDATA_PERSON_V1", "T_WC_TMDB_MOVIE",
+                    "T_WC_TMDB_SERIE", "T_WC_TMDB_PERSON", "T_WC_TMDB_GENRE",
+                ]
+                # Backtick every name (T_WC_T2S_GROUP collides with the reserved word GROUP);
+                # chunk so one bad/locked table cannot abort the rest.
+                for intanalyzestart in range(0, len(arranalyzetables), 25):
+                    arranalyzechunk = arranalyzetables[intanalyzestart:intanalyzestart + 25]
+                    cursoranalyze.execute("ANALYZE TABLE " + ", ".join("`" + t + "`" for t in arranalyzechunk))
+                    cursoranalyze.fetchall()
+                cursoranalyze.close()
+                print(f"ANALYZE TABLE: optimizer statistics refreshed on {len(arranalyzetables)} read-model + join tables.")
+            except Exception as excanalyze:
+                print(f"ANALYZE TABLE refresh skipped: {excanalyze}")
             for intindex, strdesc in arrprocessscope.items():
                 strprocessesexecuted += str(intindex) + ", "
                 cp.f_setservervariable("strtmdbmoviepreprocessprocessesexecuted",strprocessesexecuted,strprocessesexecuteddesc,0)
@@ -1490,8 +1541,8 @@ SET
                                     strsqlmovies_wikidata = ""
                                     strsqlseries_wikidata = ""
                                     if strwdpropertyid and strwditemid:
-                                        strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_TMDB_MOVIE m INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY w ON m.ID_WIKIDATA = w.ID_WIKIDATA WHERE w.ID_PROPERTY = '" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
-                                        strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_TMDB_SERIE s INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY w ON s.ID_WIKIDATA = w.ID_WIKIDATA WHERE w.ID_PROPERTY = '" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                                        strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
+                                        strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                                     # Mechanism 3: TMDb keyword filter from TMDB_ELEMENTS
                                     strtmdbelements = row['TMDB_ELEMENTS'] or ''
                                     strsqlmovies_keyword = ""
@@ -1923,8 +1974,8 @@ SET
                                     strsqlmovies_wikidata = ""
                                     strsqlseries_wikidata = ""
                                     if strwdpropertyid and strwditemid:
-                                        strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_TMDB_MOVIE m INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY w ON m.ID_WIKIDATA = w.ID_WIKIDATA WHERE w.ID_PROPERTY = '" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
-                                        strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_TMDB_SERIE s INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY w ON s.ID_WIKIDATA = w.ID_WIKIDATA WHERE w.ID_PROPERTY = '" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                                        strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
+                                        strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                                     # Mechanism 3: TMDb keyword filter from TMDB_ELEMENTS
                                     strtmdbelements = row['TMDB_ELEMENTS'] or ''
                                     strsqlmovies_keyword = ""
@@ -2307,7 +2358,7 @@ SET
                                     strwditemid = next((t for t in arrwdtokens if t.startswith('Q')), '')
                                     strsqlpersons_wikidata = ""
                                     if strwdpropertyid and strwditemid:
-                                        strsqlpersons_wikidata = "SELECT DISTINCT T_WC_TMDB_PERSON.ID_PERSON, NULL AS ORIGINAL_ORDER, T_WC_TMDB_PERSON.POPULARITY, T_WC_TMDB_PERSON.BIRTHDAY AS SORT_DATE FROM T_WC_TMDB_PERSON INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strwdpropertyid + "' AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = '" + strwditemid + "' AND T_WC_TMDB_PERSON.ADULT = 0 AND T_WC_TMDB_PERSON.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_PERSON.ID_WIKIDATA <> '' "
+                                        strsqlpersons_wikidata = "SELECT DISTINCT T_WC_TMDB_PERSON.ID_PERSON, NULL AS ORIGINAL_ORDER, T_WC_TMDB_PERSON.POPULARITY, T_WC_TMDB_PERSON.BIRTHDAY AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY STRAIGHT_JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY ='" + strwdpropertyid + "' AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = '" + strwditemid + "' AND T_WC_TMDB_PERSON.ADULT = 0 AND T_WC_TMDB_PERSON.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_PERSON.ID_WIKIDATA <> '' "
 
                                     # Mechanism 3: TMDb person name filter from TMDB_ELEMENTS
                                     strtmdbelements = row['TMDB_ELEMENTS'] or ''
@@ -2329,9 +2380,9 @@ SET
                                     strsqlpersons += "T_WC_TMDB_PERSON.BIOGRAPHY, "
                                     strsqlpersons += "T_WC_TMDB_PERSON.PROFILE_PATH, "
                                     strsqlpersons += "T_WC_TMDB_PERSON.ID_WIKIDATA "
-                                    strsqlpersons += "FROM T_WC_TMDB_PERSON "
-                                    strsqlpersons += "INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
-                                    strsqlpersons += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
+                                    strsqlpersons += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                                    strsqlpersons += "STRAIGHT_JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
+                                    strsqlpersons += "STRAIGHT_JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
                                     strsqlpersons += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
                                     strsqlpersons += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = %s "
                                     strsqlpersons += "ORDER BY T_WC_TMDB_PERSON.POPULARITY DESC "
@@ -2562,8 +2613,8 @@ SET
                         # Link to movies
                         strsqlmovies = ""
                         strsqlmovies += "SELECT DISTINCT m.ID_MOVIE, m.IMDB_RATING_WEIGHTED "
-                        strsqlmovies += "FROM T_WC_T2S_MOVIE m "
-                        strsqlmovies += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = m.ID_WIKIDATA "
+                        strsqlmovies += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
+                        strsqlmovies += "STRAIGHT_JOIN T_WC_T2S_MOVIE m ON m.ID_WIKIDATA = p.ID_WIKIDATA "
                         strsqlmovies += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
                         strsqlmovies += "AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
                         strsqlmovies += "ORDER BY m.IMDB_RATING_WEIGHTED DESC, m.ID_MOVIE ASC "
@@ -2594,8 +2645,8 @@ SET
                         # Link to series
                         strsqlseries = ""
                         strsqlseries += "SELECT DISTINCT s.ID_SERIE, s.IMDB_RATING_WEIGHTED "
-                        strsqlseries += "FROM T_WC_T2S_SERIE s "
-                        strsqlseries += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = s.ID_WIKIDATA "
+                        strsqlseries += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
+                        strsqlseries += "STRAIGHT_JOIN T_WC_T2S_SERIE s ON s.ID_WIKIDATA = p.ID_WIKIDATA "
                         strsqlseries += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
                         strsqlseries += "AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                         strsqlseries += "ORDER BY s.IMDB_RATING_WEIGHTED DESC, s.ID_SERIE ASC "
@@ -2626,8 +2677,8 @@ SET
                         # Link to persons
                         strsqlpersons = ""
                         strsqlpersons += "SELECT DISTINCT p2.ID_PERSON, p2.POPULARITY "
-                        strsqlpersons += "FROM T_WC_T2S_PERSON p2 "
-                        strsqlpersons += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = p2.ID_WIKIDATA "
+                        strsqlpersons += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
+                        strsqlpersons += "STRAIGHT_JOIN T_WC_T2S_PERSON p2 ON p2.ID_WIKIDATA = p.ID_WIKIDATA "
                         strsqlpersons += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
                         strsqlpersons += "AND p2.ID_WIKIDATA IS NOT NULL AND p2.ID_WIKIDATA <> '' "
                         strsqlpersons += "ORDER BY p2.POPULARITY DESC, p2.ID_PERSON ASC "
@@ -2866,8 +2917,8 @@ SET
                         # Link to movies
                         strsqlmovies = ""
                         strsqlmovies += "SELECT DISTINCT m.ID_MOVIE, m.IMDB_RATING_WEIGHTED "
-                        strsqlmovies += "FROM T_WC_T2S_MOVIE m "
-                        strsqlmovies += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = m.ID_WIKIDATA "
+                        strsqlmovies += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
+                        strsqlmovies += "STRAIGHT_JOIN T_WC_T2S_MOVIE m ON m.ID_WIKIDATA = p.ID_WIKIDATA "
                         strsqlmovies += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
                         strsqlmovies += "AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
                         strsqlmovies += "ORDER BY m.IMDB_RATING_WEIGHTED DESC, m.ID_MOVIE ASC "
@@ -2898,8 +2949,8 @@ SET
                         # Link to series
                         strsqlseries = ""
                         strsqlseries += "SELECT DISTINCT s.ID_SERIE, s.IMDB_RATING_WEIGHTED "
-                        strsqlseries += "FROM T_WC_T2S_SERIE s "
-                        strsqlseries += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = s.ID_WIKIDATA "
+                        strsqlseries += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
+                        strsqlseries += "STRAIGHT_JOIN T_WC_T2S_SERIE s ON s.ID_WIKIDATA = p.ID_WIKIDATA "
                         strsqlseries += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
                         strsqlseries += "AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                         strsqlseries += "ORDER BY s.IMDB_RATING_WEIGHTED DESC, s.ID_SERIE ASC "
@@ -2930,8 +2981,8 @@ SET
                         # Link to persons
                         strsqlpersons = ""
                         strsqlpersons += "SELECT DISTINCT p2.ID_PERSON, p2.POPULARITY "
-                        strsqlpersons += "FROM T_WC_T2S_PERSON p2 "
-                        strsqlpersons += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY p ON p.ID_WIKIDATA = p2.ID_WIKIDATA "
+                        strsqlpersons += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
+                        strsqlpersons += "STRAIGHT_JOIN T_WC_T2S_PERSON p2 ON p2.ID_WIKIDATA = p.ID_WIKIDATA "
                         strsqlpersons += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
                         strsqlpersons += "AND p2.ID_WIKIDATA IS NOT NULL AND p2.ID_WIKIDATA <> '' "
                         strsqlpersons += "ORDER BY p2.POPULARITY DESC, p2.ID_PERSON ASC "
@@ -3153,8 +3204,8 @@ SET
                                 strsqlmovies_wikidata = ""
                                 strsqlseries_wikidata = ""
                                 if strwdpropertyid and strwditemid:
-                                    strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_TMDB_MOVIE m INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY w ON m.ID_WIKIDATA = w.ID_WIKIDATA WHERE w.ID_PROPERTY = '" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
-                                    strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_TMDB_SERIE s INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY w ON s.ID_WIKIDATA = w.ID_WIKIDATA WHERE w.ID_PROPERTY = '" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                                    strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
+                                    strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                                 # Mechanism 3: TMDb keyword filter from TMDB_ELEMENTS
                                 strtmdbelements = row['TMDB_ELEMENTS'] or ''
                                 strsqlmovies_keyword = ""
@@ -3439,9 +3490,9 @@ SET
                                     strsqlpersons += "T_WC_TMDB_PERSON.BIOGRAPHY, "
                                     strsqlpersons += "T_WC_TMDB_PERSON.PROFILE_PATH, "
                                     strsqlpersons += "T_WC_TMDB_PERSON.ID_WIKIDATA "
-                                    strsqlpersons += "FROM T_WC_TMDB_PERSON "
-                                    strsqlpersons += "INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
-                                    strsqlpersons += "INNER JOIN T_WC_WIKIDATA_ITEM_PROPERTY ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
+                                    strsqlpersons += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
+                                    strsqlpersons += "STRAIGHT_JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
+                                    strsqlpersons += "STRAIGHT_JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
                                     strsqlpersons += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
                                     strsqlpersons += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = %s "
                                     strsqlpersons += "ORDER BY T_WC_TMDB_PERSON.POPULARITY DESC "
@@ -3560,16 +3611,41 @@ SET
                     print("T2S_MOVIE processing")
                     if 1:
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_MOVIE to T2S_MOVIE","Current sub process in the TMDb database movie preprocess",0)
+                        # --- Incremental watermark (mirrors Process 1) ---------------------------
+                        # Only re-copy movies whose source row changed since the last SUCCESSFUL run.
+                        # T_WC_TMDB_MOVIE.TIM_UPDATED (datetime, indexed) is the change marker, and the
+                        # qualification filter (ADULT / ID_IMDB) lives on the same row, so any change
+                        # that makes a movie (dis)qualify also bumps TIM_UPDATED -> incremental is exact.
+                        # The stale-delete and the enrichment passes still run over the FULL table every
+                        # run, so source deletions and independently-refreshed ratings / FR titles /
+                        # Wikidata are always picked up. A look-back buffer absorbs clock skew.
+                        lngt2smovielookbackminutes = 60
+                        strrunstart = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                        strlastrun = cp.f_getservervariable("strtmdbmoviepreprocesst2smovielastrun", 0)
+                        strincrementalfilter = ""
+                        if strlastrun:
+                            strincrementalfilter = (
+                                "AND TIM_UPDATED >= DATE_SUB('" + strlastrun + "', INTERVAL "
+                                + str(lngt2smovielookbackminutes) + " MINUTE) "
+                            )
+                            print(f"Incremental run: movies changed since {strlastrun} (minus {lngt2smovielookbackminutes} min buffer)")
+                        else:
+                            print("First run (no watermark): full scan of all qualifying movies")
+
+                        # Precompute the IMDb global weighted-rating average ONCE (previously recomputed
+                        # via a full-table CROSS JOIN subquery on every chunk).
+                        cursor.execute("SELECT AVG(averageRating) AS C FROM T_WC_IMDB_MOVIE_RATING_IMPORT WHERE averageRating IS NOT NULL AND numVotes > 0")
+                        dblavgrating = cursor.fetchone()['C']
+                        stravgrating = str(dblavgrating) if dblavgrating is not None else "NULL"
+
                         # Get the maximum ID_MOVIE value from the database
                         cursor.execute("SELECT MAX(ID_MOVIE) as max_id FROM T_WC_TMDB_MOVIE")
                         result = cursor.fetchone()
                         lngmovierangemax = result['max_id'] if result['max_id'] is not None else 0
                         print(f"Maximum ID_MOVIE in database: {lngmovierangemax}")
-                        
-                        # Process database in chunks of 1000 records
-                        lngchunksize = 250
-                        lngtotalprocessed = 0
-                        
+
+                        # Base copy in chunks (incremental runs touch few rows per chunk)
+                        lngchunksize = 5000
                         for lngmovierangestart in range(1, lngmovierangemax + 1, lngchunksize):
                             lngmovierangeend = min(lngmovierangestart + lngchunksize - 1, lngmovierangemax)
                             print(f"Processing T2S_MOVIE rows from ID {lngmovierangestart} to {lngmovierangeend}")
@@ -3602,7 +3678,7 @@ WHERE ADULT = 0
 AND ID_IMDB <> ''
 AND ID_IMDB IS NOT NULL
 AND ID_MOVIE >= {lngmovierangestart} AND ID_MOVIE <= {lngmovierangeend}
-ON DUPLICATE KEY UPDATE
+{strincrementalfilter}ON DUPLICATE KEY UPDATE
     MOVIE_TITLE = VALUES(MOVIE_TITLE),
     ID_IMDB = VALUES(ID_IMDB),
     ADULT = VALUES(ADULT),
@@ -3643,82 +3719,82 @@ ON DUPLICATE KEY UPDATE
     DELETED = VALUES(DELETED) """
                             cursor2.execute(strsqlmovies)
                             cp.connectioncp.commit()
-                            
-                            strsqlmoviesdelete = f"""
-DELETE FROM T_WC_T2S_MOVIE 
-WHERE ID_MOVIE >= {lngmovierangestart} AND ID_MOVIE <= {lngmovierangeend}
-AND ID_MOVIE NOT IN (
-    SELECT ID_MOVIE FROM T_WC_TMDB_MOVIE 
-    WHERE ADULT = 0 AND ID_IMDB <> '' AND ID_IMDB IS NOT NULL
-        AND ID_MOVIE >= {lngmovierangestart} AND ID_MOVIE <= {lngmovierangeend}
-) """
-                            cursor2.execute(strsqlmoviesdelete)
-                            cp.connectioncp.commit()
 
-                            strsqlmovies = f"""
+                        # ---- Stale delete: single full-table anti-join (full coverage) ----------
+                        # Must run over the whole table regardless of the watermark: a movie deleted
+                        # from source (or that became ADULT / lost its ID_IMDB) does not appear in the
+                        # incremental change-set, but its now-orphaned T2S row must still be removed.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Stale-delete T2S_MOVIE","Current sub process in the TMDb database movie preprocess",0)
+                        strsqlmoviesdelete = """
+DELETE t2s FROM T_WC_T2S_MOVIE t2s
+LEFT JOIN T_WC_TMDB_MOVIE src
+    ON src.ID_MOVIE = t2s.ID_MOVIE
+   AND src.ADULT = 0
+   AND src.ID_IMDB <> ''
+   AND src.ID_IMDB IS NOT NULL
+WHERE src.ID_MOVIE IS NULL """
+                        cursor2.execute(strsqlmoviesdelete)
+                        cp.connectioncp.commit()
+
+                        # ---- Enrichment: full-table set-based passes, ONCE (were per-chunk) ------
+                        # Run over the whole table every run because their source data
+                        # (IMDb ratings, FR titles, Wikidata) changes independently of a movie's
+                        # TIM_UPDATED, so scoping them to the incremental set would let them go stale.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_MOVIE (ratings / FR title / Wikidata)","Current sub process in the TMDb database movie preprocess",0)
+                        strsqlmovies = """
 UPDATE T_WC_T2S_MOVIE t2s
-INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb 
+INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
 SET t2s.IMDB_RATING = imdb.averageRating
-WHERE t2s.ID_MOVIE >= {lngmovierangestart} 
-    AND t2s.ID_MOVIE <= {lngmovierangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL """
-                            cursor2.execute(strsqlmovies)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlmovies)
+                        cp.connectioncp.commit()
 
-                            strsqlmovies = f"""
+                        strsqlmovies = f"""
 UPDATE T_WC_T2S_MOVIE t2s
-INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb 
+INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
-CROSS JOIN (
-    SELECT AVG(averageRating) AS C
-    FROM T_WC_IMDB_MOVIE_RATING_IMPORT
-    WHERE averageRating IS NOT NULL
-      AND numVotes > 0
-) stats
 SET t2s.IMDB_RATING_WEIGHTED =
     ((imdb.numVotes / (imdb.numVotes + {lngimdbweightedratingm})) * imdb.averageRating) +
-    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * stats.C)
-WHERE t2s.ID_MOVIE >= {lngmovierangestart} 
-    AND t2s.ID_MOVIE <= {lngmovierangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * {stravgrating})
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL
     AND imdb.numVotes > 0 """
-                            cursor2.execute(strsqlmovies)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlmovies)
+                        cp.connectioncp.commit()
 
-                            strsqlmovies = f"""
+                        strsqlmovies = """
 UPDATE T_WC_T2S_MOVIE t2s
-INNER JOIN T_WC_TMDB_MOVIE_LANG t 
+INNER JOIN T_WC_TMDB_MOVIE_LANG t
     ON t2s.ID_MOVIE = t.ID_MOVIE
 SET t2s.MOVIE_TITLE_FR = t.TITLE
-WHERE t2s.ID_MOVIE >= {lngmovierangestart} 
-    AND t2s.ID_MOVIE <= {lngmovierangeend}
-    AND t2s.ID_IMDB IS NOT NULL
-    AND t2s.ID_IMDB <> '' 
+WHERE t2s.ID_IMDB IS NOT NULL
+    AND t2s.ID_IMDB <> ''
     AND t.LANG = 'fr' """
-                            cursor2.execute(strsqlmovies)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlmovies)
+                        cp.connectioncp.commit()
 
-                            strsqlmovies = f"""
+                        strsqlmovies = """
 UPDATE T_WC_T2S_MOVIE t2s
-INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w 
+INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
-SET t2s.WIKIDATA_TITLE = w.TITLE, 
-    t2s.ALIASES = w.ALIASES, 
-    t2s.PLEX_MEDIA_KEY = w.PLEX_MEDIA_KEY, 
-    t2s.ID_CRITERION = w.ID_CRITERION, 
-    t2s.ID_CRITERION_SPINE = w.ID_CRITERION_SPINE, 
-    t2s.INSTANCE_OF = w.INSTANCE_OF 
-WHERE t2s.ID_MOVIE >= {lngmovierangestart} 
-    AND t2s.ID_MOVIE <= {lngmovierangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+SET t2s.WIKIDATA_TITLE = w.TITLE,
+    t2s.ALIASES = w.ALIASES,
+    t2s.PLEX_MEDIA_KEY = w.PLEX_MEDIA_KEY,
+    t2s.ID_CRITERION = w.ID_CRITERION,
+    t2s.ID_CRITERION_SPINE = w.ID_CRITERION_SPINE,
+    t2s.INSTANCE_OF = w.INSTANCE_OF
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
-                            cursor2.execute(strsqlmovies)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlmovies)
+                        cp.connectioncp.commit()
+
+                        # Persist the watermark only after a successful run (an exception earlier aborts
+                        # before this line, leaving the previous watermark so the failed window retries).
+                        cp.f_setservervariable("strtmdbmoviepreprocesst2smovielastrun", strrunstart, "Start datetime of the last successful T2S_MOVIE run; incremental watermark on T_WC_TMDB_MOVIE.TIM_UPDATED", 0)
 
                     print(f"T2S_MOVIE processing completed. ")
 
@@ -3726,17 +3802,38 @@ WHERE t2s.ID_MOVIE >= {lngmovierangestart}
                     #----------------------------------------------------
                     print("T2S_SERIE processing")
                     if 1:
-                        # Get the maximum ID_SERIE value from the database
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_SERIE to T2S_SERIE","Current sub process in the TMDb database series preprocess",0)
+
+                        # --- Incremental watermark (mirrors Process 1/4) -------------------------
+                        # Self-gated like T2S_MOVIE: the qualification filter (ADULT / ID_IMDB) lives
+                        # on the source row, so any (dis)qualifying change bumps TIM_UPDATED ->
+                        # incremental is exact. Stale-delete and enrichment run full-table every run.
+                        lngt2sserielookbackminutes = 60
+                        strrunstart = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                        strlastrun = cp.f_getservervariable("strtmdbmoviepreprocesst2sserielastrun", 0)
+                        strincrementalfilter = ""
+                        if strlastrun:
+                            strincrementalfilter = (
+                                "AND TIM_UPDATED >= DATE_SUB('" + strlastrun + "', INTERVAL "
+                                + str(lngt2sserielookbackminutes) + " MINUTE) "
+                            )
+                            print(f"Incremental run: series changed since {strlastrun} (minus {lngt2sserielookbackminutes} min buffer)")
+                        else:
+                            print("First run (no watermark): full scan of all qualifying series")
+
+                        # Precompute the IMDb global weighted-rating average ONCE.
+                        cursor.execute("SELECT AVG(averageRating) AS C FROM T_WC_IMDB_MOVIE_RATING_IMPORT WHERE averageRating IS NOT NULL AND numVotes > 0")
+                        dblavgrating = cursor.fetchone()['C']
+                        stravgrating = str(dblavgrating) if dblavgrating is not None else "NULL"
+
+                        # Get the maximum ID_SERIE value from the database
                         cursor.execute("SELECT MAX(ID_SERIE) as max_id FROM T_WC_TMDB_SERIE")
                         result = cursor.fetchone()
                         lngserierangemax = result['max_id'] if result['max_id'] is not None else 0
                         print(f"Maximum ID_SERIE in database: {lngserierangemax}")
-                        
-                        # Process database in chunks of 1000 records
-                        lngchunksize = 250
-                        lngtotalprocessed = 0
-                        
+
+                        # Base copy in chunks (incremental runs touch few rows per chunk)
+                        lngchunksize = 5000
                         for lngserierangestart in range(1, lngserierangemax + 1, lngchunksize):
                             lngserierangeend = min(lngserierangestart + lngchunksize - 1, lngserierangemax)
                             print(f"Processing T2S_SERIE rows from ID {lngserierangestart} to {lngserierangeend}")
@@ -3763,7 +3860,7 @@ WHERE ADULT = 0
 AND ID_IMDB <> ''
 AND ID_IMDB IS NOT NULL
 AND ID_SERIE >= {lngserierangestart} AND ID_SERIE <= {lngserierangeend}
-ON DUPLICATE KEY UPDATE
+{strincrementalfilter}ON DUPLICATE KEY UPDATE
     SERIE_TITLE = VALUES(SERIE_TITLE),
     ID_IMDB = VALUES(ID_IMDB),
     ADULT = VALUES(ADULT),
@@ -3796,79 +3893,72 @@ ON DUPLICATE KEY UPDATE
                             cursor2.execute(strsqlseries)
                             cp.connectioncp.commit()
                             
-                            strsqlseriesdelete = f"""
-DELETE FROM T_WC_T2S_SERIE 
-WHERE ID_SERIE >= {lngserierangestart} AND ID_SERIE <= {lngserierangeend}
-AND ID_SERIE NOT IN (
-    SELECT ID_SERIE FROM T_WC_TMDB_SERIE 
-    WHERE ADULT = 0 AND ID_IMDB <> '' AND ID_IMDB IS NOT NULL
-        AND ID_SERIE >= {lngserierangestart} AND ID_SERIE <= {lngserierangeend}
-) """
-                            cursor2.execute(strsqlseriesdelete)
-                            cp.connectioncp.commit()
+                        # ---- Stale delete: single full-table anti-join (full coverage) ----------
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Stale-delete T2S_SERIE","Current sub process in the TMDb database series preprocess",0)
+                        strsqlseriesdelete = """
+DELETE t2s FROM T_WC_T2S_SERIE t2s
+LEFT JOIN T_WC_TMDB_SERIE src
+    ON src.ID_SERIE = t2s.ID_SERIE
+   AND src.ADULT = 0
+   AND src.ID_IMDB <> ''
+   AND src.ID_IMDB IS NOT NULL
+WHERE src.ID_SERIE IS NULL """
+                        cursor2.execute(strsqlseriesdelete)
+                        cp.connectioncp.commit()
 
-                            strsqlseries = f"""
+                        # ---- Enrichment: full-table set-based passes, ONCE (were per-chunk) ------
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_SERIE (ratings / FR title / Wikidata)","Current sub process in the TMDb database series preprocess",0)
+                        strsqlseries = """
 UPDATE T_WC_T2S_SERIE t2s
-INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb 
+INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
 SET t2s.IMDB_RATING = imdb.averageRating
-WHERE t2s.ID_SERIE >= {lngserierangestart} 
-    AND t2s.ID_SERIE <= {lngserierangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL """
-                            cursor2.execute(strsqlseries)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlseries)
+                        cp.connectioncp.commit()
 
-                            strsqlseries = f"""
+                        strsqlseries = f"""
 UPDATE T_WC_T2S_SERIE t2s
-INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb 
+INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
-CROSS JOIN (
-    SELECT AVG(averageRating) AS C
-    FROM T_WC_IMDB_MOVIE_RATING_IMPORT
-    WHERE averageRating IS NOT NULL
-      AND numVotes > 0
-) stats
 SET t2s.IMDB_RATING_WEIGHTED =
     ((imdb.numVotes / (imdb.numVotes + {lngimdbweightedratingm})) * imdb.averageRating) +
-    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * stats.C)
-WHERE t2s.ID_SERIE >= {lngserierangestart} 
-    AND t2s.ID_SERIE <= {lngserierangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * {stravgrating})
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL
     AND imdb.numVotes > 0 """
-                            cursor2.execute(strsqlseries)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlseries)
+                        cp.connectioncp.commit()
 
-                            strsqlseries = f"""
+                        strsqlseries = """
 UPDATE T_WC_T2S_SERIE t2s
-INNER JOIN T_WC_TMDB_SERIE_LANG t 
+INNER JOIN T_WC_TMDB_SERIE_LANG t
     ON t2s.ID_SERIE = t.ID_SERIE
 SET t2s.SERIE_TITLE_FR = t.TITLE
-WHERE t2s.ID_SERIE >= {lngserierangestart} 
-    AND t2s.ID_SERIE <= {lngserierangeend}
-    AND t2s.ID_IMDB IS NOT NULL
-    AND t2s.ID_IMDB <> '' 
+WHERE t2s.ID_IMDB IS NOT NULL
+    AND t2s.ID_IMDB <> ''
     AND t.LANG = 'fr' """
-                            cursor2.execute(strsqlseries)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlseries)
+                        cp.connectioncp.commit()
 
-                            strsqlseries = f"""
+                        strsqlseries = """
 UPDATE T_WC_T2S_SERIE t2s
-INNER JOIN T_WC_WIKIDATA_SERIE_V1 w 
+INNER JOIN T_WC_WIKIDATA_SERIE_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
-SET t2s.WIKIDATA_TITLE = w.TITLE, 
-    t2s.ALIASES = w.ALIASES, 
-    t2s.PLEX_MEDIA_KEY = w.PLEX_MEDIA_KEY, 
-    t2s.INSTANCE_OF = w.INSTANCE_OF 
-WHERE t2s.ID_SERIE >= {lngserierangestart} 
-    AND t2s.ID_SERIE <= {lngserierangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+SET t2s.WIKIDATA_TITLE = w.TITLE,
+    t2s.ALIASES = w.ALIASES,
+    t2s.PLEX_MEDIA_KEY = w.PLEX_MEDIA_KEY,
+    t2s.INSTANCE_OF = w.INSTANCE_OF
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
-                            cursor2.execute(strsqlseries)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlseries)
+                        cp.connectioncp.commit()
+
+                        # Persist the watermark only after a successful run.
+                        cp.f_setservervariable("strtmdbmoviepreprocesst2sserielastrun", strrunstart, "Start datetime of the last successful T2S_SERIE run; incremental watermark on T_WC_TMDB_SERIE.TIM_UPDATED", 0)
 
                     # Now copy Wikipedia content to the serie records
 
@@ -3879,17 +3969,34 @@ WHERE t2s.ID_SERIE >= {lngserierangestart}
                     #----------------------------------------------------
                     print("T2S_PERSON processing")
                     if 1:
-                        # Get the maximum ID_PERSON value from the database
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_PERSON to T2S_PERSON","Current sub process in the TMDb database person preprocess",0)
+
+                        # --- Incremental watermark (mirrors Process 1/4) -------------------------
+                        # Self-gated like T2S_MOVIE: the qualification filter (ADULT / ID_IMDB /
+                        # ID_WIKIDATA) lives on the source row, so any (dis)qualifying change bumps
+                        # TIM_UPDATED -> incremental is exact. Stale-delete and the Wikidata
+                        # enrichment run full-table every run.
+                        lngt2spersonlookbackminutes = 60
+                        strrunstart = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                        strlastrun = cp.f_getservervariable("strtmdbmoviepreprocesst2spersonlastrun", 0)
+                        strincrementalfilter = ""
+                        if strlastrun:
+                            strincrementalfilter = (
+                                "AND TIM_UPDATED >= DATE_SUB('" + strlastrun + "', INTERVAL "
+                                + str(lngt2spersonlookbackminutes) + " MINUTE) "
+                            )
+                            print(f"Incremental run: persons changed since {strlastrun} (minus {lngt2spersonlookbackminutes} min buffer)")
+                        else:
+                            print("First run (no watermark): full scan of all qualifying persons")
+
+                        # Get the maximum ID_PERSON value from the database
                         cursor.execute("SELECT MAX(ID_PERSON) as max_id FROM T_WC_TMDB_PERSON")
                         result = cursor.fetchone()
                         lngpersonrangemax = result['max_id'] if result['max_id'] is not None else 0
                         print(f"Maximum ID_PERSON in database: {lngpersonrangemax}")
-                        
-                        # Process database in chunks of 1000 records
-                        lngchunksize = 1000
-                        lngtotalprocessed = 0
-                        
+
+                        # Base copy in chunks (incremental runs touch few rows per chunk)
+                        lngchunksize = 5000
                         for lngpersonrangestart in range(1, lngpersonrangemax + 1, lngchunksize):
                             lngpersonrangeend = min(lngpersonrangestart + lngchunksize - 1, lngpersonrangemax)
                             print(f"Processing T2S_PERSON rows from ID {lngpersonrangestart} to {lngpersonrangeend}")
@@ -3916,7 +4023,7 @@ WHERE t2s.ID_SERIE >= {lngserierangestart}
     AND ID_WIKIDATA <> ''
     AND ID_WIKIDATA IS NOT NULL
     AND ID_PERSON >= {lngpersonrangestart} AND ID_PERSON <= {lngpersonrangeend}
-    ON DUPLICATE KEY UPDATE
+    {strincrementalfilter}ON DUPLICATE KEY UPDATE
         PERSON_NAME = VALUES(PERSON_NAME),
         ID_IMDB = VALUES(ID_IMDB),
         ADULT = VALUES(ADULT),
@@ -3944,74 +4051,79 @@ WHERE t2s.ID_SERIE >= {lngserierangestart}
                             cursor2.execute(strsqlpersons)
                             cp.connectioncp.commit()
                             
-                            strsqlpersonsdelete = f"""
-    DELETE FROM T_WC_T2S_PERSON 
-    WHERE ID_PERSON >= {lngpersonrangestart} AND ID_PERSON <= {lngpersonrangeend}
-    AND ID_PERSON NOT IN (
-        SELECT ID_PERSON FROM T_WC_TMDB_PERSON 
-        WHERE ADULT = 0 AND ID_IMDB <> '' AND ID_IMDB IS NOT NULL AND ID_WIKIDATA <> '' AND ID_WIKIDATA IS NOT NULL
-            AND ID_PERSON >= {lngpersonrangestart} AND ID_PERSON <= {lngpersonrangeend}
-    ) """
-                            cursor2.execute(strsqlpersonsdelete)
-                            cp.connectioncp.commit()
+                        # ---- Stale delete: single full-table anti-join (full coverage) ----------
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Stale-delete T2S_PERSON","Current sub process in the TMDb database person preprocess",0)
+                        strsqlpersonsdelete = """
+DELETE t2s FROM T_WC_T2S_PERSON t2s
+LEFT JOIN T_WC_TMDB_PERSON src
+    ON src.ID_PERSON = t2s.ID_PERSON
+   AND src.ADULT = 0
+   AND src.ID_IMDB <> ''
+   AND src.ID_IMDB IS NOT NULL
+   AND src.ID_WIKIDATA <> ''
+   AND src.ID_WIKIDATA IS NOT NULL
+WHERE src.ID_PERSON IS NULL """
+                        cursor2.execute(strsqlpersonsdelete)
+                        cp.connectioncp.commit()
 
-                            strsqlpersons = f"""
-    UPDATE T_WC_T2S_PERSON t2s
-    INNER JOIN T_WC_WIKIDATA_PERSON_V1 w 
-        ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
-    SET t2s.WIKIDATA_NAME = w.NAME, 
-        t2s.ALIASES = w.ALIASES, 
-        t2s.INSTANCE_OF = w.INSTANCE_OF 
-    WHERE t2s.ID_PERSON >= {lngpersonrangestart} 
-        AND t2s.ID_PERSON <= {lngpersonrangeend}
-        AND t2s.ID_IMDB IS NOT NULL
-        AND t2s.ID_IMDB <> ''
-        AND t2s.ID_WIKIDATA IS NOT NULL
-        AND t2s.ID_WIKIDATA <> '' """
-                            cursor2.execute(strsqlpersons)
-                            cp.connectioncp.commit()
+                        # ---- Enrichment: full-table set-based pass, ONCE (was per-chunk) ---------
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_PERSON (Wikidata)","Current sub process in the TMDb database person preprocess",0)
+                        strsqlpersons = """
+UPDATE T_WC_T2S_PERSON t2s
+INNER JOIN T_WC_WIKIDATA_PERSON_V1 w
+    ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+SET t2s.WIKIDATA_NAME = w.NAME,
+    t2s.ALIASES = w.ALIASES,
+    t2s.INSTANCE_OF = w.INSTANCE_OF
+WHERE t2s.ID_IMDB IS NOT NULL
+    AND t2s.ID_IMDB <> ''
+    AND t2s.ID_WIKIDATA IS NOT NULL
+    AND t2s.ID_WIKIDATA <> '' """
+                        cursor2.execute(strsqlpersons)
+                        cp.connectioncp.commit()
+
+                        # Persist the watermark only after a successful run.
+                        cp.f_setservervariable("strtmdbmoviepreprocesst2spersonlastrun", strrunstart, "Start datetime of the last successful T2S_PERSON run; incremental watermark on T_WC_TMDB_PERSON.TIM_UPDATED", 0)
 
                 elif intindex == 7:
                     #----------------------------------------------------
                     print("T2S_COMPANY processing")
                     if 1:
-                        # Compute MOVIE_COUNT 
+                        # Compute MOVIE_COUNT — set-based, keyed on ID_COMPANY (was a per-row
+                        # f_sqlupdatearray loop grouped by NAME). Reset-then-update so companies that
+                        # lost all their movies fall back to 0 and drop out of the rebuild below.
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Computing MOVIE_COUNT for T2S_COMPANY","Current sub process in the TMDb database company preprocess",0)
+                        cursor2.execute("UPDATE T_WC_TMDB_COMPANY SET MOVIE_COUNT = 0")
+                        cp.connectioncp.commit()
                         strsqlcompanies = """
-SELECT COUNT(DISTINCT T_WC_T2S_MOVIE.ID_MOVIE) AS COMPTE, T_WC_TMDB_COMPANY.NAME, T_WC_TMDB_COMPANY.ID_COMPANY 
-FROM T_WC_T2S_MOVIE 
-JOIN T_WC_TMDB_MOVIE_COMPANY ON T_WC_T2S_MOVIE.ID_MOVIE = T_WC_TMDB_MOVIE_COMPANY.ID_MOVIE 
-JOIN T_WC_TMDB_COMPANY ON T_WC_TMDB_MOVIE_COMPANY.ID_COMPANY = T_WC_TMDB_COMPANY.ID_COMPANY 
-GROUP BY T_WC_TMDB_COMPANY.NAME 
-ORDER BY COMPTE DESC """
+UPDATE T_WC_TMDB_COMPANY c
+INNER JOIN (
+    SELECT mc.ID_COMPANY, COUNT(DISTINCT m.ID_MOVIE) AS COMPTE
+    FROM T_WC_T2S_MOVIE m
+    INNER JOIN T_WC_TMDB_MOVIE_COMPANY mc ON mc.ID_MOVIE = m.ID_MOVIE
+    GROUP BY mc.ID_COMPANY
+) x ON x.ID_COMPANY = c.ID_COMPANY
+SET c.MOVIE_COUNT = x.COMPTE """
                         print(strsqlcompanies)
                         cursor2.execute(strsqlcompanies)
-                        print("Number of rows: " + str(cursor2.rowcount))
-                        results = cursor2.fetchall()
-                        for row in results:
-                            print(row)
-                            arrcompanycouples = {}
-                            arrcompanycouples["MOVIE_COUNT"] = row['COMPTE']
-                            cp.f_sqlupdatearray("T_WC_TMDB_COMPANY",arrcompanycouples,"ID_COMPANY = " + str(row['ID_COMPANY']),0)
+                        cp.connectioncp.commit()
                     if 1:
-                        # Compute SERIE_COUNT 
+                        # Compute SERIE_COUNT — set-based, keyed on ID_COMPANY (see MOVIE_COUNT note).
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Computing SERIE_COUNT for T2S_COMPANY","Current sub process in the TMDb database company preprocess",0)
+                        cursor2.execute("UPDATE T_WC_TMDB_COMPANY SET SERIE_COUNT = 0")
+                        cp.connectioncp.commit()
                         strsqlcompanies = """
-SELECT COUNT(DISTINCT T_WC_T2S_SERIE.ID_SERIE) AS COMPTE, T_WC_TMDB_COMPANY.NAME, T_WC_TMDB_COMPANY.ID_COMPANY 
-FROM T_WC_T2S_SERIE 
-JOIN T_WC_TMDB_SERIE_COMPANY ON T_WC_T2S_SERIE.ID_SERIE = T_WC_TMDB_SERIE_COMPANY.ID_SERIE 
-JOIN T_WC_TMDB_COMPANY ON T_WC_TMDB_SERIE_COMPANY.ID_COMPANY = T_WC_TMDB_COMPANY.ID_COMPANY 
-GROUP BY T_WC_TMDB_COMPANY.NAME 
-ORDER BY COMPTE DESC """
+UPDATE T_WC_TMDB_COMPANY c
+INNER JOIN (
+    SELECT sc.ID_COMPANY, COUNT(DISTINCT s.ID_SERIE) AS COMPTE
+    FROM T_WC_T2S_SERIE s
+    INNER JOIN T_WC_TMDB_SERIE_COMPANY sc ON sc.ID_SERIE = s.ID_SERIE
+    GROUP BY sc.ID_COMPANY
+) x ON x.ID_COMPANY = c.ID_COMPANY
+SET c.SERIE_COUNT = x.COMPTE """
                         print(strsqlcompanies)
                         cursor2.execute(strsqlcompanies)
-                        print("Number of rows: " + str(cursor2.rowcount))
-                        results = cursor2.fetchall()
-                        for row in results:
-                            print(row)
-                            arrcompanycouples = {}
-                            arrcompanycouples["SERIE_COUNT"] = row['COMPTE']
-                            cp.f_sqlupdatearray("T_WC_TMDB_COMPANY",arrcompanycouples,"ID_COMPANY = " + str(row['ID_COMPANY']),0)
+                        cp.connectioncp.commit()
 
                     if 1:
                         # Get the maximum ID_COMPANY value from the database
@@ -4113,24 +4225,24 @@ RENAME TABLE
                     #----------------------------------------------------
                     print("T2S_NETWORK processing")
                     if 1:
-                        # Compute SERIE_COUNT 
+                        # Compute SERIE_COUNT — set-based, keyed on ID_NETWORK (was a per-row
+                        # f_sqlupdatearray loop grouped by NAME). Reset-then-update so networks that
+                        # lost all their series fall back to 0 and drop out of the rebuild below.
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Computing SERIE_COUNT for T2S_NETWORK","Current sub process in the TMDb database network preprocess",0)
+                        cursor2.execute("UPDATE T_WC_TMDB_NETWORK SET SERIE_COUNT = 0")
+                        cp.connectioncp.commit()
                         strsqlnetworks = """
-SELECT COUNT(DISTINCT T_WC_T2S_SERIE.ID_SERIE) AS COMPTE, T_WC_TMDB_NETWORK.NAME, T_WC_TMDB_NETWORK.ID_NETWORK 
-FROM T_WC_T2S_SERIE 
-JOIN T_WC_TMDB_SERIE_NETWORK ON T_WC_T2S_SERIE.ID_SERIE = T_WC_TMDB_SERIE_NETWORK.ID_SERIE 
-JOIN T_WC_TMDB_NETWORK ON T_WC_TMDB_SERIE_NETWORK.ID_NETWORK = T_WC_TMDB_NETWORK.ID_NETWORK 
-GROUP BY T_WC_TMDB_NETWORK.NAME 
-ORDER BY COMPTE DESC """
+UPDATE T_WC_TMDB_NETWORK n
+INNER JOIN (
+    SELECT sn.ID_NETWORK, COUNT(DISTINCT s.ID_SERIE) AS COMPTE
+    FROM T_WC_T2S_SERIE s
+    INNER JOIN T_WC_TMDB_SERIE_NETWORK sn ON sn.ID_SERIE = s.ID_SERIE
+    GROUP BY sn.ID_NETWORK
+) x ON x.ID_NETWORK = n.ID_NETWORK
+SET n.SERIE_COUNT = x.COMPTE """
                         print(strsqlnetworks)
                         cursor2.execute(strsqlnetworks)
-                        print("Number of rows: " + str(cursor2.rowcount))
-                        results = cursor2.fetchall()
-                        for row in results:
-                            print(row)
-                            arrnetworkcouples = {}
-                            arrnetworkcouples["SERIE_COUNT"] = row['COMPTE']
-                            cp.f_sqlupdatearray("T_WC_TMDB_NETWORK",arrnetworkcouples,"ID_NETWORK = " + str(row['ID_NETWORK']),0)
+                        cp.connectioncp.commit()
                     if 1:
                         # Get the maximum ID_NETWORK value from the database
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_NETWORK to T2S_NETWORK","Current sub process in the TMDb database network preprocess",0)
@@ -5105,17 +5217,42 @@ RENAME TABLE
                     #----------------------------------------------------
                     print("T2S_SEASON processing")
                     if 1:
-                        # Get the maximum ID_SEASON value from the database
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_SEASON to T2S_SEASON","Current sub process in the TMDb database season preprocess",0)
+
+                        # --- Incremental watermark -----------------------------------------------
+                        # Re-copy seasons whose own source row changed since the last successful run,
+                        # PLUS seasons whose parent serie changed: a parent serie newly qualifying for
+                        # T2S bumps its source TIM_UPDATED but not the season's, so both must be checked
+                        # to stay correct. The stale-delete and enrichment passes run over the FULL
+                        # table every run regardless. A look-back buffer absorbs clock skew.
+                        lngt2sseasonlookbackminutes = 60
+                        strrunstart = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                        strlastrun = cp.f_getservervariable("strtmdbmoviepreprocesst2sseasonlastrun", 0)
+                        strincrementalfilter = ""
+                        if strlastrun:
+                            strwatermark = "DATE_SUB('" + strlastrun + "', INTERVAL " + str(lngt2sseasonlookbackminutes) + " MINUTE)"
+                            strincrementalfilter = (
+                                "AND ( s.TIM_UPDATED >= " + strwatermark + " "
+                                "OR s.ID_SERIE IN (SELECT ID_SERIE FROM T_WC_TMDB_SERIE WHERE TIM_UPDATED >= " + strwatermark + ") ) "
+                            )
+                            print(f"Incremental run: seasons changed since {strlastrun} (minus {lngt2sseasonlookbackminutes} min buffer)")
+                        else:
+                            print("First run (no watermark): full scan of all qualifying seasons")
+
+                        # Precompute the IMDb global weighted-rating average ONCE (was recomputed via a
+                        # full-table CROSS JOIN subquery on every chunk).
+                        cursor.execute("SELECT AVG(averageRating) AS C FROM T_WC_IMDB_MOVIE_RATING_IMPORT WHERE averageRating IS NOT NULL AND numVotes > 0")
+                        dblavgrating = cursor.fetchone()['C']
+                        stravgrating = str(dblavgrating) if dblavgrating is not None else "NULL"
+
+                        # Get the maximum ID_SEASON value from the database
                         cursor.execute("SELECT MAX(ID_SEASON) as max_id FROM T_WC_TMDB_SEASON")
                         result = cursor.fetchone()
                         lngseasonrangemax = result['max_id'] if result['max_id'] is not None else 0
                         print(f"Maximum ID_SEASON in database: {lngseasonrangemax}")
 
-                        # Process database in chunks of 1000 records
-                        lngchunksize = 1000
-                        lngtotalprocessed = 0
-
+                        # Base copy in chunks (incremental runs touch few rows per chunk)
+                        lngchunksize = 5000
                         for lngseasonrangestart in range(1, lngseasonrangemax + 1, lngchunksize):
                             lngseasonrangeend = min(lngseasonrangestart + lngchunksize - 1, lngseasonrangemax)
                             print(f"Processing T2S_SEASON rows from ID {lngseasonrangestart} to {lngseasonrangeend}")
@@ -5131,16 +5268,16 @@ INSERT INTO T_WC_T2S_SEASON (
     TIM_UPDATED, ID_USER_UPDATED
 )
 SELECT
-    ID_SEASON, ID_SERIE, SEASON_NUMBER, TITLE, OVERVIEW,
-    AIR_YEAR, AIR_MONTH, AIR_DAY, DAT_AIR,
-    POSTER_PATH, EPISODE_COUNT, VOTE_AVERAGE,
-    ID_IMDB, ID_WIKIDATA, ID_TVDB,
-    DELETED, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT, ID_OWNER,
-    TIM_UPDATED, ID_USER_UPDATED
-FROM T_WC_TMDB_SEASON
-WHERE ID_SEASON >= {lngseasonrangestart} AND ID_SEASON <= {lngseasonrangeend}
-AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
-ON DUPLICATE KEY UPDATE
+    s.ID_SEASON, s.ID_SERIE, s.SEASON_NUMBER, s.TITLE, s.OVERVIEW,
+    s.AIR_YEAR, s.AIR_MONTH, s.AIR_DAY, s.DAT_AIR,
+    s.POSTER_PATH, s.EPISODE_COUNT, s.VOTE_AVERAGE,
+    s.ID_IMDB, s.ID_WIKIDATA, s.ID_TVDB,
+    s.DELETED, s.DISPLAY_ORDER, s.ID_CREATOR, s.DAT_CREAT, s.ID_OWNER,
+    s.TIM_UPDATED, s.ID_USER_UPDATED
+FROM T_WC_TMDB_SEASON s
+INNER JOIN T_WC_T2S_SERIE se ON se.ID_SERIE = s.ID_SERIE
+WHERE s.ID_SEASON >= {lngseasonrangestart} AND s.ID_SEASON <= {lngseasonrangeend}
+{strincrementalfilter}ON DUPLICATE KEY UPDATE
     ID_SERIE = VALUES(ID_SERIE),
     SEASON_NUMBER = VALUES(SEASON_NUMBER),
     SEASON_TITLE = VALUES(SEASON_TITLE),
@@ -5165,51 +5302,50 @@ ON DUPLICATE KEY UPDATE
                             cursor2.execute(strsqlseasons)
                             cp.connectioncp.commit()
 
-                            strsqlseasonsdelete = f"""
-DELETE FROM T_WC_T2S_SEASON
-WHERE ID_SEASON >= {lngseasonrangestart} AND ID_SEASON <= {lngseasonrangeend}
-AND ID_SEASON NOT IN (
-    SELECT ID_SEASON FROM T_WC_TMDB_SEASON
-    WHERE ID_SEASON >= {lngseasonrangestart} AND ID_SEASON <= {lngseasonrangeend}
-    AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
-) """
-                            cursor2.execute(strsqlseasonsdelete)
-                            cp.connectioncp.commit()
+                        # ---- Stale delete: single full-table anti-join (full coverage) ----------
+                        # Removes seasons gone from source, or whose parent serie is no longer in T2S.
+                        # Uses the source season's parent id (authoritative) like the original per-chunk
+                        # delete, but in one pass independent of the incremental change-set.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Stale-delete T2S_SEASON","Current sub process in the TMDb database season preprocess",0)
+                        strsqlseasonsdelete = """
+DELETE t2s FROM T_WC_T2S_SEASON t2s
+LEFT JOIN T_WC_TMDB_SEASON src ON src.ID_SEASON = t2s.ID_SEASON
+LEFT JOIN T_WC_T2S_SERIE se ON se.ID_SERIE = src.ID_SERIE
+WHERE src.ID_SEASON IS NULL OR se.ID_SERIE IS NULL """
+                        cursor2.execute(strsqlseasonsdelete)
+                        cp.connectioncp.commit()
 
-                            strsqlseasons = f"""
+                        # ---- Enrichment: full-table set-based passes, ONCE (were per-chunk) ------
+                        # Run over the whole table every run because the IMDb rating source changes
+                        # independently of a season's TIM_UPDATED.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_SEASON (IMDb ratings)","Current sub process in the TMDb database season preprocess",0)
+                        strsqlseasons = """
 UPDATE T_WC_T2S_SEASON t2s
 INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
 SET t2s.IMDB_RATING = imdb.averageRating
-WHERE t2s.ID_SEASON >= {lngseasonrangestart}
-    AND t2s.ID_SEASON <= {lngseasonrangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL """
-                            cursor2.execute(strsqlseasons)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlseasons)
+                        cp.connectioncp.commit()
 
-                            strsqlseasons = f"""
+                        strsqlseasons = f"""
 UPDATE T_WC_T2S_SEASON t2s
 INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
-CROSS JOIN (
-    SELECT AVG(averageRating) AS C
-    FROM T_WC_IMDB_MOVIE_RATING_IMPORT
-    WHERE averageRating IS NOT NULL
-      AND numVotes > 0
-) stats
 SET t2s.IMDB_RATING_WEIGHTED =
     ((imdb.numVotes / (imdb.numVotes + {lngimdbweightedratingm})) * imdb.averageRating) +
-    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * stats.C)
-WHERE t2s.ID_SEASON >= {lngseasonrangestart}
-    AND t2s.ID_SEASON <= {lngseasonrangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * {stravgrating})
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL
     AND imdb.numVotes > 0 """
-                            cursor2.execute(strsqlseasons)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlseasons)
+                        cp.connectioncp.commit()
+
+                        # Persist the watermark only after a successful run.
+                        cp.f_setservervariable("strtmdbmoviepreprocesst2sseasonlastrun", strrunstart, "Start datetime of the last successful T2S_SEASON run; incremental watermark on T_WC_TMDB_SEASON.TIM_UPDATED", 0)
 
                     print("T2S_SEASON processing completed. ")
 
@@ -5217,17 +5353,43 @@ WHERE t2s.ID_SEASON >= {lngseasonrangestart}
                     #----------------------------------------------------
                     print("T2S_EPISODE processing")
                     if 1:
-                        # Get the maximum ID_EPISODE value from the database
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_EPISODE to T2S_EPISODE","Current sub process in the TMDb database episode preprocess",0)
+
+                        # --- Incremental watermark -----------------------------------------------
+                        # Re-copy episodes whose own source row changed since the last successful run,
+                        # PLUS episodes whose parent serie or season changed: a parent newly qualifying
+                        # for T2S bumps its source TIM_UPDATED but not the episode's, so all three must
+                        # be checked to stay correct. The stale-delete and enrichment passes run over
+                        # the FULL table every run regardless. A look-back buffer absorbs clock skew.
+                        lngt2sepisodelookbackminutes = 60
+                        strrunstart = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                        strlastrun = cp.f_getservervariable("strtmdbmoviepreprocesst2sepisodelastrun", 0)
+                        strincrementalfilter = ""
+                        if strlastrun:
+                            strwatermark = "DATE_SUB('" + strlastrun + "', INTERVAL " + str(lngt2sepisodelookbackminutes) + " MINUTE)"
+                            strincrementalfilter = (
+                                "AND ( e.TIM_UPDATED >= " + strwatermark + " "
+                                "OR e.ID_SERIE IN (SELECT ID_SERIE FROM T_WC_TMDB_SERIE WHERE TIM_UPDATED >= " + strwatermark + ") "
+                                "OR e.ID_SEASON IN (SELECT ID_SEASON FROM T_WC_TMDB_SEASON WHERE TIM_UPDATED >= " + strwatermark + ") ) "
+                            )
+                            print(f"Incremental run: episodes changed since {strlastrun} (minus {lngt2sepisodelookbackminutes} min buffer)")
+                        else:
+                            print("First run (no watermark): full scan of all qualifying episodes")
+
+                        # Precompute the IMDb global weighted-rating average ONCE (previously recomputed
+                        # via a full-table CROSS JOIN subquery on every chunk).
+                        cursor.execute("SELECT AVG(averageRating) AS C FROM T_WC_IMDB_MOVIE_RATING_IMPORT WHERE averageRating IS NOT NULL AND numVotes > 0")
+                        dblavgrating = cursor.fetchone()['C']
+                        stravgrating = str(dblavgrating) if dblavgrating is not None else "NULL"
+
+                        # Get the maximum ID_EPISODE value from the database
                         cursor.execute("SELECT MAX(ID_EPISODE) as max_id FROM T_WC_TMDB_EPISODE")
                         result = cursor.fetchone()
                         lngepisoderangemax = result['max_id'] if result['max_id'] is not None else 0
                         print(f"Maximum ID_EPISODE in database: {lngepisoderangemax}")
 
-                        # Process database in chunks
-                        lngchunksize = 1000
-                        lngtotalprocessed = 0
-
+                        # Base copy in chunks (incremental runs touch few rows per chunk)
+                        lngchunksize = 5000
                         for lngepisoderangestart in range(1, lngepisoderangemax + 1, lngchunksize):
                             lngepisoderangeend = min(lngepisoderangestart + lngchunksize - 1, lngepisoderangemax)
                             print(f"Processing T2S_EPISODE rows from ID {lngepisoderangestart} to {lngepisoderangeend}")
@@ -5245,19 +5407,19 @@ INSERT INTO T_WC_T2S_EPISODE (
     TIM_UPDATED, ID_USER_UPDATED
 )
 SELECT
-    ID_EPISODE, ID_SERIE, ID_SEASON, SEASON_NUMBER, EPISODE_NUMBER,
-    TITLE, OVERVIEW,
-    AIR_YEAR, AIR_MONTH, AIR_DAY, DAT_AIR,
-    RUNTIME, PRODUCTION_CODE, EPISODE_TYPE, STILL_PATH,
-    VOTE_AVERAGE, VOTE_COUNT,
-    ID_IMDB, ID_WIKIDATA, ID_TVDB,
-    DELETED, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT, ID_OWNER,
-    TIM_UPDATED, ID_USER_UPDATED
-FROM T_WC_TMDB_EPISODE
-WHERE ID_EPISODE >= {lngepisoderangestart} AND ID_EPISODE <= {lngepisoderangeend}
-AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
-AND ID_SEASON IN (SELECT ID_SEASON FROM T_WC_T2S_SEASON)
-ON DUPLICATE KEY UPDATE
+    e.ID_EPISODE, e.ID_SERIE, e.ID_SEASON, e.SEASON_NUMBER, e.EPISODE_NUMBER,
+    e.TITLE, e.OVERVIEW,
+    e.AIR_YEAR, e.AIR_MONTH, e.AIR_DAY, e.DAT_AIR,
+    e.RUNTIME, e.PRODUCTION_CODE, e.EPISODE_TYPE, e.STILL_PATH,
+    e.VOTE_AVERAGE, e.VOTE_COUNT,
+    e.ID_IMDB, e.ID_WIKIDATA, e.ID_TVDB,
+    e.DELETED, e.DISPLAY_ORDER, e.ID_CREATOR, e.DAT_CREAT, e.ID_OWNER,
+    e.TIM_UPDATED, e.ID_USER_UPDATED
+FROM T_WC_TMDB_EPISODE e
+INNER JOIN T_WC_T2S_SERIE se ON se.ID_SERIE = e.ID_SERIE
+INNER JOIN T_WC_T2S_SEASON sea ON sea.ID_SEASON = e.ID_SEASON
+WHERE e.ID_EPISODE >= {lngepisoderangestart} AND e.ID_EPISODE <= {lngepisoderangeend}
+{strincrementalfilter}ON DUPLICATE KEY UPDATE
     ID_SERIE = VALUES(ID_SERIE),
     ID_SEASON = VALUES(ID_SEASON),
     SEASON_NUMBER = VALUES(SEASON_NUMBER),
@@ -5287,52 +5449,51 @@ ON DUPLICATE KEY UPDATE
                             cursor2.execute(strsqlepisodes)
                             cp.connectioncp.commit()
 
-                            strsqlepisodesdelete = f"""
-DELETE FROM T_WC_T2S_EPISODE
-WHERE ID_EPISODE >= {lngepisoderangestart} AND ID_EPISODE <= {lngepisoderangeend}
-AND ID_EPISODE NOT IN (
-    SELECT ID_EPISODE FROM T_WC_TMDB_EPISODE
-    WHERE ID_EPISODE >= {lngepisoderangestart} AND ID_EPISODE <= {lngepisoderangeend}
-    AND ID_SERIE IN (SELECT ID_SERIE FROM T_WC_T2S_SERIE)
-    AND ID_SEASON IN (SELECT ID_SEASON FROM T_WC_T2S_SEASON)
-) """
-                            cursor2.execute(strsqlepisodesdelete)
-                            cp.connectioncp.commit()
+                        # ---- Stale delete: single full-table anti-join (full coverage) ----------
+                        # Removes episodes gone from source, or whose parent serie/season is no longer
+                        # in T2S. Uses the source episode's parent ids (authoritative) like the original
+                        # per-chunk delete, but in one pass independent of the incremental change-set.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Stale-delete T2S_EPISODE","Current sub process in the TMDb database episode preprocess",0)
+                        strsqlepisodesdelete = """
+DELETE t2s FROM T_WC_T2S_EPISODE t2s
+LEFT JOIN T_WC_TMDB_EPISODE src ON src.ID_EPISODE = t2s.ID_EPISODE
+LEFT JOIN T_WC_T2S_SERIE se ON se.ID_SERIE = src.ID_SERIE
+LEFT JOIN T_WC_T2S_SEASON sea ON sea.ID_SEASON = src.ID_SEASON
+WHERE src.ID_EPISODE IS NULL OR se.ID_SERIE IS NULL OR sea.ID_SEASON IS NULL """
+                        cursor2.execute(strsqlepisodesdelete)
+                        cp.connectioncp.commit()
 
-                            strsqlepisodes = f"""
+                        # ---- Enrichment: full-table set-based passes, ONCE (were per-chunk) ------
+                        # Run over the whole table every run because the IMDb rating source changes
+                        # independently of an episode's TIM_UPDATED.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_EPISODE (IMDb ratings)","Current sub process in the TMDb database episode preprocess",0)
+                        strsqlepisodes = """
 UPDATE T_WC_T2S_EPISODE t2s
 INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
 SET t2s.IMDB_RATING = imdb.averageRating
-WHERE t2s.ID_EPISODE >= {lngepisoderangestart}
-    AND t2s.ID_EPISODE <= {lngepisoderangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL """
-                            cursor2.execute(strsqlepisodes)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlepisodes)
+                        cp.connectioncp.commit()
 
-                            strsqlepisodes = f"""
+                        strsqlepisodes = f"""
 UPDATE T_WC_T2S_EPISODE t2s
 INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
-CROSS JOIN (
-    SELECT AVG(averageRating) AS C
-    FROM T_WC_IMDB_MOVIE_RATING_IMPORT
-    WHERE averageRating IS NOT NULL
-      AND numVotes > 0
-) stats
 SET t2s.IMDB_RATING_WEIGHTED =
     ((imdb.numVotes / (imdb.numVotes + {lngimdbweightedratingm})) * imdb.averageRating) +
-    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * stats.C)
-WHERE t2s.ID_EPISODE >= {lngepisoderangestart}
-    AND t2s.ID_EPISODE <= {lngepisoderangeend}
-    AND t2s.ID_IMDB IS NOT NULL
+    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * {stravgrating})
+WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL
     AND imdb.numVotes > 0 """
-                            cursor2.execute(strsqlepisodes)
-                            cp.connectioncp.commit()
+                        cursor2.execute(strsqlepisodes)
+                        cp.connectioncp.commit()
+
+                        # Persist the watermark only after a successful run.
+                        cp.f_setservervariable("strtmdbmoviepreprocesst2sepisodelastrun", strrunstart, "Start datetime of the last successful T2S_EPISODE run; incremental watermark on T_WC_TMDB_EPISODE.TIM_UPDATED", 0)
 
                     print("T2S_EPISODE processing completed. ")
 
@@ -6311,6 +6472,11 @@ ORDER BY COMPTE DESC
                     print(f"  {dblseconds:10.2f}s  process {intidx:>3}  {strlabel}  ({strreadable})")
                     arrrankingparts.append(f"{intidx}:{strlabel}={dblseconds:.2f}s")
                 strprocessdurationranking = " | ".join(arrrankingparts)
+                # VAR_VALUE is varchar(255); the full ranking (~45 processes) far
+                # exceeds that. Truncate to fit — since parts are sorted longest
+                # first, the slowest (optimization candidates) are always kept.
+                if len(strprocessdurationranking) > 255:
+                    strprocessdurationranking = strprocessdurationranking[:252].rstrip(" |") + "..."
                 cp.f_setservervariable(
                     "strtmdbmoviepreprocessprocessdurationranking",
                     strprocessdurationranking,
