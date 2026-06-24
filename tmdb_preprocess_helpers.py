@@ -375,56 +375,66 @@ def f_wikipediaresolvepage(session, strtitle):
     return None
 
 
-def f_wikidataentitysummary(session, strwikidataid, arrentitytypecache):
+def f_wikidataentitysummary(session, strwikidataid, arrentitytypecache, arracceptedtypes=None):
+    # arracceptedtypes: optional set/list of Wikidata P31 ids. When provided, the
+    # entity is accepted ONLY if it is an instance of one of those types
+    # (allowlist mode, used for typed entities like companies). When None, the
+    # legacy blocklist applies (keywords/technicals): accept unless the entity is
+    # a work/medium that should never be a topic (film, book, song, album, ...).
     if not strwikidataid:
         return {"accepted": False, "label": ""}
+    # The cache stores the raw instance-of (P31) ids + label, independent of the
+    # acceptance mode, so one cache can serve both blocklist and allowlist callers
+    # within a run without cross-contaminating their verdicts.
     if strwikidataid in arrentitytypecache:
-        return arrentitytypecache[strwikidataid]
-    strurl = "https://www.wikidata.org/w/api.php"
-    arrparams = {
-        "action": "wbgetentities",
-        "ids": strwikidataid,
-        "props": "labels|claims",
-        "format": "json",
-        "languages": "en",
-    }
-    response = f_wikimediarequest(session, strurl, arrparams)
-    arrdata = response.json()
-    arrentity = arrdata.get("entities", {}).get(strwikidataid, {})
-    arrclaims = arrentity.get("claims", {})
-    arrp31 = arrclaims.get("P31", [])
-    arrblockedtypes = {
-        "Q571",
-        "Q7725634",
-        "Q11424",
-        "Q15416",
-        "Q5398426",
-        "Q482994",
-        "Q7366",
-        "Q2188189",
-        "Q7889",
-    }
-    # Removed "Q5" (human) from blocked types
-    arrblockedtypes.discard("Q5")
-    arrinstanceofids = set()
-    for arrclaim in arrp31:
-        arrmainsnak = arrclaim.get("mainsnak", {})
-        arrdatavalue = arrmainsnak.get("datavalue", {})
-        arrvalue = arrdatavalue.get("value", {})
-        strinstanceofid = arrvalue.get("id")
-        if strinstanceofid:
-            arrinstanceofids.add(strinstanceofid)
-    boolaccepted = not bool(arrinstanceofids & arrblockedtypes)
-    strlabel = arrentity.get("labels", {}).get("en", {}).get("value", "")
-    arrsummary = {
-        "accepted": boolaccepted,
-        "label": strlabel,
-    }
-    arrentitytypecache[strwikidataid] = arrsummary
-    return arrsummary
+        arrcached = arrentitytypecache[strwikidataid]
+        arrinstanceofids = arrcached["instanceof"]
+        strlabel = arrcached["label"]
+    else:
+        strurl = "https://www.wikidata.org/w/api.php"
+        arrparams = {
+            "action": "wbgetentities",
+            "ids": strwikidataid,
+            "props": "labels|claims",
+            "format": "json",
+            "languages": "en",
+        }
+        response = f_wikimediarequest(session, strurl, arrparams)
+        arrdata = response.json()
+        arrentity = arrdata.get("entities", {}).get(strwikidataid, {})
+        arrclaims = arrentity.get("claims", {})
+        arrp31 = arrclaims.get("P31", [])
+        arrinstanceofids = set()
+        for arrclaim in arrp31:
+            arrmainsnak = arrclaim.get("mainsnak", {})
+            arrdatavalue = arrmainsnak.get("datavalue", {})
+            arrvalue = arrdatavalue.get("value", {})
+            strinstanceofid = arrvalue.get("id")
+            if strinstanceofid:
+                arrinstanceofids.add(strinstanceofid)
+        strlabel = arrentity.get("labels", {}).get("en", {}).get("value", "")
+        arrentitytypecache[strwikidataid] = {"instanceof": arrinstanceofids, "label": strlabel}
+    if arracceptedtypes:
+        boolaccepted = bool(arrinstanceofids & set(arracceptedtypes))
+    else:
+        arrblockedtypes = {
+            "Q571",
+            "Q7725634",
+            "Q11424",
+            "Q15416",
+            "Q5398426",
+            "Q482994",
+            "Q7366",
+            "Q2188189",
+            "Q7889",
+        }
+        # Removed "Q5" (human) from blocked types
+        arrblockedtypes.discard("Q5")
+        boolaccepted = not bool(arrinstanceofids & arrblockedtypes)
+    return {"accepted": boolaccepted, "label": strlabel}
 
 
-def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arrentitytypecache):
+def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arrentitytypecache, arracceptedtypes=None):
     if not strsearchquery:
         return None
     arrinputvariants = f_topiclinkingvariants(strscoreinput)
@@ -438,7 +448,7 @@ def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arr
         if f_normalizewikidatalinkingtext(strcandidatetitle) in arrinputvariants:
             arrresolved = f_wikipediaresolvepage(session, strcandidatetitle)
             if arrresolved and not arrresolved.get("is_disambiguation") and arrresolved.get("wikibase_item"):
-                arrentitysummary = f_wikidataentitysummary(session, arrresolved["wikibase_item"], arrentitytypecache)
+                arrentitysummary = f_wikidataentitysummary(session, arrresolved["wikibase_item"], arrentitytypecache, arracceptedtypes)
                 if arrentitysummary.get("accepted"):
                     arrresolved["wikidata_label"] = arrentitysummary.get("label", "")
                     arrresolved["confidence"] = 1.0
@@ -447,7 +457,7 @@ def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arr
     arrresolvedtop = f_wikipediaresolvepage(session, arrtopcandidate.get("title", ""))
     if arrresolvedtop and not arrresolvedtop.get("is_disambiguation") and arrresolvedtop.get("wikibase_item"):
         if f_normalizewikidatalinkingtext(arrresolvedtop.get("title", "")) in arrinputvariants:
-            arrentitysummary = f_wikidataentitysummary(session, arrresolvedtop["wikibase_item"], arrentitytypecache)
+            arrentitysummary = f_wikidataentitysummary(session, arrresolvedtop["wikibase_item"], arrentitytypecache, arracceptedtypes)
             if arrentitysummary.get("accepted"):
                 arrresolvedtop["wikidata_label"] = arrentitysummary.get("label", "")
                 arrresolvedtop["confidence"] = 0.95
@@ -463,7 +473,7 @@ def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arr
         arrresolved = f_wikipediaresolvepage(session, strcandidatetitle)
         if not arrresolved or arrresolved.get("is_disambiguation") or not arrresolved.get("wikibase_item"):
             continue
-        arrentitysummary = f_wikidataentitysummary(session, arrresolved["wikibase_item"], arrentitytypecache)
+        arrentitysummary = f_wikidataentitysummary(session, arrresolved["wikibase_item"], arrentitytypecache, arracceptedtypes)
         if not arrentitysummary.get("accepted"):
             continue
         if dblscore > dblbestscore:
@@ -474,7 +484,7 @@ def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arr
     return arrbestmatch
 
 
-def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache):
+def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache, arracceptedtypes=None):
     if not strkeywordname:
         return None
     arrqueryattempts = [strkeywordname]
@@ -488,7 +498,7 @@ def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache):
         if strinsideparentheses and strinsideparentheses not in arrqueryattempts:
             arrqueryattempts.append(strinsideparentheses)
     for strqueryattempt in arrqueryattempts:
-        arrmatch = f_linktmdbkeywordtowikidataquery(session, strqueryattempt, strqueryattempt, arrentitytypecache)
+        arrmatch = f_linktmdbkeywordtowikidataquery(session, strqueryattempt, strqueryattempt, arrentitytypecache, arracceptedtypes)
         if arrmatch:
             return arrmatch
     return None

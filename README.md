@@ -14,7 +14,13 @@ for intindex, strdesc in arrprocessscope.items():
     ...
 ```
 
-The current default scope runs processes: **1, 2, 62, 60, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40**.
+**Scope selection (`TMDB_PREPROCESS_SCOPE`).** The active scope is chosen by an environment variable so the network-bound Wikidata linkers can run on their **own schedule** decoupled from the main DB ETL:
+- `main` (default, or unset) — the full DB ETL **excluding** the decoupled linkers (Process 60, Process 63).
+- `wikidata-topics` — **only** Process 60 (link keywords/topics to Wikidata).
+- `wikidata-companies` — **only** Process 63 (link companies to Wikidata) — **pilot**.
+- `wikidata-all` (alias `wikidata`) — **all** Wikidata linkers run **sequentially in one container** (Process 60 → 63 → future network/genre/character). This is the scope to **schedule**: one process means one Wikimedia request stream, so the linkers never contend for the rate limit. The `wikidata-topics` / `wikidata-companies` scopes remain for targeted single-linker / debug runs.
+
+The `main` scope runs processes: **1, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40**. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
 
 Progress is tracked server-side via `cp.f_setservervariable()`. Multiple cursor objects (`cursor`, `cursor2` … `cursor5`) allow parallel DB operations within a single process.
 
@@ -57,6 +63,97 @@ docker run -d --rm \
 Adjust the path after `--env-file` to wherever the host operator stores the runtime env file for this project. Use `.env.example` as a template for the variables that must be defined.
 
 The included `tmdb-movie-preprocess.sh` wraps build + run and already uses `--env-file` with the host path above; update that path if your deployment layout differs.
+
+### Decoupled Wikidata-topics job (Process 60)
+
+Process 60 (Link Wikidata items to topics) is network-bound and rate-limited (~3h45m) and is **excluded from the `main` scope**. Run it as a separate scheduled container that reuses the same image and env file, with the scope overridden via `-e`:
+
+```bash
+docker run -d --rm \
+    --network="host" \
+    --env-file /home/debian/docker/tmdb-movie-preprocess/.env \
+    -e TMDB_PREPROCESS_SCOPE=wikidata-topics \
+    --name tmdb-movie-preprocess-wikidata-topics \
+    tmdb-movie-preprocess-python-app
+```
+
+The included `tmdb-movie-preprocess-wikidata-topics.sh` wraps build + run for this job. Schedule it on its own cron cadence (e.g. once a day), independently of the main `tmdb-movie-preprocess.sh` run. Because Process 60 already rotates through the keyword table over a ~30-day cycle and is idempotent, the only effect of decoupling is that topic Wikidata IDs lag the main run by at most one linker cycle.
+
+### Decoupled Wikidata-companies job (Process 63) — pilot
+
+Process 63 (Link Wikidata items to companies) extends the same Wikidata-linking
+pattern to `T_WC_TMDB_COMPANY`. It is network-bound and rate-limited like Process
+60, so it runs as its **own decoupled, separately scheduled container** under the
+`wikidata-companies` scope — it is **not** in `main`.
+
+**Prerequisite — run the migration once.** Process 63 writes to four new columns
+that do not exist on a fresh `T_WC_TMDB_COMPANY`. Apply
+[`migration-company-wikidata.sql`](migration-company-wikidata.sql) on the live DB
+first (it adds `ID_WIKIDATA`, `WIKIDATA_LABEL`, `CONFIDENCE`,
+`TIM_WIKIPEDIA_SEARCH` + indexes, mirroring `T_WC_TMDB_KEYWORD`). For example, via
+the MariaDB container:
+
+```bash
+docker exec -i <mariadb-container> \
+    mysql -u<user> -p<password> <dbname> < migration-company-wikidata.sql
+```
+
+(or run the same SQL through phpMyAdmin). The canonical schema dump in
+`tmdb-crawler/doc/sql/TMDb-tables.sql` has been updated to match.
+
+**Run it** (same image + env file, scope overridden via `-e`):
+
+```bash
+docker run -d --rm \
+    --network="host" \
+    --env-file /home/debian/docker/tmdb-movie-preprocess/.env \
+    -e TMDB_PREPROCESS_SCOPE=wikidata-companies \
+    --name tmdb-movie-preprocess-wikidata-companies \
+    tmdb-movie-preprocess-python-app
+```
+
+The included `tmdb-movie-preprocess-wikidata-companies.sh` wraps build + run.
+
+**Per-entity allowlist (why Process 63 differs from Process 60).** The shared
+linker resolves a name to a Wikidata entity, but the *acceptance* test differs by
+entity kind. Process 60 (keywords) uses a **blocklist**: accept any entity unless
+its `P31` (instance-of) is a work that should never be a topic (film, book, song,
+album, video game…). That is wrong for typed entities: a company name can collide
+with a person, a place, or a film of the same name. So Process 63 passes a
+**per-entity allowlist** of accepted `P31` types (business, company, public
+company, film production company, film studio, animation studio, organization,
+multinational corporation) and accepts a match **only** if the resolved entity is
+one of those types. This trades recall for precision — exactly what you want when
+stamping an authoritative `ID_WIKIDATA`. The allowlist is implemented as an
+optional `arracceptedtypes` argument on `f_linktmdbkeywordtowikidata(...)` /
+`f_wikidataentitysummary(...)`; when omitted (Process 60/technical) the legacy
+blocklist still applies, so existing behaviour is unchanged.
+
+> **Pilot status.** Companies first, to validate match precision on real data.
+> After review, the allowlist can be tuned and the same pattern replicated to
+> networks, genres, and characters. The `tmdb-front` company page already renders
+> the `ID_WIKIDATA` (id + Wikidata media + properties) when present. Review match
+> quality with [`doc/queries/wikidata-company-review.sql`](doc/queries/wikidata-company-review.sql).
+
+### Decoupled all-Wikidata job (recommended for scheduling)
+
+Rather than firing each per-entity linker as its own parallel container (which
+makes them contend for the Wikimedia rate limit), run them **all sequentially in
+one container** via the `wikidata-all` scope:
+
+```bash
+docker run -d --rm \
+    --network="host" \
+    --env-file /home/debian/docker/tmdb-movie-preprocess/.env \
+    -e TMDB_PREPROCESS_SCOPE=wikidata-all \
+    --name tmdb-movie-preprocess-wikidata \
+    tmdb-movie-preprocess-python-app
+```
+
+The included `tmdb-movie-preprocess-wikidata.sh` wraps build + run, and the main
+`tmdb-movie-preprocess.sh` launcher calls it (one decoupled Wikidata job, not one
+per entity). Apply each linker's migration first. The single-linker scopes
+(`wikidata-topics`, `wikidata-companies`) remain for targeted/debug runs.
 
 ---
 
@@ -162,15 +259,17 @@ The per-keyword work for the selected batch:
 
 Copies filtered movie records from `T_WC_TMDB_MOVIE` into the T2S layer.
 
-**Reads:** `T_WC_TMDB_MOVIE`
+**Reads:** `T_WC_TMDB_MOVIE`, `T_WC_IMDB_MOVIE_RATING_IMPORT`, `T_WC_TMDB_MOVIE_LANG`, `T_WC_WIKIDATA_MOVIE_V1`
 **Writes:** `T_WC_T2S_MOVIE`
 
 **Filter:** `ADULT = 0` AND `ID_IMDB` not null/empty
 
+**Incremental selection (watermark).** The base copy only re-processes movies whose source `TIM_UPDATED` advanced since the **last successful run** (same pattern as Process 1). The watermark is the previous run's start time, stored in the server variable `strtmdbmoviepreprocesst2smovielastrun` and written **only after the run completes** (a crash leaves the old watermark so the failed window retries). On the **first run** (empty watermark) it falls back to a full scan. A configurable look-back buffer (`lngt2smovielookbackminutes`, default **60 min**) absorbs clock skew; re-processing is an idempotent upsert. This is exact for movies because the qualification filter (`ADULT` / `ID_IMDB`) lives on the same row, so any change that makes a movie (dis)qualify also bumps `TIM_UPDATED`.
+
 **Operations:**
-- Processes in chunks of 1000 records by `ID_MOVIE` range.
-- `INSERT … ON DUPLICATE KEY UPDATE` for ~34 fields including title, IMDb ID, release date, ratings, Wikidata ID, technical flags, and financial data.
-- Deletes records within the processed range that no longer exist in the source.
+- Base copy: `INSERT … ON DUPLICATE KEY UPDATE` for ~34 fields (title, IMDb ID, release date, ratings, Wikidata ID, technical flags, financial data), processed in chunks of 5000 by `ID_MOVIE` range and restricted to the incremental change-set.
+- **Stale delete:** a single full-table anti-join (`T_WC_T2S_MOVIE LEFT JOIN T_WC_TMDB_MOVIE … WHERE source IS NULL`) removes T2S rows whose source no longer qualifies. Runs every run regardless of the watermark, so source deletions (and movies that became `ADULT` / lost their `ID_IMDB`) are always caught.
+- **Enrichment** (IMDb rating, IMDb weighted rating, French title from `T_WC_TMDB_MOVIE_LANG`, Wikidata fields from `T_WC_WIKIDATA_MOVIE_V1`): full-table set-based UPDATEs run **once per run** (previously per chunk), because their source data changes independently of a movie's `TIM_UPDATED`. The global IMDb weighted-rating average is computed once up-front instead of via a per-chunk `CROSS JOIN` subquery.
 
 ---
 
@@ -178,16 +277,17 @@ Copies filtered movie records from `T_WC_TMDB_MOVIE` into the T2S layer.
 
 Copies filtered series records from `T_WC_TMDB_SERIE` into the T2S layer.
 
-**Reads:** `T_WC_TMDB_SERIE`, `T_WC_IMDB_MOVIE_RATING_IMPORT`
+**Reads:** `T_WC_TMDB_SERIE`, `T_WC_IMDB_MOVIE_RATING_IMPORT`, `T_WC_TMDB_SERIE_LANG`, `T_WC_WIKIDATA_SERIE_V1`
 **Writes:** `T_WC_T2S_SERIE`
 
 **Filter:** `ADULT = 0` AND `ID_IMDB` not null/empty
 
+**Incremental selection (watermark).** Same self-gated incremental pattern as Process 4 (the qualification filter lives on the source row, so any (dis)qualifying change bumps `TIM_UPDATED`). The base copy re-processes only series changed since the **last successful run**, tracked by the server variable `strtmdbmoviepreprocesst2sserielastrun` (written only after completion; first run = full scan; `lngt2sserielookbackminutes`, default 60 min, absorbs clock skew).
+
 **Operations:**
-- Processes in chunks of 1000 records by `ID_SERIE` range.
-- `INSERT … ON DUPLICATE KEY UPDATE` for ~30 fields.
-- Additional UPDATE step: enriches `IMDB_RATING` from `T_WC_IMDB_MOVIE_RATING_IMPORT` via `ID_IMDB` join.
-- Deletes records within processed range that no longer exist in source.
+- Base copy: `INSERT … ON DUPLICATE KEY UPDATE` for ~30 fields, in chunks of 5000 by `ID_SERIE` range, restricted to the incremental change-set.
+- **Stale delete:** a single full-table anti-join removes T2S rows whose source no longer qualifies; runs every run regardless of the watermark.
+- **Enrichment** (IMDb rating, IMDb weighted rating, French title from `T_WC_TMDB_SERIE_LANG`, Wikidata fields from `T_WC_WIKIDATA_SERIE_V1`): full-table set-based UPDATEs run **once per run**, with the global IMDb weighted-rating average computed once up-front instead of via a per-chunk `CROSS JOIN`.
 
 ---
 
@@ -200,11 +300,12 @@ Copies filtered person records from `T_WC_TMDB_PERSON` into the T2S layer, enric
 
 **Filter:** `ADULT = 0` AND `ID_IMDB` not null/empty AND `ID_WIKIDATA` not null/empty
 
+**Incremental selection (watermark).** Same self-gated incremental pattern as Process 4 (the qualification filter — `ADULT` / `ID_IMDB` / `ID_WIKIDATA` — lives on the source row, so any (dis)qualifying change bumps `TIM_UPDATED`). The base copy re-processes only persons changed since the **last successful run**, tracked by `strtmdbmoviepreprocesst2spersonlastrun` (written only after completion; first run = full scan; `lngt2spersonlookbackminutes`, default 60 min, absorbs clock skew).
+
 **Operations:**
-- Processes in chunks of 1000 records.
-- `INSERT … ON DUPLICATE KEY UPDATE` for ~24 fields.
-- Additional UPDATE step: enriches `WIKIDATA_NAME`, `ALIASES`, `INSTANCE_OF` from `T_WC_WIKIDATA_PERSON_V1`.
-- Deletes stale records within processed ranges.
+- Base copy: `INSERT … ON DUPLICATE KEY UPDATE` for ~24 fields, in chunks of 5000 by `ID_PERSON` range, restricted to the incremental change-set.
+- **Stale delete:** a single full-table anti-join removes T2S rows whose source no longer qualifies; runs every run regardless of the watermark.
+- **Enrichment** (`WIKIDATA_NAME`, `ALIASES`, `INSTANCE_OF` from `T_WC_WIKIDATA_PERSON_V1`): a full-table set-based UPDATE run **once per run** (previously per chunk).
 
 ---
 
@@ -216,7 +317,7 @@ Computes movie/serie counts per production company and copies qualifying compani
 **Writes:** `T_WC_TMDB_COMPANY` (counts), `T_WC_T2S_COMPANY`
 
 **Operations:**
-- Computes and updates `MOVIE_COUNT` and `SERIE_COUNT` on `T_WC_TMDB_COMPANY`.
+- Computes and updates `MOVIE_COUNT` and `SERIE_COUNT` on `T_WC_TMDB_COMPANY` via **set-based reset-then-update** keyed on `ID_COMPANY` (a single `UPDATE … SET count = 0` followed by one `UPDATE … JOIN (… GROUP BY ID_COMPANY)` per count, replacing the former per-row `f_sqlupdatearray` loop grouped by `NAME`). The reset means companies that lost all their movies/series fall back to 0 and drop out of the rebuild; counts are keyed on `ID_COMPANY` rather than `NAME`, so same-named companies are each counted independently.
 - Copies companies with at least one movie or serie into `T_WC_T2S_COMPANY` in 1000-record chunks.
 - Deletes stale records.
 
@@ -248,7 +349,7 @@ Computes serie counts per broadcast network and copies qualifying networks into 
 **Writes:** `T_WC_TMDB_NETWORK` (counts), `T_WC_T2S_NETWORK`
 
 **Operations:**
-- Computes and updates `SERIE_COUNT` on `T_WC_TMDB_NETWORK`.
+- Computes and updates `SERIE_COUNT` on `T_WC_TMDB_NETWORK` via **set-based reset-then-update** keyed on `ID_NETWORK` (a single `UPDATE … SET SERIE_COUNT = 0` followed by one `UPDATE … JOIN (… GROUP BY ID_NETWORK)`, replacing the former per-row `f_sqlupdatearray` loop grouped by `NAME`). The reset means networks that lost all their series fall back to 0 and drop out of the rebuild; counts are keyed on `ID_NETWORK` rather than `NAME`, so same-named networks are each counted independently.
 - Copies networks with `SERIE_COUNT > 0` into `T_WC_T2S_NETWORK` in 1000-record chunks.
 - Deletes stale records.
 
@@ -469,11 +570,12 @@ Copies TV season records from `T_WC_TMDB_SEASON` into the T2S layer, gated by me
 
 **Filter:** `ID_SERIE` exists in `T_WC_T2S_SERIE`
 
+**Incremental selection (watermark).** The base copy re-processes a season when **either** its own source `TIM_UPDATED` advanced since the **last successful run**, **or** its parent series `TIM_UPDATED` advanced — a parent series newly qualifying for T2S bumps its own `TIM_UPDATED` but not the season's, so both are checked to stay correct. The watermark is the previous run's start time, stored in `strtmdbmoviepreprocesst2sseasonlastrun` and written **only after the run completes** (a crash leaves the old watermark so the failed window retries); the first run (empty watermark) falls back to a full scan. A look-back buffer (`lngt2sseasonlookbackminutes`, default **60 min**) absorbs clock skew; re-processing is an idempotent upsert.
+
 **Operations:**
-- Processes in chunks of 1000 records by `ID_SEASON` range.
-- `INSERT … ON DUPLICATE KEY UPDATE` for ~22 fields (renames `TITLE` → `SEASON_TITLE`; drops crawler-only `TIM_*_COMPLETED` flags).
-- Enriches `IMDB_RATING` and `IMDB_RATING_WEIGHTED` from `T_WC_IMDB_MOVIE_RATING_IMPORT` via `ID_IMDB` join when the season carries an IMDb id.
-- Deletes records within the processed range that no longer exist in source (or whose parent series dropped out of T2S).
+- Base copy: `INSERT … ON DUPLICATE KEY UPDATE` for ~22 fields (renames `TITLE` → `SEASON_TITLE`; drops crawler-only `TIM_*_COMPLETED` flags), processed in chunks of 5000 by `ID_SEASON` range and restricted to the incremental change-set. The parent series membership gate is enforced with an `INNER JOIN` to `T_WC_T2S_SERIE` (previously an `IN (SELECT …)` subquery).
+- **Enrichment** (`IMDB_RATING`, `IMDB_RATING_WEIGHTED` from `T_WC_IMDB_MOVIE_RATING_IMPORT` via `ID_IMDB` join, for seasons that carry an IMDb id): full-table set-based UPDATEs run **once per run** (previously per chunk), with the global IMDb weighted-rating average computed once up-front instead of via a per-chunk `CROSS JOIN`.
+- **Stale delete:** a single full-table anti-join removes seasons gone from source or whose parent series is no longer in T2S. Runs every run regardless of the watermark.
 
 ---
 
@@ -486,11 +588,12 @@ Copies TV episode records from `T_WC_TMDB_EPISODE` into the T2S layer, gated by 
 
 **Filter:** `ID_SERIE` exists in `T_WC_T2S_SERIE` AND `ID_SEASON` exists in `T_WC_T2S_SEASON`
 
+**Incremental selection (watermark).** The base copy re-processes an episode when **either** its own source `TIM_UPDATED` advanced since the **last successful run**, **or** its parent series / season `TIM_UPDATED` advanced — a parent newly qualifying for T2S bumps its own `TIM_UPDATED` but not the episode's, so all three are checked to stay correct. The watermark is the previous run's start time, stored in `strtmdbmoviepreprocesst2sepisodelastrun` and written **only after the run completes**; the first run (empty watermark) falls back to a full scan. A look-back buffer (`lngt2sepisodelookbackminutes`, default **60 min**) absorbs clock skew.
+
 **Operations:**
-- Processes in chunks of 1000 records by `ID_EPISODE` range.
-- `INSERT … ON DUPLICATE KEY UPDATE` for ~27 fields (renames `TITLE` → `EPISODE_TITLE`; drops crawler-only `TIM_*_COMPLETED` flags).
-- Enriches `IMDB_RATING` and `IMDB_RATING_WEIGHTED` from `T_WC_IMDB_MOVIE_RATING_IMPORT` (most episodes lack an `ID_IMDB`, so this populates a sparse minority).
-- Deletes records within the processed range that no longer exist in source.
+- Base copy: `INSERT … ON DUPLICATE KEY UPDATE` for ~27 fields (renames `TITLE` → `EPISODE_TITLE`; drops crawler-only `TIM_*_COMPLETED` flags), processed in chunks of 5000 by `ID_EPISODE` range and restricted to the incremental change-set. The parent series/season membership gate is enforced with `INNER JOIN`s to `T_WC_T2S_SERIE` / `T_WC_T2S_SEASON` (previously `IN (SELECT …)` subqueries).
+- Enriches `IMDB_RATING` and `IMDB_RATING_WEIGHTED` from `T_WC_IMDB_MOVIE_RATING_IMPORT` (most episodes lack an `ID_IMDB`, so this populates a sparse minority) — full-table set-based UPDATEs run **once per run**, with the global IMDb weighted-rating average computed once up-front instead of via a per-chunk `CROSS JOIN`.
+- **Stale delete:** a single full-table anti-join removes episodes gone from source or whose parent series/season is no longer in T2S. Runs every run regardless of the watermark.
 
 ---
 
@@ -569,6 +672,8 @@ Copies episode videos into the T2S layer.
 ### Process 60 — Link Wikidata items to topics
 
 Links TMDb keywords to Wikidata items before process `3` builds `T_WC_T2S_TOPIC`, and spreads the work over rolling daily batches.
+
+> **Decoupled from the main run.** This process is network-bound and rate-limited (~3h45m) and is **not** part of the `main` scope. It runs under the `wikidata-topics` scope as a separately scheduled container (`TMDB_PREPROCESS_SCOPE=wikidata-topics`, see Docker → "Decoupled Wikidata-topics job"). It writes only `T_WC_TMDB_KEYWORD.ID_WIKIDATA`, which Process 3 reads on its own rolling cadence, so the two stay correct without running in the same invocation.
 
 **Reads:** `T_WC_TMDB_KEYWORD`, Wikipedia API, Wikidata API
 **Writes:** `T_WC_TMDB_KEYWORD`
