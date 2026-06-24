@@ -176,7 +176,7 @@ CREATE TABLE `T_WC_WIKIDATA_ITEM_PROPERTY` (
   KEY `ID_ITEM` (`ID_ITEM`),
   KEY `IDX_PROPERTY_WIKIDATA` (`ID_PROPERTY`,`ID_WIKIDATA`),
   KEY `IDX_PROPERTY_ITEM` (`ID_PROPERTY`,`ID_ITEM`)
-) ENGINE=InnoDB AUTO_INCREMENT=11503385 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11528253 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -210,7 +210,7 @@ CREATE TABLE `T_WC_WIKIDATA_ITEM_V1` (
   KEY `ID_WIKIDATA` (`ID_WIKIDATA`),
   KEY `INSTANCE_OF` (`INSTANCE_OF`),
   KEY `WIKIPEDIA_IMAGE_PATH` (`WIKIPEDIA_IMAGE_PATH`)
-) ENGINE=InnoDB AUTO_INCREMENT=2399315 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2551191 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;

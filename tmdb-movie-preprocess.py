@@ -112,9 +112,34 @@ try:
             # run in the same invocation. The default scope ("main") excludes Process 60.
             arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
+            # Pilot: the same decoupled, rate-limited pattern as Process 60, for
+            # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
+            arrprocessscopewikidatacompany = {63: 'Link Wikidata items to companies'}
+            # Combined scope: run EVERY Wikidata linker SEQUENTIALLY in a single
+            # container (dict insertion order = execution order). This is the
+            # preferred scope to schedule: one process means one Wikimedia request
+            # stream, so the linkers never contend for the rate limit (unlike firing
+            # several decoupled containers at once). To add a future linker
+            # (network / genre / character), define its own scope dict above and
+            # merge it in here -- it then runs as part of `wikidata-all` automatically.
+            arrprocessscopewikidataall = {
+                **arrprocessscopewikidatatopics,
+                # PILOT PAUSED (2026-06-23): Process 63 (companies) is excluded from
+                # the scheduled wikidata-all run while its first-run match quality is
+                # reviewed and the allowlist / recall are tuned. With this line
+                # commented out, the nightly schedule runs ONLY the keyword/topic
+                # linker (Process 60). Re-enable by uncommenting once the pilot fix
+                # is validated. (The standalone `wikidata-companies` scope still runs
+                # Process 63 for targeted / debug runs.)
+                # **arrprocessscopewikidatacompany,
+            }
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
                 arrprocessscope = arrprocessscopewikidatatopics
+            elif strprocessscope == "wikidata-companies":
+                arrprocessscope = arrprocessscopewikidatacompany
+            elif strprocessscope in ("wikidata-all", "wikidata"):
+                arrprocessscope = arrprocessscopewikidataall
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
@@ -723,6 +748,130 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                                 "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
+                elif intindex == 63:
+                    # Wikidata entity linking for TMDb companies (pilot). Mirrors the
+                    # keyword linker (Process 60) but passes a per-entity ALLOWLIST of
+                    # accepted P31 types, so only genuine companies/organizations match
+                    # (not a person or a film sharing the name). Tune the allowlist
+                    # after reviewing real match results, then replicate to
+                    # network / genre / character.
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Wikipedia entity linking for TMDb companies","Current sub process in the TMDb database movie preprocess",0)
+                    # Tiered P31 allowlist. TRUSTED = unambiguously a media company
+                    # (film OR broadcast); a match on one of these is trusted at face
+                    # value. GENERIC = business/organization types SHARED with
+                    # airlines, insurers, retailers, telecoms... A match that qualifies
+                    # ONLY through a generic type (no media-specific type) is a
+                    # brand-collision risk: the first pilot run produced Spirit ->
+                    # Spirit Airlines, Allianz -> Allianz SE, American Eagle ->
+                    # American Eagle Outfitters, pro-ject -> Pro-Ject Audio -- some at
+                    # confidence 1.0 (exact name match on a famous non-film brand).
+                    # Such generic-only matches are QUARANTINED below (CONFIDENCE
+                    # capped to a sentinel) so the review query surfaces them and
+                    # downstream consumers thresholding on CONFIDENCE skip them,
+                    # instead of a wrong link entering silently.
+                    arrcompanystrongtypes = {
+                        "Q1762059",   # film production company
+                        "Q375336",    # film studio
+                        "Q1107679",   # animation studio
+                    }
+                    # Broadcast / TV media types -- added 2026-06-24 after the pilot
+                    # review showed the film-only allowlist gated out high-MOVIE_COUNT
+                    # broadcasters and distributors (BBC, ZDF, NBC, ITV, RAI, Canal+,
+                    # Lifetime, History...). These are media-specific and collide
+                    # essentially never with non-media brands, so they are TRUSTED like
+                    # the strong film types, NOT quarantined. QIDs label-verified
+                    # against Wikidata; derived from the missed-P31 review query
+                    # (doc/queries/wikidata-company-missed-p31.sql).
+                    arrcompanybroadcasttypes = {
+                        "Q11396960",  # production company
+                        "Q10689397",  # television production company
+                        "Q368290",    # film distributor
+                        "Q1616075",   # television station
+                        "Q1254874",   # television network
+                        "Q1126006",   # public broadcaster
+                        "Q15265344",  # broadcaster
+                        "Q26398",     # public broadcasting
+                        "Q561068",    # specialty channel
+                        "Q5009242",   # cable channel
+                    }
+                    # Trusted = film + broadcast media types (kept at real confidence).
+                    arrcompanytrustedtypes = arrcompanystrongtypes | arrcompanybroadcasttypes
+                    arrcompanygenerictypes = {
+                        "Q4830453",   # business
+                        "Q783794",    # company
+                        "Q6881511",   # enterprise
+                        "Q891723",    # public company
+                        "Q43229",     # organization
+                        "Q161726",    # multinational corporation
+                    }
+                    arrcompanyacceptedtypes = arrcompanytrustedtypes | arrcompanygenerictypes
+                    # Sentinel confidence for generic-only (brand-collision-risk)
+                    # matches. Kept below the linker's real-match floor (0.92) so a
+                    # CONFIDENCE >= 0.9 downstream filter cleanly excludes them.
+                    dblgenericonlyconfidencecap = 0.50
+                    strsqlcompanies = ""
+                    strsqlcompanies += "SELECT ID_COMPANY, NAME "
+                    strsqlcompanies += "FROM T_WC_TMDB_COMPANY "
+                    strsqlcompanies += "WHERE NAME IS NOT NULL AND NAME <> '' "
+                    strsqlcompanies += "AND (DELETED IS NULL OR DELETED = 0) "
+                    strsqlcompanies += "ORDER BY TIM_WIKIPEDIA_SEARCH ASC, ID_COMPANY ASC "
+                    strsqlcompanies += "LIMIT 3000 "
+                    # The LIMIT processes 3000 companies a day (rolling, TIM-ordered so
+                    # never-searched rows come first). Re-runs keep refreshing the oldest.
+                    print(strsqlcompanies)
+                    cursor2.execute(strsqlcompanies)
+                    print("Number of rows: " + str(cursor2.rowcount))
+                    results = cursor2.fetchall()
+                    session = requests.Session()
+                    strwikimediauseragent = os.getenv("WIKIMEDIA_USER_AGENT", "tmdb-movie-preprocess/1.0")
+                    session.headers.update({"User-Agent": strwikimediauseragent})
+                    session.wikimedia_request_delay_seconds = float(os.getenv("WIKIMEDIA_REQUEST_DELAY_SECONDS", "0.25"))
+                    session.wikimedia_backoff_seconds = float(os.getenv("WIKIMEDIA_BACKOFF_SECONDS", "1.0"))
+                    session.wikimedia_max_retries = int(os.getenv("WIKIMEDIA_MAX_RETRIES", "4"))
+                    session.wikimedia_timeout_seconds = float(os.getenv("WIKIMEDIA_TIMEOUT_SECONDS", "20"))
+                    arrentitytypecache = {}
+                    for row in results:
+                        lngcompanyid = row['ID_COMPANY']
+                        strcompanyname = row['NAME'] or ''
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentcompanyid",str(lngcompanyid),"Current company ID in the TMDb database movie preprocess",0)
+                        print("Processing company: " + str(lngcompanyid) + ": " + strcompanyname)
+                        try:
+                            arrmatch = f_linktmdbkeywordtowikidata(session, strcompanyname, arrentitytypecache, arrcompanyacceptedtypes)
+                        except Exception as exc:
+                            print("Wikipedia/Wikidata linking error for company " + str(lngcompanyid) + ": " + str(exc))
+                            arrcompanycouples = {
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                            cp.f_sqlupdatearray("T_WC_TMDB_COMPANY",arrcompanycouples,"ID_COMPANY = " + str(lngcompanyid),0)
+                            continue
+                        if arrmatch and arrmatch.get("wikibase_item"):
+                            strwikibaseitem = arrmatch["wikibase_item"]
+                            dblconfidence = arrmatch.get("confidence", 0.0)
+                            # Gate on the matched entity's P31 tier. The linker cached
+                            # the entity's instance-of ids during acceptance, so no
+                            # extra Wikidata call is needed here. A match that has NO
+                            # media-specific type (passed only via a generic business
+                            # type) is a brand-collision risk -> cap its confidence to
+                            # quarantine it for review rather than trust it.
+                            arrmatchinstanceof = arrentitytypecache.get(strwikibaseitem, {}).get("instanceof", set())
+                            booltrustedtype = bool(arrmatchinstanceof & arrcompanytrustedtypes)
+                            if not booltrustedtype and dblconfidence > dblgenericonlyconfidencecap:
+                                print("  Generic-only P31 match for '" + strcompanyname + "' -> " + strwikibaseitem + " (types " + str(sorted(arrmatchinstanceof)) + "); quarantining confidence " + str(round(dblconfidence, 4)) + " -> " + str(dblgenericonlyconfidencecap))
+                                dblconfidence = dblgenericonlyconfidencecap
+                            print("Matched company '" + strcompanyname + "' to " + arrmatch.get("title", "") + " (" + strwikibaseitem + ") with confidence " + str(round(dblconfidence, 4)))
+                            arrcompanycouples = {
+                                "ID_WIKIDATA": strwikibaseitem,
+                                "WIKIDATA_LABEL": arrmatch.get("wikidata_label", ""),
+                                "CONFIDENCE": dblconfidence,
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                            cp.f_sqlupdatearray("T_WC_TMDB_COMPANY",arrcompanycouples,"ID_COMPANY = " + str(lngcompanyid),0)
+                        else:
+                            print("No match found for company '" + strcompanyname + "'")
+                            arrcompanycouples = {
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            }
+                            cp.f_sqlupdatearray("T_WC_TMDB_COMPANY",arrcompanycouples,"ID_COMPANY = " + str(lngcompanyid),0)
                 elif intindex == 61:
                     print("Link Wikidata items to collections processing")
                     cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Link Wikidata items to T2S collections","Current sub process in the TMDb database movie preprocess",0)

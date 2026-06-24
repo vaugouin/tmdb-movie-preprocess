@@ -13,3 +13,11 @@ else
     docker run -d --rm --network="host" --env-file /home/debian/docker/tmdb-movie-preprocess/.env --name tmdb-movie-preprocess tmdb-movie-preprocess-python-app
     echo "tmdb-movie-preprocess Docker container started."
 fi
+
+# Decoupled Wikidata linkers: ALL of them, sequentially, in ONE container
+# (scope wikidata-all = Process 60 topics -> 63 companies -> future linkers).
+# One process = one Wikimedia request stream, so they never contend for the rate
+# limit. For a targeted single-linker run, call -wikidata-topics.sh or
+# -wikidata-companies.sh directly instead.
+cd /home/debian/docker/tmdb-movie-preprocess
+./tmdb-movie-preprocess-wikidata.sh

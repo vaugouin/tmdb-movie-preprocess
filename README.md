@@ -14,9 +14,11 @@ for intindex, strdesc in arrprocessscope.items():
     ...
 ```
 
-**Scope selection (`TMDB_PREPROCESS_SCOPE`).** The active scope is chosen by an environment variable so the network-bound Wikidata keyword linker (Process 60, ~3h45m) can run on its **own schedule** decoupled from the main DB ETL:
-- `main` (default, or unset) — the full DB ETL **excluding** Process 60.
-- `wikidata-topics` — **only** Process 60.
+**Scope selection (`TMDB_PREPROCESS_SCOPE`).** The active scope is chosen by an environment variable so the network-bound Wikidata linkers can run on their **own schedule** decoupled from the main DB ETL:
+- `main` (default, or unset) — the full DB ETL **excluding** the decoupled linkers (Process 60, Process 63).
+- `wikidata-topics` — **only** Process 60 (link keywords/topics to Wikidata).
+- `wikidata-companies` — **only** Process 63 (link companies to Wikidata) — **pilot**.
+- `wikidata-all` (alias `wikidata`) — **all** Wikidata linkers run **sequentially in one container** (Process 60 → 63 → future network/genre/character). This is the scope to **schedule**: one process means one Wikimedia request stream, so the linkers never contend for the rate limit. The `wikidata-topics` / `wikidata-companies` scopes remain for targeted single-linker / debug runs.
 
 The `main` scope runs processes: **1, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40**. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
 
@@ -76,6 +78,82 @@ docker run -d --rm \
 ```
 
 The included `tmdb-movie-preprocess-wikidata-topics.sh` wraps build + run for this job. Schedule it on its own cron cadence (e.g. once a day), independently of the main `tmdb-movie-preprocess.sh` run. Because Process 60 already rotates through the keyword table over a ~30-day cycle and is idempotent, the only effect of decoupling is that topic Wikidata IDs lag the main run by at most one linker cycle.
+
+### Decoupled Wikidata-companies job (Process 63) — pilot
+
+Process 63 (Link Wikidata items to companies) extends the same Wikidata-linking
+pattern to `T_WC_TMDB_COMPANY`. It is network-bound and rate-limited like Process
+60, so it runs as its **own decoupled, separately scheduled container** under the
+`wikidata-companies` scope — it is **not** in `main`.
+
+**Prerequisite — run the migration once.** Process 63 writes to four new columns
+that do not exist on a fresh `T_WC_TMDB_COMPANY`. Apply
+[`migration-company-wikidata.sql`](migration-company-wikidata.sql) on the live DB
+first (it adds `ID_WIKIDATA`, `WIKIDATA_LABEL`, `CONFIDENCE`,
+`TIM_WIKIPEDIA_SEARCH` + indexes, mirroring `T_WC_TMDB_KEYWORD`). For example, via
+the MariaDB container:
+
+```bash
+docker exec -i <mariadb-container> \
+    mysql -u<user> -p<password> <dbname> < migration-company-wikidata.sql
+```
+
+(or run the same SQL through phpMyAdmin). The canonical schema dump in
+`tmdb-crawler/doc/sql/TMDb-tables.sql` has been updated to match.
+
+**Run it** (same image + env file, scope overridden via `-e`):
+
+```bash
+docker run -d --rm \
+    --network="host" \
+    --env-file /home/debian/docker/tmdb-movie-preprocess/.env \
+    -e TMDB_PREPROCESS_SCOPE=wikidata-companies \
+    --name tmdb-movie-preprocess-wikidata-companies \
+    tmdb-movie-preprocess-python-app
+```
+
+The included `tmdb-movie-preprocess-wikidata-companies.sh` wraps build + run.
+
+**Per-entity allowlist (why Process 63 differs from Process 60).** The shared
+linker resolves a name to a Wikidata entity, but the *acceptance* test differs by
+entity kind. Process 60 (keywords) uses a **blocklist**: accept any entity unless
+its `P31` (instance-of) is a work that should never be a topic (film, book, song,
+album, video game…). That is wrong for typed entities: a company name can collide
+with a person, a place, or a film of the same name. So Process 63 passes a
+**per-entity allowlist** of accepted `P31` types (business, company, public
+company, film production company, film studio, animation studio, organization,
+multinational corporation) and accepts a match **only** if the resolved entity is
+one of those types. This trades recall for precision — exactly what you want when
+stamping an authoritative `ID_WIKIDATA`. The allowlist is implemented as an
+optional `arracceptedtypes` argument on `f_linktmdbkeywordtowikidata(...)` /
+`f_wikidataentitysummary(...)`; when omitted (Process 60/technical) the legacy
+blocklist still applies, so existing behaviour is unchanged.
+
+> **Pilot status.** Companies first, to validate match precision on real data.
+> After review, the allowlist can be tuned and the same pattern replicated to
+> networks, genres, and characters. The `tmdb-front` company page already renders
+> the `ID_WIKIDATA` (id + Wikidata media + properties) when present. Review match
+> quality with [`doc/queries/wikidata-company-review.sql`](doc/queries/wikidata-company-review.sql).
+
+### Decoupled all-Wikidata job (recommended for scheduling)
+
+Rather than firing each per-entity linker as its own parallel container (which
+makes them contend for the Wikimedia rate limit), run them **all sequentially in
+one container** via the `wikidata-all` scope:
+
+```bash
+docker run -d --rm \
+    --network="host" \
+    --env-file /home/debian/docker/tmdb-movie-preprocess/.env \
+    -e TMDB_PREPROCESS_SCOPE=wikidata-all \
+    --name tmdb-movie-preprocess-wikidata \
+    tmdb-movie-preprocess-python-app
+```
+
+The included `tmdb-movie-preprocess-wikidata.sh` wraps build + run, and the main
+`tmdb-movie-preprocess.sh` launcher calls it (one decoupled Wikidata job, not one
+per entity). Apply each linker's migration first. The single-linker scopes
+(`wikidata-topics`, `wikidata-companies`) remain for targeted/debug runs.
 
 ---
 
