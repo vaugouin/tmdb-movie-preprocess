@@ -107,3 +107,15 @@ All source and target data is multilingual (English + French labels, accented an
 
 **Last Updated**: 2026-06-01
 **Current Version**: 1.0.0
+
+## Backlog (Nestor second-brain)
+
+The prioritized, agent-ready implementation backlog for this repo lives in the **Nestor**
+knowledge repo (a separate repo, not cloned alongside this one):
+
+- This repo: `C:\Users\vaugo\Nestor\projets\t2s-backlog\repos\tmdb-movie-preprocess.md`
+- Cross-repo dashboard: `C:\Users\vaugo\Nestor\projets\t2s-backlog\index.md`
+
+Consult it before implementing: tasks are `TMDB-MOVIE-PREPROCESS-NNN` with status (done / in-progress /
+todo), priority, and quick-wins. NOTE: these are local paths on Philippe's PC and do not
+resolve on the VPS or on cloud agents (claude.ai/code).
