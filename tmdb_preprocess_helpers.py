@@ -452,6 +452,7 @@ def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arr
                 if arrentitysummary.get("accepted"):
                     arrresolved["wikidata_label"] = arrentitysummary.get("label", "")
                     arrresolved["confidence"] = 1.0
+                    arrresolved["match_type"] = "exact_title"
                     return arrresolved
     arrtopcandidate = arrcandidates[0]
     arrresolvedtop = f_wikipediaresolvepage(session, arrtopcandidate.get("title", ""))
@@ -461,6 +462,7 @@ def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arr
             if arrentitysummary.get("accepted"):
                 arrresolvedtop["wikidata_label"] = arrentitysummary.get("label", "")
                 arrresolvedtop["confidence"] = 0.95
+                arrresolvedtop["match_type"] = "top_candidate"
                 return arrresolvedtop
     arrbestmatch = None
     dblbestscore = 0.0
@@ -481,10 +483,22 @@ def f_linktmdbkeywordtowikidataquery(session, strsearchquery, strscoreinput, arr
             arrbestmatch = arrresolved
             arrbestmatch["wikidata_label"] = arrentitysummary.get("label", "")
             arrbestmatch["confidence"] = dblscore
+            arrbestmatch["match_type"] = "fuzzy"
     return arrbestmatch
 
 
-def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache, arracceptedtypes=None):
+def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache, arracceptedtypes=None, arrtrustedtypes=None):
+    # arrtrustedtypes: optional set of "high-trust" P31 ids (a subset of
+    # arracceptedtypes). When provided, a REDIRECT-RESOLUTION fallback is enabled
+    # after the search-based attempts fail: the raw name is resolved directly as a
+    # Wikipedia page title, which follows Wikipedia's redirect graph. That graph
+    # authoritatively maps historical / renamed company names to the current entity
+    # ("20th Century Fox" -> "20th Century Studios", "RKO Radio Pictures" -> "RKO
+    # Pictures", "Walt Disney Productions" -> "The Walt Disney Company"). The
+    # fallback is gated on TRUSTED membership so a bare-brand collision whose page
+    # resolves directly to a generic-typed company ("Allianz" -> the insurer) is
+    # NOT auto-accepted. When arrtrustedtypes is None (keywords / technicals) the
+    # fallback is skipped and behaviour is unchanged.
     if not strkeywordname:
         return None
     arrqueryattempts = [strkeywordname]
@@ -501,6 +515,20 @@ def f_linktmdbkeywordtowikidata(session, strkeywordname, arrentitytypecache, arr
         arrmatch = f_linktmdbkeywordtowikidataquery(session, strqueryattempt, strqueryattempt, arrentitytypecache, arracceptedtypes)
         if arrmatch:
             return arrmatch
+    if arrtrustedtypes:
+        arrtrustedtypeset = set(arrtrustedtypes)
+        for strqueryattempt in arrqueryattempts:
+            arrresolved = f_wikipediaresolvepage(session, strqueryattempt)
+            if not arrresolved or arrresolved.get("is_disambiguation") or not arrresolved.get("wikibase_item"):
+                continue
+            strwikibaseitem = arrresolved["wikibase_item"]
+            arrentitysummary = f_wikidataentitysummary(session, strwikibaseitem, arrentitytypecache, arracceptedtypes)
+            arrresolvedtypes = arrentitytypecache.get(strwikibaseitem, {}).get("instanceof", set())
+            if arrentitysummary.get("accepted") and (arrresolvedtypes & arrtrustedtypeset):
+                arrresolved["wikidata_label"] = arrentitysummary.get("label", "")
+                arrresolved["confidence"] = 0.95
+                arrresolved["match_type"] = "redirect"
+                return arrresolved
     return None
 
 

@@ -773,6 +773,11 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                         "Q1762059",   # film production company
                         "Q375336",    # film studio
                         "Q1107679",   # animation studio
+                        "Q735427",    # Poverty Row (low-budget studio classification --
+                                      # the sole P31 of Monogram, Republic, PRC, Grand
+                                      # National...; unambiguously film-industry, no
+                                      # collision risk). Added 2026-06-29 after the pilot
+                                      # review found exact-title studios rejected on type.
                     }
                     # Broadcast / TV media types -- added 2026-06-24 after the pilot
                     # review showed the film-only allowlist gated out high-MOVIE_COUNT
@@ -836,7 +841,7 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentcompanyid",str(lngcompanyid),"Current company ID in the TMDb database movie preprocess",0)
                         print("Processing company: " + str(lngcompanyid) + ": " + strcompanyname)
                         try:
-                            arrmatch = f_linktmdbkeywordtowikidata(session, strcompanyname, arrentitytypecache, arrcompanyacceptedtypes)
+                            arrmatch = f_linktmdbkeywordtowikidata(session, strcompanyname, arrentitytypecache, arrcompanyacceptedtypes, arrcompanytrustedtypes)
                         except Exception as exc:
                             print("Wikipedia/Wikidata linking error for company " + str(lngcompanyid) + ": " + str(exc))
                             arrcompanycouples = {
@@ -855,8 +860,21 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                             # quarantine it for review rather than trust it.
                             arrmatchinstanceof = arrentitytypecache.get(strwikibaseitem, {}).get("instanceof", set())
                             booltrustedtype = bool(arrmatchinstanceof & arrcompanytrustedtypes)
-                            if not booltrustedtype and dblconfidence > dblgenericonlyconfidencecap:
-                                print("  Generic-only P31 match for '" + strcompanyname + "' -> " + strwikibaseitem + " (types " + str(sorted(arrmatchinstanceof)) + "); quarantining confidence " + str(round(dblconfidence, 4)) + " -> " + str(dblgenericonlyconfidencecap))
+                            # An exact-TITLE match (the resolved Wikipedia page is
+                            # literally titled the company name) is a strong correctness
+                            # signal even when Wikidata types the entity with only a
+                            # generic corporate P31 (many legit studios are typed
+                            # `business`/`enterprise`, not `film studio`: Toei, Shochiku,
+                            # Disney Television Animation...), so it is trusted at face
+                            # value. Gate on the explicit match_type, NOT on the
+                            # confidence value: a FUZZY match can also score 1.0 via
+                            # token overlap (single-word brand fully contained in a longer
+                            # title -- "Spirit" -> "Spirit Airlines", "Apple" -> "Apple
+                            # Inc."), and those generic-only fuzzy hits must stay
+                            # quarantined as brand-collision risks.
+                            boolexacttitlematch = arrmatch.get("match_type") == "exact_title"
+                            if not booltrustedtype and not boolexacttitlematch and dblconfidence > dblgenericonlyconfidencecap:
+                                print("  Generic-only fuzzy P31 match for '" + strcompanyname + "' -> " + strwikibaseitem + " (types " + str(sorted(arrmatchinstanceof)) + "); quarantining confidence " + str(round(dblconfidence, 4)) + " -> " + str(dblgenericonlyconfidencecap))
                                 dblconfidence = dblgenericonlyconfidencecap
                             print("Matched company '" + strcompanyname + "' to " + arrmatch.get("title", "") + " (" + strwikibaseitem + ") with confidence " + str(round(dblconfidence, 4)))
                             arrcompanycouples = {
