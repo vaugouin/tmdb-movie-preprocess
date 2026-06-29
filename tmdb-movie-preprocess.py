@@ -124,14 +124,13 @@ try:
             # merge it in here -- it then runs as part of `wikidata-all` automatically.
             arrprocessscopewikidataall = {
                 **arrprocessscopewikidatatopics,
-                # PILOT PAUSED (2026-06-23): Process 63 (companies) is excluded from
-                # the scheduled wikidata-all run while its first-run match quality is
-                # reviewed and the allowlist / recall are tuned. With this line
-                # commented out, the nightly schedule runs ONLY the keyword/topic
-                # linker (Process 60). Re-enable by uncommenting once the pilot fix
-                # is validated. (The standalone `wikidata-companies` scope still runs
-                # Process 63 for targeted / debug runs.)
-                # **arrprocessscopewikidatacompany,
+                # PILOT VALIDATED (2026-06-29): Process 63 (companies) re-enabled in
+                # the scheduled wikidata-all run after the tuning pass (Poverty Row
+                # allowlist type, redirect-resolution fallback for renamed studios,
+                # match_type-based quarantine). The review batch confirmed the 0.50
+                # quarantine band shrank 584->208, exact-title studios moved to 1.0,
+                # and brand collisions (Apple, Spirit) stayed quarantined.
+                **arrprocessscopewikidatacompany,
             }
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
