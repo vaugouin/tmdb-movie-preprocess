@@ -5,3 +5,7 @@ data/*
 archive/
 *.log
 .claude/settings.local.json
+
+# Claude Code / agent local tooling
+.claude/
+.agents/
