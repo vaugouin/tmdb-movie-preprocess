@@ -110,7 +110,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 70: 'T2S_EVALUATION_ASSERTION_REFRESH'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -6612,6 +6612,81 @@ ORDER BY COMPTE DESC
                             arrcharactercouples["WORD_COUNT"] = lngwordcount
                             cp.f_sqlupdatearray("T_WC_TMDB_CHARACTER",arrcharactercouples,"ID_CHARACTER = " + str(lngcharacterid),0)
 
+                elif intindex == 70:
+                    #----------------------------------------------------
+                    # Refresh "living" evaluation assertions (AES-05 /
+                    # TMDB-MOVIE-PREPROCESS-026). For every T_WC_T2S_EVALUATION row
+                    # carrying an ASSERTION_REFRESH_SQL, re-run that canonical SELECT
+                    # and rewrite ASSERTIONS_QUERY_RESULT = "<ID_COL> IN (...)" so
+                    # time-varying samples (e.g. "trending series") stay current.
+                    # Runs LAST in the pipeline, after POPULARITY (Process 5) is fresh.
+                    # Guardrails: single read-only SELECT, exactly one ID_* column,
+                    # per-statement timeout; skip + log on anything else.
+                    print("T2S_EVALUATION_ASSERTION_REFRESH processing")
+                    start_time = time.time()
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Refresh living-eval assertions","Current sub process in the TMDb database preprocess",0)
+                    intassertionmaxstatementtime = 15
+                    cursor2.execute(
+                        "SELECT ID_T2S_EVALUATION, ASSERTION_REFRESH_SQL "
+                        "FROM T_WC_T2S_EVALUATION "
+                        "WHERE ASSERTION_REFRESH_SQL IS NOT NULL AND TRIM(ASSERTION_REFRESH_SQL) <> '' "
+                        "AND (DELETED IS NULL OR DELETED = 0) "
+                        "ORDER BY ASSERTION_REFRESH_LAST ASC, ID_T2S_EVALUATION ASC "
+                    )
+                    arrrefreshevals = cursor2.fetchall()
+                    print(f"Found {len(arrrefreshevals)} eval(s) with a refresh SQL")
+                    lngrefreshed = 0
+                    lngskipped = 0
+                    for rowrefresh in arrrefreshevals:
+                        lngevalid = rowrefresh["ID_T2S_EVALUATION"]
+                        strrefreshsql = (rowrefresh["ASSERTION_REFRESH_SQL"] or "").strip().rstrip(";").strip()
+                        strrefreshlower = strrefreshsql.lower()
+                        if (not strrefreshlower.startswith("select")) or (";" in strrefreshsql) or ("into outfile" in strrefreshlower) or ("into dumpfile" in strrefreshlower):
+                            print(f"  eval {lngevalid}: SKIP (not a single read-only SELECT)")
+                            lngskipped += 1
+                            continue
+                        try:
+                            cursor2.execute(f"SET STATEMENT max_statement_time={intassertionmaxstatementtime} FOR {strrefreshsql}")
+                            arridrows = cursor2.fetchall()
+                            arridcols = [strd[0] for strd in cursor2.description]
+                        except Exception as exrefresh:
+                            print(f"  eval {lngevalid}: SKIP (query error: {exrefresh})")
+                            lngskipped += 1
+                            continue
+                        if len(arridcols) != 1 or not str(arridcols[0]).upper().startswith("ID_"):
+                            print(f"  eval {lngevalid}: SKIP (query must return exactly one ID_* column, got {arridcols})")
+                            lngskipped += 1
+                            continue
+                        strcol = arridcols[0]
+                        arrids = []
+                        intbadvalue = 0
+                        for rowid in arridrows:
+                            valid = rowid[strcol]
+                            if valid is None:
+                                continue
+                            try:
+                                arrids.append(int(valid))
+                            except (TypeError, ValueError):
+                                intbadvalue = 1
+                                break
+                        if intbadvalue == 1 or len(arrids) == 0:
+                            print(f"  eval {lngevalid}: SKIP (no usable integer ids returned)")
+                            lngskipped += 1
+                            continue
+                        strassertion = strcol + " IN (" + ", ".join(str(intid) for intid in arrids) + ")"
+                        cursor2.execute(
+                            "UPDATE T_WC_T2S_EVALUATION "
+                            "SET ASSERTIONS_QUERY_RESULT = %s, ASSERTION_REFRESH_LAST = NOW() "
+                            "WHERE ID_T2S_EVALUATION = %s ",
+                            [strassertion, lngevalid],
+                        )
+                        lngrefreshed += 1
+                        print(f"  eval {lngevalid}: {strassertion}")
+                    cp.connectioncp.commit()
+                    cp.f_setservervariable("strtmdbmoviepreprocessassertionrefreshcount", str(lngrefreshed), "Living-eval assertions refreshed in the last run", 0)
+                    cp.f_setservervariable("strtmdbmoviepreprocessassertionrefreshskipped", str(lngskipped), "Living-eval assertions skipped by a guardrail in the last run", 0)
+                    print(f"T2S_EVALUATION_ASSERTION_REFRESH complete: {lngrefreshed} refreshed, {lngskipped} skipped")
+                    print(f"Elapsed time: {time.time() - start_time:.2f} seconds")
                 if telcopy is not None:
                     telcopy.finish()
                 dblprocesselapsed = time.time() - dblprocessstarttime

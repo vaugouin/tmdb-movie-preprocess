@@ -973,6 +973,20 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 - Links movies, series, and persons that have the nomination (via Wikidata property join) into the respective junction tables with incremental display order.
 - Stale delete (inverse of the pre-filter): removes any nomination whose item no longer has ≥ 1 linked T2S entity (items gone from `T_WC_WIKIDATA_ITEM_PROPERTY`, now-empty, or degraded to zero tracked recipients); orphan junction rows are then cleaned via `ID_NOMINATION NOT IN (SELECT ID_NOMINATION FROM T_WC_T2S_NOMINATION)` on each junction table.
 
+### Process 70 — T2S_EVALUATION_ASSERTION_REFRESH
+
+Refreshes "living" evaluation assertions so time-varying samples/evals (e.g. *trending series ordered by popularity*) stay current. Runs **last** in the `main` scope, after `POPULARITY` is recomputed (Process 5).
+
+**Reads:** `T_WC_T2S_EVALUATION` (rows where `ASSERTION_REFRESH_SQL` is set), plus whatever tables each stored query targets (e.g. `T_WC_T2S_SERIE`).
+**Writes:** `T_WC_T2S_EVALUATION` (`ASSERTIONS_QUERY_RESULT`, `ASSERTION_REFRESH_LAST`).
+
+**Operations:**
+- Selects evals with a non-empty `ASSERTION_REFRESH_SQL` and `DELETED = 0`, oldest-refreshed first.
+- For each, runs the stored canonical query under **guardrails** — a single read-only `SELECT` (no `;`-chaining, no `INTO OUTFILE`/`DUMPFILE`), exactly one `ID_*` column, bounded by a per-statement `max_statement_time` — then rewrites `ASSERTIONS_QUERY_RESULT = "<ID_COL> IN (...)"` in the query's returned order and stamps `ASSERTION_REFRESH_LAST = NOW()`.
+- Malformed / non-conforming queries are **skipped and logged**; the run never aborts. Counts are published as server variables (`strtmdbmoviepreprocessassertionrefreshcount` / `…skipped`).
+
+> Second writer on `T_WC_T2S_EVALUATION` (authored via the `tmdb-front` back office), scoped to the two assertion-refresh columns only. See backlog AES-05 / TMDB-MOVIE-PREPROCESS-026.
+
 ---
 
 ## Common Patterns
