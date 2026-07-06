@@ -6627,11 +6627,14 @@ ORDER BY COMPTE DESC
                     # time-varying samples (e.g. "trending series") stay current.
                     # Runs LAST in the pipeline, after POPULARITY (Process 5) is fresh.
                     # Guardrails: single read-only SELECT, exactly one ID_* column,
-                    # per-statement timeout; skip + log on anything else.
+                    # per-statement timeout, and a cap on the number of ids written (a
+                    # refresh SQL missing its LIMIT would otherwise write 100k+ ids -> a
+                    # ~1 MB assertion that bloats /samples); skip + log on anything else.
                     print("T2S_EVALUATION_ASSERTION_REFRESH processing")
                     start_time = time.time()
                     cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Refresh living-eval assertions","Current sub process in the TMDb database preprocess",0)
                     intassertionmaxstatementtime = 15
+                    intassertionmaxids = 50  # a well-formed living assertion is small (LIMIT N); many more = a missing LIMIT
                     cursor2.execute(
                         "SELECT ID_T2S_EVALUATION, ASSERTION_REFRESH_SQL "
                         "FROM T_WC_T2S_EVALUATION "
@@ -6677,6 +6680,10 @@ ORDER BY COMPTE DESC
                                 break
                         if intbadvalue == 1 or len(arrids) == 0:
                             print(f"  eval {lngevalid}: SKIP (no usable integer ids returned)")
+                            lngskipped += 1
+                            continue
+                        if len(arrids) > intassertionmaxids:
+                            print(f"  eval {lngevalid}: SKIP ({len(arrids)} ids > {intassertionmaxids} cap -- add a LIMIT to its ASSERTION_REFRESH_SQL)")
                             lngskipped += 1
                             continue
                         strassertion = strcol + " IN (" + ", ".join(str(intid) for intid in arrids) + ")"
