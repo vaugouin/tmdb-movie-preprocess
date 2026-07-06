@@ -132,6 +132,10 @@ try:
                 # and brand collisions (Apple, Spirit) stayed quarantined.
                 **arrprocessscopewikidatacompany,
             }
+            # Assertion-refresh only (Process 70): rebuild ASSERTIONS_QUERY_RESULT for the
+            # living evals from ASSERTION_REFRESH_SQL, on demand (e.g. right after seeding
+            # new showcase samples). Run with TMDB_PREPROCESS_SCOPE=assertion-refresh.
+            arrprocessscopeassertionrefresh = {70: 'T2S_EVALUATION_ASSERTION_REFRESH'}
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
                 arrprocessscope = arrprocessscopewikidatatopics
@@ -139,10 +143,12 @@ try:
                 arrprocessscope = arrprocessscopewikidatacompany
             elif strprocessscope in ("wikidata-all", "wikidata"):
                 arrprocessscope = arrprocessscopewikidataall
+            elif strprocessscope in ("assertion-refresh", "assertions"):
+                arrprocessscope = arrprocessscopeassertionrefresh
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
-            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics)", 0)
+            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
