@@ -136,6 +136,12 @@ try:
             # living evals from ASSERTION_REFRESH_SQL, on demand (e.g. right after seeding
             # new showcase samples). Run with TMDB_PREPROCESS_SCOPE=assertion-refresh.
             arrprocessscopeassertionrefresh = {70: 'T2S_EVALUATION_ASSERTION_REFRESH'}
+            # Grounded-neighbour build only (Processes 36-39): rebuild the T2S similar /
+            # recommendation tables from the raw T_WC_TMDB_* neighbours, on demand -- handy as a
+            # unit test right after creating the four T2S tables, without the whole pipeline.
+            # Run with TMDB_PREPROCESS_SCOPE=neighbours. Order matters: T2S_MOVIE/SERIE (4/5) must
+            # already exist, which they do in a normal DB (this scope only rebuilds the neighbour twins).
+            arrprocessscopeneighbours = {36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION'}
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
                 arrprocessscope = arrprocessscopewikidatatopics
@@ -145,10 +151,12 @@ try:
                 arrprocessscope = arrprocessscopewikidataall
             elif strprocessscope in ("assertion-refresh", "assertions"):
                 arrprocessscope = arrprocessscopeassertionrefresh
+            elif strprocessscope in ("neighbours", "neighbors", "similar-recommendations"):
+                arrprocessscope = arrprocessscopeneighbours
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
-            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh)", 0)
+            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | neighbours)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
