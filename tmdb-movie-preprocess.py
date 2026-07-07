@@ -110,7 +110,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 70: 'T2S_EVALUATION_ASSERTION_REFRESH'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 70: 'T2S_EVALUATION_ASSERTION_REFRESH'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -4725,6 +4725,270 @@ RENAME TABLE
                         cursor2.execute(strsql)
                         cp.connectioncp.commit()
                         strsql = "DROP TABLE IF EXISTS T_WC_T2S_SERIE_GENRE_OLD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+
+                elif intindex == 36:
+                    #----------------------------------------------------
+                    print("T2S_MOVIE_SIMILAR processing")
+                    if 1:
+                        cursor.execute("SELECT COUNT(*) as row_count FROM T_WC_TMDB_MOVIE_SIMILAR")
+                        result = cursor.fetchone()
+                        lngrowcount = result['row_count'] if result['row_count'] is not None else 0
+                        print(f"Rebuilding T_WC_T2S_MOVIE_SIMILAR from {lngrowcount} source rows")
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentmoviesimilarid","BUILD","Current movie-similar ID in the TMDb database preprocess",0)
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_MOVIE_SIMILAR_BUILD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = "CREATE TABLE T_WC_T2S_MOVIE_SIMILAR_BUILD LIKE T_WC_T2S_MOVIE_SIMILAR"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = """
+INSERT INTO T_WC_T2S_MOVIE_SIMILAR_BUILD (
+    ID_MOVIE, ID_MOVIE_SIMILAR,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_MOVIE, ID_MOVIE_SIMILAR,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM (
+    SELECT
+        T_WC_TMDB_MOVIE_SIMILAR.ID_MOVIE,
+        T_WC_TMDB_MOVIE_SIMILAR.ID_MOVIE_SIMILAR,
+        T_WC_TMDB_MOVIE_SIMILAR.DELETED,
+        ROW_NUMBER() OVER (
+            PARTITION BY T_WC_TMDB_MOVIE_SIMILAR.ID_MOVIE
+            ORDER BY T_WC_TMDB_MOVIE_SIMILAR.DISPLAY_ORDER ASC,
+                     T_WC_TMDB_MOVIE_SIMILAR.ID_MOVIE_SIMILAR ASC
+        ) AS DISPLAY_ORDER,
+        T_WC_TMDB_MOVIE_SIMILAR.ID_CREATOR,
+        T_WC_TMDB_MOVIE_SIMILAR.DAT_CREAT,
+        T_WC_TMDB_MOVIE_SIMILAR.ID_OWNER,
+        T_WC_TMDB_MOVIE_SIMILAR.TIM_UPDATED,
+        T_WC_TMDB_MOVIE_SIMILAR.ID_USER_UPDATED
+    FROM T_WC_TMDB_MOVIE_SIMILAR
+    INNER JOIN T_WC_T2S_MOVIE AS T2S_SRC ON T_WC_TMDB_MOVIE_SIMILAR.ID_MOVIE = T2S_SRC.ID_MOVIE
+    INNER JOIN T_WC_T2S_MOVIE AS T2S_NB ON T_WC_TMDB_MOVIE_SIMILAR.ID_MOVIE_SIMILAR = T2S_NB.ID_MOVIE
+    WHERE (T_WC_TMDB_MOVIE_SIMILAR.DELETED IS NULL OR T_WC_TMDB_MOVIE_SIMILAR.DELETED = 0)
+) ranked_movie_similar
+"""
+                        execute_sql_with_retry(
+                            cp.connectioncp,
+                            cursor2,
+                            strsql,
+                            "T2S_MOVIE_SIMILAR build table population",
+                        )
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_MOVIE_SIMILAR_OLD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = """
+RENAME TABLE
+    T_WC_T2S_MOVIE_SIMILAR TO T_WC_T2S_MOVIE_SIMILAR_OLD,
+    T_WC_T2S_MOVIE_SIMILAR_BUILD TO T_WC_T2S_MOVIE_SIMILAR
+"""
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_MOVIE_SIMILAR_OLD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+
+                elif intindex == 37:
+                    #----------------------------------------------------
+                    print("T2S_MOVIE_RECOMMENDATION processing")
+                    if 1:
+                        cursor.execute("SELECT COUNT(*) as row_count FROM T_WC_TMDB_MOVIE_RECOMMENDATION")
+                        result = cursor.fetchone()
+                        lngrowcount = result['row_count'] if result['row_count'] is not None else 0
+                        print(f"Rebuilding T_WC_T2S_MOVIE_RECOMMENDATION from {lngrowcount} source rows")
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentmovierecommendationid","BUILD","Current movie-recommendation ID in the TMDb database preprocess",0)
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_MOVIE_RECOMMENDATION_BUILD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = "CREATE TABLE T_WC_T2S_MOVIE_RECOMMENDATION_BUILD LIKE T_WC_T2S_MOVIE_RECOMMENDATION"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = """
+INSERT INTO T_WC_T2S_MOVIE_RECOMMENDATION_BUILD (
+    ID_MOVIE, ID_MOVIE_RECOMMENDED,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_MOVIE, ID_MOVIE_RECOMMENDED,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM (
+    SELECT
+        T_WC_TMDB_MOVIE_RECOMMENDATION.ID_MOVIE,
+        T_WC_TMDB_MOVIE_RECOMMENDATION.ID_MOVIE_RECOMMENDED,
+        T_WC_TMDB_MOVIE_RECOMMENDATION.DELETED,
+        ROW_NUMBER() OVER (
+            PARTITION BY T_WC_TMDB_MOVIE_RECOMMENDATION.ID_MOVIE
+            ORDER BY T_WC_TMDB_MOVIE_RECOMMENDATION.DISPLAY_ORDER ASC,
+                     T_WC_TMDB_MOVIE_RECOMMENDATION.ID_MOVIE_RECOMMENDED ASC
+        ) AS DISPLAY_ORDER,
+        T_WC_TMDB_MOVIE_RECOMMENDATION.ID_CREATOR,
+        T_WC_TMDB_MOVIE_RECOMMENDATION.DAT_CREAT,
+        T_WC_TMDB_MOVIE_RECOMMENDATION.ID_OWNER,
+        T_WC_TMDB_MOVIE_RECOMMENDATION.TIM_UPDATED,
+        T_WC_TMDB_MOVIE_RECOMMENDATION.ID_USER_UPDATED
+    FROM T_WC_TMDB_MOVIE_RECOMMENDATION
+    INNER JOIN T_WC_T2S_MOVIE AS T2S_SRC ON T_WC_TMDB_MOVIE_RECOMMENDATION.ID_MOVIE = T2S_SRC.ID_MOVIE
+    INNER JOIN T_WC_T2S_MOVIE AS T2S_NB ON T_WC_TMDB_MOVIE_RECOMMENDATION.ID_MOVIE_RECOMMENDED = T2S_NB.ID_MOVIE
+    WHERE (T_WC_TMDB_MOVIE_RECOMMENDATION.DELETED IS NULL OR T_WC_TMDB_MOVIE_RECOMMENDATION.DELETED = 0)
+) ranked_movie_recommendation
+"""
+                        execute_sql_with_retry(
+                            cp.connectioncp,
+                            cursor2,
+                            strsql,
+                            "T2S_MOVIE_RECOMMENDATION build table population",
+                        )
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_MOVIE_RECOMMENDATION_OLD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = """
+RENAME TABLE
+    T_WC_T2S_MOVIE_RECOMMENDATION TO T_WC_T2S_MOVIE_RECOMMENDATION_OLD,
+    T_WC_T2S_MOVIE_RECOMMENDATION_BUILD TO T_WC_T2S_MOVIE_RECOMMENDATION
+"""
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_MOVIE_RECOMMENDATION_OLD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+
+                elif intindex == 38:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_SIMILAR processing")
+                    if 1:
+                        cursor.execute("SELECT COUNT(*) as row_count FROM T_WC_TMDB_SERIE_SIMILAR")
+                        result = cursor.fetchone()
+                        lngrowcount = result['row_count'] if result['row_count'] is not None else 0
+                        print(f"Rebuilding T_WC_T2S_SERIE_SIMILAR from {lngrowcount} source rows")
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentseriesimilarid","BUILD","Current serie-similar ID in the TMDb database preprocess",0)
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_SERIE_SIMILAR_BUILD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = "CREATE TABLE T_WC_T2S_SERIE_SIMILAR_BUILD LIKE T_WC_T2S_SERIE_SIMILAR"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = """
+INSERT INTO T_WC_T2S_SERIE_SIMILAR_BUILD (
+    ID_SERIE, ID_SERIE_SIMILAR,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_SERIE, ID_SERIE_SIMILAR,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM (
+    SELECT
+        T_WC_TMDB_SERIE_SIMILAR.ID_SERIE,
+        T_WC_TMDB_SERIE_SIMILAR.ID_SERIE_SIMILAR,
+        T_WC_TMDB_SERIE_SIMILAR.DELETED,
+        ROW_NUMBER() OVER (
+            PARTITION BY T_WC_TMDB_SERIE_SIMILAR.ID_SERIE
+            ORDER BY T_WC_TMDB_SERIE_SIMILAR.DISPLAY_ORDER ASC,
+                     T_WC_TMDB_SERIE_SIMILAR.ID_SERIE_SIMILAR ASC
+        ) AS DISPLAY_ORDER,
+        T_WC_TMDB_SERIE_SIMILAR.ID_CREATOR,
+        T_WC_TMDB_SERIE_SIMILAR.DAT_CREAT,
+        T_WC_TMDB_SERIE_SIMILAR.ID_OWNER,
+        T_WC_TMDB_SERIE_SIMILAR.TIM_UPDATED,
+        T_WC_TMDB_SERIE_SIMILAR.ID_USER_UPDATED
+    FROM T_WC_TMDB_SERIE_SIMILAR
+    INNER JOIN T_WC_T2S_SERIE AS T2S_SRC ON T_WC_TMDB_SERIE_SIMILAR.ID_SERIE = T2S_SRC.ID_SERIE
+    INNER JOIN T_WC_T2S_SERIE AS T2S_NB ON T_WC_TMDB_SERIE_SIMILAR.ID_SERIE_SIMILAR = T2S_NB.ID_SERIE
+    WHERE (T_WC_TMDB_SERIE_SIMILAR.DELETED IS NULL OR T_WC_TMDB_SERIE_SIMILAR.DELETED = 0)
+) ranked_serie_similar
+"""
+                        execute_sql_with_retry(
+                            cp.connectioncp,
+                            cursor2,
+                            strsql,
+                            "T2S_SERIE_SIMILAR build table population",
+                        )
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_SERIE_SIMILAR_OLD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = """
+RENAME TABLE
+    T_WC_T2S_SERIE_SIMILAR TO T_WC_T2S_SERIE_SIMILAR_OLD,
+    T_WC_T2S_SERIE_SIMILAR_BUILD TO T_WC_T2S_SERIE_SIMILAR
+"""
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_SERIE_SIMILAR_OLD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+
+                elif intindex == 39:
+                    #----------------------------------------------------
+                    print("T2S_SERIE_RECOMMENDATION processing")
+                    if 1:
+                        cursor.execute("SELECT COUNT(*) as row_count FROM T_WC_TMDB_SERIE_RECOMMENDATION")
+                        result = cursor.fetchone()
+                        lngrowcount = result['row_count'] if result['row_count'] is not None else 0
+                        print(f"Rebuilding T_WC_T2S_SERIE_RECOMMENDATION from {lngrowcount} source rows")
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentserierecommendationid","BUILD","Current serie-recommendation ID in the TMDb database preprocess",0)
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_SERIE_RECOMMENDATION_BUILD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = "CREATE TABLE T_WC_T2S_SERIE_RECOMMENDATION_BUILD LIKE T_WC_T2S_SERIE_RECOMMENDATION"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = """
+INSERT INTO T_WC_T2S_SERIE_RECOMMENDATION_BUILD (
+    ID_SERIE, ID_SERIE_RECOMMENDED,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    ID_SERIE, ID_SERIE_RECOMMENDED,
+    DELETED, DISPLAY_ORDER,
+    ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+FROM (
+    SELECT
+        T_WC_TMDB_SERIE_RECOMMENDATION.ID_SERIE,
+        T_WC_TMDB_SERIE_RECOMMENDATION.ID_SERIE_RECOMMENDED,
+        T_WC_TMDB_SERIE_RECOMMENDATION.DELETED,
+        ROW_NUMBER() OVER (
+            PARTITION BY T_WC_TMDB_SERIE_RECOMMENDATION.ID_SERIE
+            ORDER BY T_WC_TMDB_SERIE_RECOMMENDATION.DISPLAY_ORDER ASC,
+                     T_WC_TMDB_SERIE_RECOMMENDATION.ID_SERIE_RECOMMENDED ASC
+        ) AS DISPLAY_ORDER,
+        T_WC_TMDB_SERIE_RECOMMENDATION.ID_CREATOR,
+        T_WC_TMDB_SERIE_RECOMMENDATION.DAT_CREAT,
+        T_WC_TMDB_SERIE_RECOMMENDATION.ID_OWNER,
+        T_WC_TMDB_SERIE_RECOMMENDATION.TIM_UPDATED,
+        T_WC_TMDB_SERIE_RECOMMENDATION.ID_USER_UPDATED
+    FROM T_WC_TMDB_SERIE_RECOMMENDATION
+    INNER JOIN T_WC_T2S_SERIE AS T2S_SRC ON T_WC_TMDB_SERIE_RECOMMENDATION.ID_SERIE = T2S_SRC.ID_SERIE
+    INNER JOIN T_WC_T2S_SERIE AS T2S_NB ON T_WC_TMDB_SERIE_RECOMMENDATION.ID_SERIE_RECOMMENDED = T2S_NB.ID_SERIE
+    WHERE (T_WC_TMDB_SERIE_RECOMMENDATION.DELETED IS NULL OR T_WC_TMDB_SERIE_RECOMMENDATION.DELETED = 0)
+) ranked_serie_recommendation
+"""
+                        execute_sql_with_retry(
+                            cp.connectioncp,
+                            cursor2,
+                            strsql,
+                            "T2S_SERIE_RECOMMENDATION build table population",
+                        )
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_SERIE_RECOMMENDATION_OLD"
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = """
+RENAME TABLE
+    T_WC_T2S_SERIE_RECOMMENDATION TO T_WC_T2S_SERIE_RECOMMENDATION_OLD,
+    T_WC_T2S_SERIE_RECOMMENDATION_BUILD TO T_WC_T2S_SERIE_RECOMMENDATION
+"""
+                        cursor2.execute(strsql)
+                        cp.connectioncp.commit()
+                        strsql = "DROP TABLE IF EXISTS T_WC_T2S_SERIE_RECOMMENDATION_OLD"
                         cursor2.execute(strsql)
                         cp.connectioncp.commit()
 

@@ -407,6 +407,50 @@ Copies serie↔genre relations into the T2S layer (filtered to series that exist
 
 ---
 
+### Process 36 — T2S_MOVIE_SIMILAR
+
+Copies the grounded TMDb **similar-movie** neighbours into the T2S layer. Both the source movie and each neighbour must exist in `T_WC_T2S_MOVIE`, so every stored neighbour is showable. Backlog: TMDB-MOVIE-PREPROCESS-027.
+
+**Reads:** `T_WC_TMDB_MOVIE_SIMILAR`, `T_WC_T2S_MOVIE`
+**Writes:** `T_WC_T2S_MOVIE_SIMILAR`
+
+**Operations:** Same rebuild pattern as Process 11 (full rebuild into `_BUILD`, atomic `RENAME TABLE` swap, `_OLD` cleanup). Two `INNER JOIN`s to `T_WC_T2S_MOVIE` (source + neighbour) drop rows absent from the read-model; `ROW_NUMBER()` re-densifies the TMDb page-1 rank into `DISPLAY_ORDER`. Runs after Process 4 (T2S_MOVIE).
+
+---
+
+### Process 37 — T2S_MOVIE_RECOMMENDATION
+
+Same as Process 36 for the behaviour-based **recommended-movie** neighbours. Backlog: TMDB-MOVIE-PREPROCESS-027.
+
+**Reads:** `T_WC_TMDB_MOVIE_RECOMMENDATION`, `T_WC_T2S_MOVIE`
+**Writes:** `T_WC_T2S_MOVIE_RECOMMENDATION`
+
+**Operations:** Identical rebuild + double-join grounding + `ROW_NUMBER()` re-densify as Process 36, on `ID_MOVIE_RECOMMENDED`.
+
+---
+
+### Process 38 — T2S_SERIE_SIMILAR
+
+Series mirror of Process 36 (content-based similar series). Backlog: TMDB-MOVIE-PREPROCESS-028.
+
+**Reads:** `T_WC_TMDB_SERIE_SIMILAR`, `T_WC_T2S_SERIE`
+**Writes:** `T_WC_T2S_SERIE_SIMILAR`
+
+**Operations:** Same rebuild pattern; two `INNER JOIN`s to `T_WC_T2S_SERIE` (source + neighbour). Runs after Process 5 (T2S_SERIE).
+
+---
+
+### Process 39 — T2S_SERIE_RECOMMENDATION
+
+Series mirror of Process 37 (behaviour-based recommended series). Backlog: TMDB-MOVIE-PREPROCESS-028.
+
+**Reads:** `T_WC_TMDB_SERIE_RECOMMENDATION`, `T_WC_T2S_SERIE`
+**Writes:** `T_WC_T2S_SERIE_RECOMMENDATION`
+
+**Operations:** Identical to Process 38, on `ID_SERIE_RECOMMENDED`.
+
+---
+
 ### Process 13 — T2S_MOVIE_COMPANY
 
 Copies movie↔company relations into the T2S layer.
@@ -1019,6 +1063,10 @@ Refreshes "living" evaluation assertions so time-varying samples/evals (e.g. *tr
 | T_WC_TMDB_PERSON_SERIE | T_WC_T2S_PERSON_SERIE |
 | T_WC_TMDB_MOVIE_GENRE | T_WC_T2S_MOVIE_GENRE |
 | T_WC_TMDB_SERIE_GENRE | T_WC_T2S_SERIE_GENRE |
+| T_WC_TMDB_MOVIE_SIMILAR | T_WC_T2S_MOVIE_SIMILAR |
+| T_WC_TMDB_MOVIE_RECOMMENDATION | T_WC_T2S_MOVIE_RECOMMENDATION |
+| T_WC_TMDB_SERIE_SIMILAR | T_WC_T2S_SERIE_SIMILAR |
+| T_WC_TMDB_SERIE_RECOMMENDATION | T_WC_T2S_SERIE_RECOMMENDATION |
 | T_WC_TMDB_MOVIE_COMPANY | T_WC_T2S_MOVIE_COMPANY |
 | T_WC_TMDB_SERIE_COMPANY | T_WC_T2S_SERIE_COMPANY |
 | T_WC_TMDB_SERIE_NETWORK | T_WC_T2S_SERIE_NETWORK |
