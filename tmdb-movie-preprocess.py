@@ -6920,7 +6920,12 @@ ORDER BY COMPTE DESC
                     lngskipped = 0
                     for rowrefresh in arrrefreshevals:
                         lngevalid = rowrefresh["ID_T2S_EVALUATION"]
-                        strrefreshsql = (rowrefresh["ASSERTION_REFRESH_SQL"] or "").strip().rstrip(";").strip()
+                        # html.unescape FIRST: some rows are stored HTML-entity-encoded by the
+                        # admin write path (htmlspecialchars: > -> &gt;, ' -> &#039;). Each entity
+                        # ends in ';', so the interior-semicolon guard below would wrongly skip them
+                        # -- and the SQL would not execute as-is (WHERE ... &gt; 0). Decoding restores
+                        # valid SQL; a genuine interior ';' is still caught after this.
+                        strrefreshsql = html.unescape(rowrefresh["ASSERTION_REFRESH_SQL"] or "").strip().rstrip(";").strip()
                         strrefreshlower = strrefreshsql.lower()
                         if (not strrefreshlower.startswith("select")) or (";" in strrefreshsql) or ("into outfile" in strrefreshlower) or ("into dumpfile" in strrefreshlower):
                             print(f"  eval {lngevalid}: SKIP (not a single read-only SELECT)")
