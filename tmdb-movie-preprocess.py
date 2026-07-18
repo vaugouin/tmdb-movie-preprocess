@@ -157,6 +157,7 @@ try:
                 arrprocessscope = arrprocessscopemain
             if strnow.startswith("2026-07-18"):
                 arrprocessscope = {4: 'T2S_MOVIE'}
+                arrprocessscope = {5: 'T2S_SERIE'}
             cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | neighbours)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
