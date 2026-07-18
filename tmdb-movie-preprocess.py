@@ -101,7 +101,6 @@ try:
             #arrprocessscope = {2: 'T2S_MOVIE_TECHNICAL'}
             #arrprocessscope = {20: 'TMDB_KEYWORD'}
             #arrprocessscope = {6: 'T2S_PERSON'}
-            #arrprocessscope = {4: 'T2S_MOVIE'}
             #arrprocessscope = {5: 'T2S_SERIE'}
             # --- Process scope selection (env-driven) --------------------------------------
             # The network-bound, rate-limited Wikidata keyword linker (Process 60, ~3h45m) is
@@ -156,6 +155,8 @@ try:
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
+            if strnow.startswith("2026-07-18"):
+                arrprocessscope = {4: 'T2S_MOVIE'}
             cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | neighbours)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
@@ -3916,55 +3917,18 @@ WHERE src.ID_MOVIE IS NULL """
                         cursor2.execute(strsqlmoviesdelete)
                         cp.connectioncp.commit()
 
-                        # ---- Enrichment: full-table set-based passes, ONCE (were per-chunk) ------
-                        # Run over the whole table every run because their source data
-                        # (IMDb ratings, FR titles, Wikidata) changes independently of a movie's
+                        # ---- Enrichment: full-table set-based passes, CHUNKED by ID range ---------
+                        # Run over the whole table every run because their source data (IMDb ratings,
+                        # FR title, localized display, Wikidata) changes independently of a movie's
                         # TIM_UPDATED, so scoping them to the incremental set would let them go stale.
-                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_MOVIE (ratings / FR title / Wikidata)","Current sub process in the TMDb database movie preprocess",0)
-                        strsqlmovies = """
-UPDATE T_WC_T2S_MOVIE t2s
-INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
-    ON t2s.ID_IMDB = imdb.tconst
-SET t2s.IMDB_RATING = imdb.averageRating
-WHERE t2s.ID_IMDB IS NOT NULL
-    AND t2s.ID_IMDB <> ''
-    AND imdb.averageRating IS NOT NULL """
-                        cursor2.execute(strsqlmovies)
-                        cp.connectioncp.commit()
+                        # TMDB-MOVIE-PREPROCESS-032: these used to be single full-table UPDATEs, too heavy
+                        # on the DB (long locks on the hot T_WC_T2S_MOVIE table, one huge transaction each).
+                        # Now chunked by ID_MOVIE range like the base copy above, so each transaction stays
+                        # small; full coverage is preserved (the loop spans every id). Reuses lngchunksize
+                        # and lngmovierangemax computed for the base copy.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_MOVIE (ratings / FR title / display _LANG / Wikidata), chunked","Current sub process in the TMDb database movie preprocess",0)
 
-                        strsqlmovies = f"""
-UPDATE T_WC_T2S_MOVIE t2s
-INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
-    ON t2s.ID_IMDB = imdb.tconst
-SET t2s.IMDB_RATING_WEIGHTED =
-    ((imdb.numVotes / (imdb.numVotes + {lngimdbweightedratingm})) * imdb.averageRating) +
-    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * {stravgrating})
-WHERE t2s.ID_IMDB IS NOT NULL
-    AND t2s.ID_IMDB <> ''
-    AND imdb.averageRating IS NOT NULL
-    AND imdb.numVotes > 0 """
-                        cursor2.execute(strsqlmovies)
-                        cp.connectioncp.commit()
-
-                        strsqlmovies = """
-UPDATE T_WC_T2S_MOVIE t2s
-INNER JOIN T_WC_TMDB_MOVIE_LANG t
-    ON t2s.ID_MOVIE = t.ID_MOVIE
-SET t2s.MOVIE_TITLE_FR = t.TITLE
-WHERE t2s.ID_IMDB IS NOT NULL
-    AND t2s.ID_IMDB <> ''
-    AND t.LANG = 'fr' """
-                        cursor2.execute(strsqlmovies)
-                        cp.connectioncp.commit()
-
-                        # TMDB-MOVIE-PREPROCESS-030 (localization) : build T_WC_T2S_MOVIE_LANG, the
-                        # row-per-(movie,language) DISPLAY table. The crawler already collected FR
-                        # overview/tagline/poster/backdrop into T_WC_TMDB_MOVIE_LANG but the flatten
-                        # above only kept the TITLE (a search column). Here we copy the DISPLAY fields
-                        # into a T2S-side _LANG table, language-AGNOSTIC (no LANG='fr' literal so a
-                        # future crawled language flows through unchanged), curated to the T2S subset,
-                        # lean (skip rows with no display field), and upsert so it is re-runnable.
-                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Build T2S_MOVIE_LANG (localized display fields)","Current sub process in the TMDb database movie preprocess",0)
+                        # TMDB-MOVIE-PREPROCESS-030: create the localized DISPLAY table ONCE, before the loop.
                         strsqlmovies = """
 CREATE TABLE IF NOT EXISTS T_WC_T2S_MOVIE_LANG (
   ID_MOVIE int(11) NOT NULL,
@@ -3980,13 +3944,64 @@ CREATE TABLE IF NOT EXISTS T_WC_T2S_MOVIE_LANG (
                         cursor2.execute(strsqlmovies)
                         cp.connectioncp.commit()
 
-                        strsqlmovies = """
+                        for lngmovierangestart in range(1, lngmovierangemax + 1, lngchunksize):
+                            lngmovierangeend = min(lngmovierangestart + lngchunksize - 1, lngmovierangemax)
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentmovieid",str(lngmovierangestart),"Current movie ID in the TMDb database movie preprocess (enrichment)",0)
+
+                            # IMDb rating
+                            strsqlmovies = f"""
+UPDATE T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
+    ON t2s.ID_IMDB = imdb.tconst
+SET t2s.IMDB_RATING = imdb.averageRating
+WHERE t2s.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
+    AND t2s.ID_IMDB IS NOT NULL
+    AND t2s.ID_IMDB <> ''
+    AND imdb.averageRating IS NOT NULL """
+                            cursor2.execute(strsqlmovies)
+                            cp.connectioncp.commit()
+
+                            # IMDb weighted rating
+                            strsqlmovies = f"""
+UPDATE T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
+    ON t2s.ID_IMDB = imdb.tconst
+SET t2s.IMDB_RATING_WEIGHTED =
+    ((imdb.numVotes / (imdb.numVotes + {lngimdbweightedratingm})) * imdb.averageRating) +
+    (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * {stravgrating})
+WHERE t2s.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
+    AND t2s.ID_IMDB IS NOT NULL
+    AND t2s.ID_IMDB <> ''
+    AND imdb.averageRating IS NOT NULL
+    AND imdb.numVotes > 0 """
+                            cursor2.execute(strsqlmovies)
+                            cp.connectioncp.commit()
+
+                            # FR title (search column, stays on T_WC_T2S_MOVIE)
+                            strsqlmovies = f"""
+UPDATE T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_TMDB_MOVIE_LANG t
+    ON t2s.ID_MOVIE = t.ID_MOVIE
+SET t2s.MOVIE_TITLE_FR = t.TITLE
+WHERE t2s.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
+    AND t2s.ID_IMDB IS NOT NULL
+    AND t2s.ID_IMDB <> ''
+    AND t.LANG = 'fr' """
+                            cursor2.execute(strsqlmovies)
+                            cp.connectioncp.commit()
+
+                            # TMDB-MOVIE-PREPROCESS-030: localized DISPLAY fields into T_WC_T2S_MOVIE_LANG,
+                            # row-per-(movie,language). Language-AGNOSTIC (no LANG='fr' literal so a future
+                            # crawled language flows through), curated to the T2S subset, lean (skip rows
+                            # with no display field), upsert so it is re-runnable. Table created above.
+                            strsqlmovies = f"""
 INSERT INTO T_WC_T2S_MOVIE_LANG (ID_MOVIE, LANG, OVERVIEW, TAGLINE, POSTER_PATH, BACKDROP_PATH)
 SELECT l.ID_MOVIE, l.LANG, l.OVERVIEW, l.TAGLINE, l.POSTER_PATH, l.BACKDROP_PATH
 FROM T_WC_TMDB_MOVIE_LANG l
 INNER JOIN T_WC_T2S_MOVIE t2s
     ON t2s.ID_MOVIE = l.ID_MOVIE
-WHERE (l.DELETED IS NULL OR l.DELETED = 0)
+WHERE l.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
+    AND (l.DELETED IS NULL OR l.DELETED = 0)
     AND l.LANG IS NOT NULL AND l.LANG <> ''
     AND ( (l.OVERVIEW IS NOT NULL AND l.OVERVIEW <> '')
        OR (l.TAGLINE IS NOT NULL AND l.TAGLINE <> '')
@@ -3997,10 +4012,11 @@ ON DUPLICATE KEY UPDATE
     TAGLINE = VALUES(TAGLINE),
     POSTER_PATH = VALUES(POSTER_PATH),
     BACKDROP_PATH = VALUES(BACKDROP_PATH) """
-                        cursor2.execute(strsqlmovies)
-                        cp.connectioncp.commit()
+                            cursor2.execute(strsqlmovies)
+                            cp.connectioncp.commit()
 
-                        strsqlmovies = """
+                            # Wikidata V1 enrichment
+                            strsqlmovies = f"""
 UPDATE T_WC_T2S_MOVIE t2s
 INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
@@ -4010,10 +4026,11 @@ SET t2s.WIKIDATA_TITLE = w.TITLE,
     t2s.ID_CRITERION = w.ID_CRITERION,
     t2s.ID_CRITERION_SPINE = w.ID_CRITERION_SPINE,
     t2s.INSTANCE_OF = w.INSTANCE_OF
-WHERE t2s.ID_IMDB IS NOT NULL
+WHERE t2s.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
+    AND t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
-                        cursor2.execute(strsqlmovies)
-                        cp.connectioncp.commit()
+                            cursor2.execute(strsqlmovies)
+                            cp.connectioncp.commit()
 
                         # Persist the watermark only after a successful run (an exception earlier aborts
                         # before this line, leaving the previous watermark so the failed window retries).
