@@ -2684,18 +2684,32 @@ CREATE TABLE `T_WC_T2S_TOPIC` (
 ) ENGINE=InnoDB AUTO_INCREMENT=33051 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
--- LOCALIZATION (TMDB-MOVIE-PREPROCESS-030) : champs display localises, une ligne par (film, langue).
+-- LOCALIZATION (TMDB-MOVIE-PREPROCESS-030) : texte localise, une ligne par (film, langue).
 -- Le TITRE localise reste en colonne MOVIE_TITLE_FR sur T_WC_T2S_MOVIE (cle de recherche) ; cette
--- table ne porte que le display (overview/tagline/affiche). Peuplee par copie curee depuis
+-- table ne porte que le TEXTE (overview/tagline). POSTER_PATH/BACKDROP_PATH ont ete retires : 88%
+-- des affiches localisees sont identiques a l'affiche EN (494792/561941 mesure), et les 12% vraiment
+-- distinctes sont deja servies par le mecanisme image (apply_localized_main_image sur
+-- T_WC_TMDB_MOVIE_IMAGE, affiche FR epinglee a DISPLAY_ORDER=1). Peuplee par copie curee depuis
 -- T_WC_TMDB_MOVIE_LANG, langue-agnostique. Forme "lignes" qui passe a N langues sans ALTER.
 CREATE TABLE IF NOT EXISTS `T_WC_T2S_MOVIE_LANG` (
   `ID_MOVIE` int(11) NOT NULL,
   `LANG` varchar(10) NOT NULL,
   `OVERVIEW` mediumtext DEFAULT NULL,
   `TAGLINE` mediumtext DEFAULT NULL,
-  `POSTER_PATH` varchar(200) DEFAULT NULL,
-  `BACKDROP_PATH` varchar(200) DEFAULT NULL,
   `TIM_UPDATED` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`ID_MOVIE`,`LANG`),
+  KEY `LANG` (`LANG`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- LOCALIZATION (TMDB-MOVIE-PREPROCESS-031) : jumeau serie de T_WC_T2S_MOVIE_LANG. Meme logique,
+-- texte pur (overview/tagline), une ligne par (serie, langue). Le titre localise reste en colonne
+-- SERIE_TITLE_FR sur T_WC_T2S_SERIE. Peuplee par copie curee depuis T_WC_TMDB_SERIE_LANG.
+CREATE TABLE IF NOT EXISTS `T_WC_T2S_SERIE_LANG` (
+  `ID_SERIE` int(11) NOT NULL,
+  `LANG` varchar(10) NOT NULL,
+  `OVERVIEW` mediumtext DEFAULT NULL,
+  `TAGLINE` mediumtext DEFAULT NULL,
+  `TIM_UPDATED` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`ID_SERIE`,`LANG`),
   KEY `LANG` (`LANG`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -3928,15 +3928,18 @@ WHERE src.ID_MOVIE IS NULL """
                         # and lngmovierangemax computed for the base copy.
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_MOVIE (ratings / FR title / display _LANG / Wikidata), chunked","Current sub process in the TMDb database movie preprocess",0)
 
-                        # TMDB-MOVIE-PREPROCESS-030: create the localized DISPLAY table ONCE, before the loop.
+                        # TMDB-MOVIE-PREPROCESS-030: create the localized TEXT table ONCE, before the loop.
+                        # Text-only (OVERVIEW / TAGLINE). POSTER_PATH/BACKDROP_PATH were dropped: measured
+                        # 88% of localized posters are identical to the EN poster (494792/561941), and the
+                        # 12% genuinely-distinct ones are already served by the image mechanism
+                        # (apply_localized_main_image on T_WC_TMDB_MOVIE_IMAGE, FR poster pinned at
+                        # DISPLAY_ORDER=1). Keeping them here only bloated the table (~450k poster-only rows).
                         strsqlmovies = """
 CREATE TABLE IF NOT EXISTS T_WC_T2S_MOVIE_LANG (
   ID_MOVIE int(11) NOT NULL,
   LANG varchar(10) NOT NULL,
   OVERVIEW mediumtext DEFAULT NULL,
   TAGLINE mediumtext DEFAULT NULL,
-  POSTER_PATH varchar(200) DEFAULT NULL,
-  BACKDROP_PATH varchar(200) DEFAULT NULL,
   TIM_UPDATED timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (ID_MOVIE, LANG),
   KEY LANG (LANG)
@@ -3990,13 +3993,14 @@ WHERE t2s.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
                             cursor2.execute(strsqlmovies)
                             cp.connectioncp.commit()
 
-                            # TMDB-MOVIE-PREPROCESS-030: localized DISPLAY fields into T_WC_T2S_MOVIE_LANG,
+                            # TMDB-MOVIE-PREPROCESS-030: localized TEXT fields into T_WC_T2S_MOVIE_LANG,
                             # row-per-(movie,language). Language-AGNOSTIC (no LANG='fr' literal so a future
                             # crawled language flows through), curated to the T2S subset, lean (skip rows
-                            # with no display field), upsert so it is re-runnable. Table created above.
+                            # with no text), upsert so it is re-runnable. Text-only: posters come from the
+                            # image mechanism, not here (see the CREATE TABLE note above). Table created above.
                             strsqlmovies = f"""
-INSERT INTO T_WC_T2S_MOVIE_LANG (ID_MOVIE, LANG, OVERVIEW, TAGLINE, POSTER_PATH, BACKDROP_PATH)
-SELECT l.ID_MOVIE, l.LANG, l.OVERVIEW, l.TAGLINE, l.POSTER_PATH, l.BACKDROP_PATH
+INSERT INTO T_WC_T2S_MOVIE_LANG (ID_MOVIE, LANG, OVERVIEW, TAGLINE)
+SELECT l.ID_MOVIE, l.LANG, l.OVERVIEW, l.TAGLINE
 FROM T_WC_TMDB_MOVIE_LANG l
 INNER JOIN T_WC_T2S_MOVIE t2s
     ON t2s.ID_MOVIE = l.ID_MOVIE
@@ -4004,14 +4008,10 @@ WHERE l.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
     AND (l.DELETED IS NULL OR l.DELETED = 0)
     AND l.LANG IS NOT NULL AND l.LANG <> ''
     AND ( (l.OVERVIEW IS NOT NULL AND l.OVERVIEW <> '')
-       OR (l.TAGLINE IS NOT NULL AND l.TAGLINE <> '')
-       OR (l.POSTER_PATH IS NOT NULL AND l.POSTER_PATH <> '')
-       OR (l.BACKDROP_PATH IS NOT NULL AND l.BACKDROP_PATH <> '') )
+       OR (l.TAGLINE IS NOT NULL AND l.TAGLINE <> '') )
 ON DUPLICATE KEY UPDATE
     OVERVIEW = VALUES(OVERVIEW),
-    TAGLINE = VALUES(TAGLINE),
-    POSTER_PATH = VALUES(POSTER_PATH),
-    BACKDROP_PATH = VALUES(BACKDROP_PATH) """
+    TAGLINE = VALUES(TAGLINE) """
                             cursor2.execute(strsqlmovies)
                             cp.connectioncp.commit()
 
@@ -4196,6 +4196,46 @@ WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
                         cursor2.execute(strsqlseries)
                         cp.connectioncp.commit()
+
+                        # ---- TMDB-MOVIE-PREPROCESS-031: localized TEXT into T_WC_T2S_SERIE_LANG ---------
+                        # Twin of the movie T_WC_T2S_MOVIE_LANG copy. Text-only (OVERVIEW / TAGLINE); posters
+                        # come from the image mechanism, not here. Language-AGNOSTIC (no LANG='fr' literal),
+                        # curated to the T2S subset, lean (skip rows with no text), upsert (re-runnable).
+                        # Chunked by ID_SERIE range so each transaction stays small (large source table).
+                        # Reuses lngchunksize and lngserierangemax computed for the base copy above.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copy localized text into T_WC_T2S_SERIE_LANG, chunked","Current sub process in the TMDb database series preprocess",0)
+                        strsqlseries = """
+CREATE TABLE IF NOT EXISTS T_WC_T2S_SERIE_LANG (
+  ID_SERIE int(11) NOT NULL,
+  LANG varchar(10) NOT NULL,
+  OVERVIEW mediumtext DEFAULT NULL,
+  TAGLINE mediumtext DEFAULT NULL,
+  TIM_UPDATED timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (ID_SERIE, LANG),
+  KEY LANG (LANG)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci """
+                        cursor2.execute(strsqlseries)
+                        cp.connectioncp.commit()
+
+                        for lngserierangestart in range(1, lngserierangemax + 1, lngchunksize):
+                            lngserierangeend = min(lngserierangestart + lngchunksize - 1, lngserierangemax)
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentserieid",str(lngserierangestart),"Current serie ID in the TMDb database preprocess (SERIE_LANG)",0)
+                            strsqlseries = f"""
+INSERT INTO T_WC_T2S_SERIE_LANG (ID_SERIE, LANG, OVERVIEW, TAGLINE)
+SELECT l.ID_SERIE, l.LANG, l.OVERVIEW, l.TAGLINE
+FROM T_WC_TMDB_SERIE_LANG l
+INNER JOIN T_WC_T2S_SERIE t2s
+    ON t2s.ID_SERIE = l.ID_SERIE
+WHERE l.ID_SERIE BETWEEN {lngserierangestart} AND {lngserierangeend}
+    AND (l.DELETED IS NULL OR l.DELETED = 0)
+    AND l.LANG IS NOT NULL AND l.LANG <> ''
+    AND ( (l.OVERVIEW IS NOT NULL AND l.OVERVIEW <> '')
+       OR (l.TAGLINE IS NOT NULL AND l.TAGLINE <> '') )
+ON DUPLICATE KEY UPDATE
+    OVERVIEW = VALUES(OVERVIEW),
+    TAGLINE = VALUES(TAGLINE) """
+                            cursor2.execute(strsqlseries)
+                            cp.connectioncp.commit()
 
                         # Persist the watermark only after a successful run.
                         cp.f_setservervariable("strtmdbmoviepreprocesst2sserielastrun", strrunstart, "Start datetime of the last successful T2S_SERIE run; incremental watermark on T_WC_TMDB_SERIE.TIM_UPDATED", 0)
