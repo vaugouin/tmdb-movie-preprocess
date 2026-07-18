@@ -3957,6 +3957,49 @@ WHERE t2s.ID_IMDB IS NOT NULL
                         cursor2.execute(strsqlmovies)
                         cp.connectioncp.commit()
 
+                        # TMDB-MOVIE-PREPROCESS-030 (localization) : build T_WC_T2S_MOVIE_LANG, the
+                        # row-per-(movie,language) DISPLAY table. The crawler already collected FR
+                        # overview/tagline/poster/backdrop into T_WC_TMDB_MOVIE_LANG but the flatten
+                        # above only kept the TITLE (a search column). Here we copy the DISPLAY fields
+                        # into a T2S-side _LANG table, language-AGNOSTIC (no LANG='fr' literal so a
+                        # future crawled language flows through unchanged), curated to the T2S subset,
+                        # lean (skip rows with no display field), and upsert so it is re-runnable.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Build T2S_MOVIE_LANG (localized display fields)","Current sub process in the TMDb database movie preprocess",0)
+                        strsqlmovies = """
+CREATE TABLE IF NOT EXISTS T_WC_T2S_MOVIE_LANG (
+  ID_MOVIE int(11) NOT NULL,
+  LANG varchar(10) NOT NULL,
+  OVERVIEW mediumtext DEFAULT NULL,
+  TAGLINE mediumtext DEFAULT NULL,
+  POSTER_PATH varchar(200) DEFAULT NULL,
+  BACKDROP_PATH varchar(200) DEFAULT NULL,
+  TIM_UPDATED timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (ID_MOVIE, LANG),
+  KEY LANG (LANG)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci """
+                        cursor2.execute(strsqlmovies)
+                        cp.connectioncp.commit()
+
+                        strsqlmovies = """
+INSERT INTO T_WC_T2S_MOVIE_LANG (ID_MOVIE, LANG, OVERVIEW, TAGLINE, POSTER_PATH, BACKDROP_PATH)
+SELECT l.ID_MOVIE, l.LANG, l.OVERVIEW, l.TAGLINE, l.POSTER_PATH, l.BACKDROP_PATH
+FROM T_WC_TMDB_MOVIE_LANG l
+INNER JOIN T_WC_T2S_MOVIE t2s
+    ON t2s.ID_MOVIE = l.ID_MOVIE
+WHERE (l.DELETED IS NULL OR l.DELETED = 0)
+    AND l.LANG IS NOT NULL AND l.LANG <> ''
+    AND ( (l.OVERVIEW IS NOT NULL AND l.OVERVIEW <> '')
+       OR (l.TAGLINE IS NOT NULL AND l.TAGLINE <> '')
+       OR (l.POSTER_PATH IS NOT NULL AND l.POSTER_PATH <> '')
+       OR (l.BACKDROP_PATH IS NOT NULL AND l.BACKDROP_PATH <> '') )
+ON DUPLICATE KEY UPDATE
+    OVERVIEW = VALUES(OVERVIEW),
+    TAGLINE = VALUES(TAGLINE),
+    POSTER_PATH = VALUES(POSTER_PATH),
+    BACKDROP_PATH = VALUES(BACKDROP_PATH) """
+                        cursor2.execute(strsqlmovies)
+                        cp.connectioncp.commit()
+
                         strsqlmovies = """
 UPDATE T_WC_T2S_MOVIE t2s
 INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w

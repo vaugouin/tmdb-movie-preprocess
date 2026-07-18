@@ -2683,3 +2683,19 @@ CREATE TABLE `T_WC_T2S_TOPIC` (
   KEY `TIM_WIKIDATA_COMPLETED` (`TIM_WIKIDATA_COMPLETED`)
 ) ENGINE=InnoDB AUTO_INCREMENT=33051 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+-- LOCALIZATION (TMDB-MOVIE-PREPROCESS-030) : champs display localises, une ligne par (film, langue).
+-- Le TITRE localise reste en colonne MOVIE_TITLE_FR sur T_WC_T2S_MOVIE (cle de recherche) ; cette
+-- table ne porte que le display (overview/tagline/affiche). Peuplee par copie curee depuis
+-- T_WC_TMDB_MOVIE_LANG, langue-agnostique. Forme "lignes" qui passe a N langues sans ALTER.
+CREATE TABLE IF NOT EXISTS `T_WC_T2S_MOVIE_LANG` (
+  `ID_MOVIE` int(11) NOT NULL,
+  `LANG` varchar(10) NOT NULL,
+  `OVERVIEW` mediumtext DEFAULT NULL,
+  `TAGLINE` mediumtext DEFAULT NULL,
+  `POSTER_PATH` varchar(200) DEFAULT NULL,
+  `BACKDROP_PATH` varchar(200) DEFAULT NULL,
+  `TIM_UPDATED` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`ID_MOVIE`,`LANG`),
+  KEY `LANG` (`LANG`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
