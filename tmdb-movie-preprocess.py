@@ -5927,6 +5927,15 @@ WHERE t2s.ID_IMDB IS NOT NULL
                         dblavgrating = cursor.fetchone()['C']
                         stravgrating = str(dblavgrating) if dblavgrating is not None else "NULL"
 
+                        # TMDB-MOVIE-PREPROCESS-033: IMDB_VOTES carries the IMDb vote count next to
+                        # the rating. IMDB_RATING alone is not interpretable on an episode: a 9.3 on
+                        # 43000 votes and a 9.3 on 12 votes are not the same claim, and consumers
+                        # (API / front) need the count to decide what to display and to prefer the
+                        # IMDb figure over the much thinner TMDb VOTE_COUNT. Idempotent, so the
+                        # process stays safe to re-run and self-installs on a fresh database.
+                        cursor2.execute("ALTER TABLE T_WC_T2S_EPISODE ADD COLUMN IF NOT EXISTS IMDB_VOTES INT DEFAULT NULL AFTER IMDB_RATING_WEIGHTED")
+                        cp.connectioncp.commit()
+
                         # Get the maximum ID_EPISODE value from the database
                         cursor.execute("SELECT MAX(ID_EPISODE) as max_id FROM T_WC_TMDB_EPISODE")
                         result = cursor.fetchone()
@@ -6008,34 +6017,48 @@ WHERE src.ID_EPISODE IS NULL OR se.ID_SERIE IS NULL OR sea.ID_SEASON IS NULL """
                         cursor2.execute(strsqlepisodesdelete)
                         cp.connectioncp.commit()
 
-                        # ---- Enrichment: full-table set-based passes, ONCE (were per-chunk) ------
+                        # ---- Enrichment: set-based passes over the WHOLE table, once per run -----
                         # Run over the whole table every run because the IMDb rating source changes
                         # independently of an episode's TIM_UPDATED.
+                        # TMDB-MOVIE-PREPROCESS-033: the two passes are now chunked by ID_EPISODE
+                        # range, same reasoning as -032 on Process 4. Coverage is unchanged (the loop
+                        # sweeps every id, "full-table" != "one transaction"): only the transaction
+                        # granularity changes, so a table in the millions of rows no longer holds a
+                        # single long write lock on T_WC_T2S_EPISODE.
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_EPISODE (IMDb ratings)","Current sub process in the TMDb database episode preprocess",0)
-                        strsqlepisodes = """
+                        for lngepisoderangestart in range(1, lngepisoderangemax + 1, lngchunksize):
+                            lngepisoderangeend = min(lngepisoderangestart + lngchunksize - 1, lngepisoderangemax)
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentepisodeid",str(lngepisoderangestart),"Current episode ID in the TMDb database preprocess",0)
+
+                            # IMDb rating AND vote count in a single pass: same join, same predicate,
+                            # so splitting them would scan the range twice for nothing.
+                            strsqlepisodes = f"""
 UPDATE T_WC_T2S_EPISODE t2s
 INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
-SET t2s.IMDB_RATING = imdb.averageRating
-WHERE t2s.ID_IMDB IS NOT NULL
+SET t2s.IMDB_RATING = imdb.averageRating,
+    t2s.IMDB_VOTES = imdb.numVotes
+WHERE t2s.ID_EPISODE BETWEEN {lngepisoderangestart} AND {lngepisoderangeend}
+    AND t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL """
-                        cursor2.execute(strsqlepisodes)
-                        cp.connectioncp.commit()
+                            cursor2.execute(strsqlepisodes)
+                            cp.connectioncp.commit()
 
-                        strsqlepisodes = f"""
+                            strsqlepisodes = f"""
 UPDATE T_WC_T2S_EPISODE t2s
 INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
 SET t2s.IMDB_RATING_WEIGHTED =
     ((imdb.numVotes / (imdb.numVotes + {lngimdbweightedratingm})) * imdb.averageRating) +
     (({lngimdbweightedratingm} / (imdb.numVotes + {lngimdbweightedratingm})) * {stravgrating})
-WHERE t2s.ID_IMDB IS NOT NULL
+WHERE t2s.ID_EPISODE BETWEEN {lngepisoderangestart} AND {lngepisoderangeend}
+    AND t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL
     AND imdb.numVotes > 0 """
-                        cursor2.execute(strsqlepisodes)
-                        cp.connectioncp.commit()
+                            cursor2.execute(strsqlepisodes)
+                            cp.connectioncp.commit()
 
                         # Persist the watermark only after a successful run.
                         cp.f_setservervariable("strtmdbmoviepreprocesst2sepisodelastrun", strrunstart, "Start datetime of the last successful T2S_EPISODE run; incremental watermark on T_WC_TMDB_EPISODE.TIM_UPDATED", 0)
