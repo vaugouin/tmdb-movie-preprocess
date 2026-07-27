@@ -6060,6 +6060,57 @@ WHERE t2s.ID_EPISODE BETWEEN {lngepisoderangestart} AND {lngepisoderangeend}
                             cursor2.execute(strsqlepisodes)
                             cp.connectioncp.commit()
 
+                        # ---- Season rollup: derive the season's IMDb rating from its episodes ----
+                        # TMDB-MOVIE-PREPROCESS-034. IMDb rates titles and episodes, never seasons,
+                        # so a season rating has to be derived. Two columns, same meaning as
+                        # everywhere else in the schema:
+                        #   IMDB_RATING          = plain mean of the season's rated episodes. Answers
+                        #                          "were these episodes good", which is what a season
+                        #                          score is taken to mean. NOT weighted by votes: the
+                        #                          opening episodes are always the most watched, so
+                        #                          vote-weighting would systematically over-represent
+                        #                          the start of a season.
+                        #   IMDB_RATING_WEIGHTED = the SAME bayesian shrinkage used for movies, series
+                        #                          and episodes, applied to that mean with the season's
+                        #                          summed episode votes as the vote mass. Keeping the
+                        #                          formula identical is the whole point: the column must
+                        #                          mean one thing across every entity type, otherwise
+                        #                          any cross-type sort compares unlike numbers.
+                        # MUST run here, at the end of Process 28, not in Process 27: the scope dict
+                        # executes 27 (T2S_SEASON) BEFORE 28, so rolling up there would average the
+                        # PREVIOUS run's episode ratings and stay one run behind forever.
+                        # Episodes with no rating are excluded, never counted as zero, so a season in
+                        # flight is scored on the episodes actually aired and rated. Both aggregates
+                        # use the same episode population, so the two columns always describe the same
+                        # set of rows.
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Roll up IMDb season averages from episodes","Current sub process in the TMDb database episode preprocess",0)
+                        cursor.execute("SELECT MAX(ID_SEASON) as max_id FROM T_WC_T2S_SEASON")
+                        result = cursor.fetchone()
+                        lngseasonrangemax = result['max_id'] if result['max_id'] is not None else 0
+                        print(f"Rolling up IMDb season averages up to ID_SEASON {lngseasonrangemax}")
+                        for lngseasonrangestart in range(1, lngseasonrangemax + 1, lngchunksize):
+                            lngseasonrangeend = min(lngseasonrangestart + lngchunksize - 1, lngseasonrangemax)
+                            strsqlseasons = f"""
+UPDATE T_WC_T2S_SEASON s
+INNER JOIN (
+    SELECT ID_SEASON,
+           AVG(IMDB_RATING) AS EPISODES_AVG,
+           SUM(IMDB_VOTES)  AS EPISODES_VOTES
+    FROM T_WC_T2S_EPISODE
+    WHERE ID_SEASON BETWEEN {lngseasonrangestart} AND {lngseasonrangeend}
+        AND IMDB_RATING IS NOT NULL
+        AND IMDB_VOTES IS NOT NULL
+        AND IMDB_VOTES > 0
+    GROUP BY ID_SEASON
+) e ON e.ID_SEASON = s.ID_SEASON
+SET s.IMDB_RATING = e.EPISODES_AVG,
+    s.IMDB_RATING_WEIGHTED =
+        ((e.EPISODES_VOTES / (e.EPISODES_VOTES + {lngimdbweightedratingm})) * e.EPISODES_AVG) +
+        (({lngimdbweightedratingm} / (e.EPISODES_VOTES + {lngimdbweightedratingm})) * {stravgrating})
+WHERE s.ID_SEASON BETWEEN {lngseasonrangestart} AND {lngseasonrangeend} """
+                            cursor2.execute(strsqlseasons)
+                            cp.connectioncp.commit()
+
                         # Persist the watermark only after a successful run.
                         cp.f_setservervariable("strtmdbmoviepreprocesst2sepisodelastrun", strrunstart, "Start datetime of the last successful T2S_EPISODE run; incremental watermark on T_WC_TMDB_EPISODE.TIM_UPDATED", 0)
 
