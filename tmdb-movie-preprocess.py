@@ -3952,12 +3952,17 @@ CREATE TABLE IF NOT EXISTS T_WC_T2S_MOVIE_LANG (
                             lngmovierangeend = min(lngmovierangestart + lngchunksize - 1, lngmovierangemax)
                             cp.f_setservervariable("strtmdbmoviepreprocesscurrentmovieid",str(lngmovierangestart),"Current movie ID in the TMDb database movie preprocess (enrichment)",0)
 
-                            # IMDb rating
+                            # IMDb rating and vote count. IMDB_VOTES rides on this very pass
+                            # (FASTAPI-TEXT2SQL-194): the join already carries numVotes for the
+                            # weighted rating below, so the count costs one more SET and no extra
+                            # scan. It became necessary when the TMDb VOTE_COUNT left the API and
+                            # movies and series were left with no vote count at all.
                             strsqlmovies = f"""
 UPDATE T_WC_T2S_MOVIE t2s
 INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
-SET t2s.IMDB_RATING = imdb.averageRating
+SET t2s.IMDB_RATING = imdb.averageRating,
+    t2s.IMDB_VOTES = imdb.numVotes
 WHERE t2s.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
     AND t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
@@ -4149,11 +4154,14 @@ WHERE src.ID_SERIE IS NULL """
 
                         # ---- Enrichment: full-table set-based passes, ONCE (were per-chunk) ------
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_SERIE (ratings / FR title / Wikidata)","Current sub process in the TMDb database series preprocess",0)
+                        # IMDb rating and vote count, same pass as the movies above
+                        # (FASTAPI-TEXT2SQL-194).
                         strsqlseries = """
 UPDATE T_WC_T2S_SERIE t2s
 INNER JOIN T_WC_IMDB_MOVIE_RATING_IMPORT imdb
     ON t2s.ID_IMDB = imdb.tconst
-SET t2s.IMDB_RATING = imdb.averageRating
+SET t2s.IMDB_RATING = imdb.averageRating,
+    t2s.IMDB_VOTES = imdb.numVotes
 WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND imdb.averageRating IS NOT NULL """
