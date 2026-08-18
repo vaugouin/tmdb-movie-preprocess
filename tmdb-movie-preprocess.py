@@ -2484,13 +2484,22 @@ SET
                                     # Image: prefer T_WC_WIKIPEDIA_PAGE_LANG (WIKIPEDIA-CRAWLER-020), fall back on
                                     # the V1 column until the V1 tables are dropped. LABEL / DESCRIPTION still
                                     # come from V1: their migration is WIKIDATA-CRAWLER-017, not this one.
-                                    strsqlitem += "SELECT v1.LABEL, v1.DESCRIPTION, "
-                                    strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH) AS WIKIPEDIA_IMAGE_PATH "
-                                    strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 v1 "
+                                    # WIKIDATA-CRAWLER-017 : texte EN et image pris dans V2 / PAGE_LANG, V1 en repli.
+                                    # La requete part d une table derivee d une ligne et non de V1, sinon une entite
+                                    # absente de V1 ne rendrait rien du tout. COALESCE final sur '' pour garantir une
+                                    # chaine et non NULL aux appelants, qui concatenent ces valeurs.
+                                    strsqlitem += "SELECT COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.LABELS_JSON,'$.en')), "
+                                    strsqlitem += "  NULLIF(v2.LABEL_EN,''), v1.LABEL, '') AS LABEL, "
+                                    strsqlitem += "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.DESCRIPTIONS_JSON,'$.en')), "
+                                    strsqlitem += "  NULLIF(v2.DESCRIPTION_EN,''), v1.DESCRIPTION, '') AS DESCRIPTION, "
+                                    strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH, '') AS WIKIPEDIA_IMAGE_PATH "
+                                    strsqlitem += "FROM (SELECT %s AS ID_WIKIDATA) k "
+                                    strsqlitem += "LEFT JOIN T_WC_WIKIDATA_ITEM v2 ON v2.ID_WIKIDATA = k.ID_WIKIDATA "
+                                    strsqlitem += "LEFT JOIN T_WC_WIKIDATA_ITEM_V1 v1 "
+                                    strsqlitem += "  ON v1.ID_WIKIDATA = k.ID_WIKIDATA AND v1.LANG = 'en' "
                                     strsqlitem += "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pl "
-                                    strsqlitem += "  ON pl.ID_WIKIDATA = v1.ID_WIKIDATA AND pl.LANG = 'en' "
-                                    strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> '' "
-                                    strsqlitem += "WHERE v1.ID_WIKIDATA = %s AND v1.LANG = 'en'"
+                                    strsqlitem += "  ON pl.ID_WIKIDATA = k.ID_WIKIDATA AND pl.LANG = 'en' "
+                                    strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> ''"
                                     arrvalues = cp.f_fieldsfromquery(
                                         strsqlitem,
                                         "strrecordname|strrecordoverview|strrecordposterpath",
@@ -2745,13 +2754,22 @@ SET
                         # Image: prefer T_WC_WIKIPEDIA_PAGE_LANG (WIKIPEDIA-CRAWLER-020), fall back on
                         # the V1 column until the V1 tables are dropped. LABEL / DESCRIPTION still
                         # come from V1: their migration is WIKIDATA-CRAWLER-017, not this one.
-                        strsqlitem += "SELECT v1.LABEL, v1.DESCRIPTION, "
-                        strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH) AS WIKIPEDIA_IMAGE_PATH "
-                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 v1 "
+                        # WIKIDATA-CRAWLER-017 : texte EN et image pris dans V2 / PAGE_LANG, V1 en repli.
+                        # La requete part d une table derivee d une ligne et non de V1, sinon une entite
+                        # absente de V1 ne rendrait rien du tout. COALESCE final sur '' pour garantir une
+                        # chaine et non NULL aux appelants, qui concatenent ces valeurs.
+                        strsqlitem += "SELECT COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.LABELS_JSON,'$.en')), "
+                        strsqlitem += "  NULLIF(v2.LABEL_EN,''), v1.LABEL, '') AS LABEL, "
+                        strsqlitem += "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.DESCRIPTIONS_JSON,'$.en')), "
+                        strsqlitem += "  NULLIF(v2.DESCRIPTION_EN,''), v1.DESCRIPTION, '') AS DESCRIPTION, "
+                        strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH, '') AS WIKIPEDIA_IMAGE_PATH "
+                        strsqlitem += "FROM (SELECT %s AS ID_WIKIDATA) k "
+                        strsqlitem += "LEFT JOIN T_WC_WIKIDATA_ITEM v2 ON v2.ID_WIKIDATA = k.ID_WIKIDATA "
+                        strsqlitem += "LEFT JOIN T_WC_WIKIDATA_ITEM_V1 v1 "
+                        strsqlitem += "  ON v1.ID_WIKIDATA = k.ID_WIKIDATA AND v1.LANG = 'en' "
                         strsqlitem += "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pl "
-                        strsqlitem += "  ON pl.ID_WIKIDATA = v1.ID_WIKIDATA AND pl.LANG = 'en' "
-                        strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> '' "
-                        strsqlitem += "WHERE v1.ID_WIKIDATA = %s AND v1.LANG = 'en'"
+                        strsqlitem += "  ON pl.ID_WIKIDATA = k.ID_WIKIDATA AND pl.LANG = 'en' "
+                        strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> ''"
                         arrvalues = cp.f_fieldsfromquery(
                             strsqlitem,
                             "strawardname|strawardoverview|strawardimagepath",
@@ -3047,13 +3065,22 @@ SET
                         # Image: prefer T_WC_WIKIPEDIA_PAGE_LANG (WIKIPEDIA-CRAWLER-020), fall back on
                         # the V1 column until the V1 tables are dropped. LABEL / DESCRIPTION still
                         # come from V1: their migration is WIKIDATA-CRAWLER-017, not this one.
-                        strsqlitem += "SELECT v1.LABEL, v1.DESCRIPTION, "
-                        strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH) AS WIKIPEDIA_IMAGE_PATH "
-                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 v1 "
+                        # WIKIDATA-CRAWLER-017 : texte EN et image pris dans V2 / PAGE_LANG, V1 en repli.
+                        # La requete part d une table derivee d une ligne et non de V1, sinon une entite
+                        # absente de V1 ne rendrait rien du tout. COALESCE final sur '' pour garantir une
+                        # chaine et non NULL aux appelants, qui concatenent ces valeurs.
+                        strsqlitem += "SELECT COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.LABELS_JSON,'$.en')), "
+                        strsqlitem += "  NULLIF(v2.LABEL_EN,''), v1.LABEL, '') AS LABEL, "
+                        strsqlitem += "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.DESCRIPTIONS_JSON,'$.en')), "
+                        strsqlitem += "  NULLIF(v2.DESCRIPTION_EN,''), v1.DESCRIPTION, '') AS DESCRIPTION, "
+                        strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH, '') AS WIKIPEDIA_IMAGE_PATH "
+                        strsqlitem += "FROM (SELECT %s AS ID_WIKIDATA) k "
+                        strsqlitem += "LEFT JOIN T_WC_WIKIDATA_ITEM v2 ON v2.ID_WIKIDATA = k.ID_WIKIDATA "
+                        strsqlitem += "LEFT JOIN T_WC_WIKIDATA_ITEM_V1 v1 "
+                        strsqlitem += "  ON v1.ID_WIKIDATA = k.ID_WIKIDATA AND v1.LANG = 'en' "
                         strsqlitem += "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pl "
-                        strsqlitem += "  ON pl.ID_WIKIDATA = v1.ID_WIKIDATA AND pl.LANG = 'en' "
-                        strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> '' "
-                        strsqlitem += "WHERE v1.ID_WIKIDATA = %s AND v1.LANG = 'en'"
+                        strsqlitem += "  ON pl.ID_WIKIDATA = k.ID_WIKIDATA AND pl.LANG = 'en' "
+                        strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> ''"
                         arrvalues = cp.f_fieldsfromquery(
                             strsqlitem,
                             "strnominationname|strnominationoverview|strnominationimagepath",
@@ -3617,13 +3644,22 @@ SET
                                 # Image: prefer T_WC_WIKIPEDIA_PAGE_LANG (WIKIPEDIA-CRAWLER-020), fall back on
                                 # the V1 column until the V1 tables are dropped. LABEL / DESCRIPTION still
                                 # come from V1: their migration is WIKIDATA-CRAWLER-017, not this one.
-                                strsqlitem += "SELECT v1.LABEL, v1.DESCRIPTION, "
-                                strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH) AS WIKIPEDIA_IMAGE_PATH "
-                                strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 v1 "
+                                # WIKIDATA-CRAWLER-017 : texte EN et image pris dans V2 / PAGE_LANG, V1 en repli.
+                                # La requete part d une table derivee d une ligne et non de V1, sinon une entite
+                                # absente de V1 ne rendrait rien du tout. COALESCE final sur '' pour garantir une
+                                # chaine et non NULL aux appelants, qui concatenent ces valeurs.
+                                strsqlitem += "SELECT COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.LABELS_JSON,'$.en')), "
+                                strsqlitem += "  NULLIF(v2.LABEL_EN,''), v1.LABEL, '') AS LABEL, "
+                                strsqlitem += "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.DESCRIPTIONS_JSON,'$.en')), "
+                                strsqlitem += "  NULLIF(v2.DESCRIPTION_EN,''), v1.DESCRIPTION, '') AS DESCRIPTION, "
+                                strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH, '') AS WIKIPEDIA_IMAGE_PATH "
+                                strsqlitem += "FROM (SELECT %s AS ID_WIKIDATA) k "
+                                strsqlitem += "LEFT JOIN T_WC_WIKIDATA_ITEM v2 ON v2.ID_WIKIDATA = k.ID_WIKIDATA "
+                                strsqlitem += "LEFT JOIN T_WC_WIKIDATA_ITEM_V1 v1 "
+                                strsqlitem += "  ON v1.ID_WIKIDATA = k.ID_WIKIDATA AND v1.LANG = 'en' "
                                 strsqlitem += "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pl "
-                                strsqlitem += "  ON pl.ID_WIKIDATA = v1.ID_WIKIDATA AND pl.LANG = 'en' "
-                                strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> '' "
-                                strsqlitem += "WHERE v1.ID_WIKIDATA = %s AND v1.LANG = 'en'"
+                                strsqlitem += "  ON pl.ID_WIKIDATA = k.ID_WIKIDATA AND pl.LANG = 'en' "
+                                strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> ''"
                                 arrvalues = cp.f_fieldsfromquery(
                                     strsqlitem,
                                     "strrecordname|strrecordoverview|strrecordimagepath",
@@ -6462,12 +6498,28 @@ INSERT INTO T_WC_T2S_ITEM_BUILD (
     DELETED
 )
 SELECT
-    ID_ROW, ID_WIKIDATA, LABEL, ALIASES, DESCRIPTION,
-    WIKIPEDIA_IMAGE_PATH, INSTANCE_OF,
-    DAT_CREAT, TIM_UPDATED,
-    DELETED
-FROM T_WC_WIKIDATA_ITEM_V1
-WHERE LANG = 'en'
+    v1.ID_ROW, v1.ID_WIKIDATA,
+    -- WIKIDATA-CRAWLER-017 : texte EN pris dans V2 (LABELS_JSON / DESCRIPTIONS_JSON),
+    -- V1 en dernier recours. LABEL_EN est intercale car il existe sur une partie des
+    -- lignes ou le document JSON n'a pas de cle 'en'.
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.LABELS_JSON, '$.en')),
+             NULLIF(v2.LABEL_EN, ''),
+             v1.LABEL)                                            AS LABEL,
+    v1.ALIASES,
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v2.DESCRIPTIONS_JSON, '$.en')),
+             NULLIF(v2.DESCRIPTION_EN, ''),
+             v1.DESCRIPTION)                                      AS DESCRIPTION,
+    v1.WIKIPEDIA_IMAGE_PATH, v1.INSTANCE_OF,
+    v1.DAT_CREAT, v1.TIM_UPDATED,
+    v1.DELETED
+-- La POPULATION reste celle de V1, deliberement : V2 ne porte pas toutes les entites
+-- que V1 connait, et partir de V2 supprimerait des lignes de T2S_ITEM. On ne change
+-- donc que la SOURCE DES VALEURS, pas le perimetre. Inverser le sens de cette jointure
+-- est le geste a faire le jour ou le gap d entites sera ferme, pas avant.
+FROM T_WC_WIKIDATA_ITEM_V1 v1
+LEFT JOIN T_WC_WIKIDATA_ITEM v2
+    ON v2.ID_WIKIDATA = v1.ID_WIKIDATA
+WHERE v1.LANG = 'en'
 """
                         cursor2.execute(strsqlitems)
                         cp.connectioncp.commit()
