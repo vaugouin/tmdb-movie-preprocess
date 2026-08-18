@@ -2480,9 +2480,16 @@ SET
                                     strrecordoverview = ""
                                     strrecordposterpath = ""
                                     strsqlitem = ""
-                                    strsqlitem += "SELECT LABEL, DESCRIPTION, WIKIPEDIA_IMAGE_PATH "
-                                    strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
-                                    strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'en'"
+                                    # Image: prefer T_WC_WIKIPEDIA_PAGE_LANG (WIKIPEDIA-CRAWLER-020), fall back on
+                                    # the V1 column until the V1 tables are dropped. LABEL / DESCRIPTION still
+                                    # come from V1: their migration is WIKIDATA-CRAWLER-017, not this one.
+                                    strsqlitem += "SELECT v1.LABEL, v1.DESCRIPTION, "
+                                    strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH) AS WIKIPEDIA_IMAGE_PATH "
+                                    strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 v1 "
+                                    strsqlitem += "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pl "
+                                    strsqlitem += "  ON pl.ID_WIKIDATA = v1.ID_WIKIDATA AND pl.LANG = 'en' "
+                                    strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> '' "
+                                    strsqlitem += "WHERE v1.ID_WIKIDATA = %s AND v1.LANG = 'en'"
                                     arrvalues = cp.f_fieldsfromquery(
                                         strsqlitem,
                                         "strrecordname|strrecordoverview|strrecordposterpath",
@@ -2743,9 +2750,16 @@ SET
                         strawardoverview = ""
                         strawardimagepath = ""
                         strsqlitem = ""
-                        strsqlitem += "SELECT LABEL, DESCRIPTION, WIKIPEDIA_IMAGE_PATH "
-                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
-                        strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'en'"
+                        # Image: prefer T_WC_WIKIPEDIA_PAGE_LANG (WIKIPEDIA-CRAWLER-020), fall back on
+                        # the V1 column until the V1 tables are dropped. LABEL / DESCRIPTION still
+                        # come from V1: their migration is WIKIDATA-CRAWLER-017, not this one.
+                        strsqlitem += "SELECT v1.LABEL, v1.DESCRIPTION, "
+                        strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH) AS WIKIPEDIA_IMAGE_PATH "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 v1 "
+                        strsqlitem += "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pl "
+                        strsqlitem += "  ON pl.ID_WIKIDATA = v1.ID_WIKIDATA AND pl.LANG = 'en' "
+                        strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> '' "
+                        strsqlitem += "WHERE v1.ID_WIKIDATA = %s AND v1.LANG = 'en'"
                         arrvalues = cp.f_fieldsfromquery(
                             strsqlitem,
                             "strawardname|strawardoverview|strawardimagepath",
@@ -3047,9 +3061,16 @@ SET
                         strnominationoverview = ""
                         strnominationimagepath = ""
                         strsqlitem = ""
-                        strsqlitem += "SELECT LABEL, DESCRIPTION, WIKIPEDIA_IMAGE_PATH "
-                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
-                        strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'en'"
+                        # Image: prefer T_WC_WIKIPEDIA_PAGE_LANG (WIKIPEDIA-CRAWLER-020), fall back on
+                        # the V1 column until the V1 tables are dropped. LABEL / DESCRIPTION still
+                        # come from V1: their migration is WIKIDATA-CRAWLER-017, not this one.
+                        strsqlitem += "SELECT v1.LABEL, v1.DESCRIPTION, "
+                        strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH) AS WIKIPEDIA_IMAGE_PATH "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 v1 "
+                        strsqlitem += "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pl "
+                        strsqlitem += "  ON pl.ID_WIKIDATA = v1.ID_WIKIDATA AND pl.LANG = 'en' "
+                        strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> '' "
+                        strsqlitem += "WHERE v1.ID_WIKIDATA = %s AND v1.LANG = 'en'"
                         arrvalues = cp.f_fieldsfromquery(
                             strsqlitem,
                             "strnominationname|strnominationoverview|strnominationimagepath",
@@ -3619,9 +3640,16 @@ SET
                                 strrecordoverview = ""
                                 strrecordimagepath = ""
                                 strsqlitem = ""
-                                strsqlitem += "SELECT LABEL, DESCRIPTION, WIKIPEDIA_IMAGE_PATH "
-                                strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
-                                strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'en'"
+                                # Image: prefer T_WC_WIKIPEDIA_PAGE_LANG (WIKIPEDIA-CRAWLER-020), fall back on
+                                # the V1 column until the V1 tables are dropped. LABEL / DESCRIPTION still
+                                # come from V1: their migration is WIKIDATA-CRAWLER-017, not this one.
+                                strsqlitem += "SELECT v1.LABEL, v1.DESCRIPTION, "
+                                strsqlitem += "COALESCE(pl.MAIN_IMAGE_URL, v1.WIKIPEDIA_IMAGE_PATH) AS WIKIPEDIA_IMAGE_PATH "
+                                strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 v1 "
+                                strsqlitem += "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pl "
+                                strsqlitem += "  ON pl.ID_WIKIDATA = v1.ID_WIKIDATA AND pl.LANG = 'en' "
+                                strsqlitem += "  AND COALESCE(pl.MAIN_IMAGE_URL,'') <> '' "
+                                strsqlitem += "WHERE v1.ID_WIKIDATA = %s AND v1.LANG = 'en'"
                                 arrvalues = cp.f_fieldsfromquery(
                                     strsqlitem,
                                     "strrecordname|strrecordoverview|strrecordimagepath",

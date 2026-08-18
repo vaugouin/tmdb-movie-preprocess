@@ -224,10 +224,42 @@ def f_buildcustomaggregatequery(arrsqlsources, stridfield, strscorefield, intsor
     return arrsqlsources[0] + strorderby
 
 
-def f_getwikidataimagepath(strwikidataid):
+def f_getwikidataimagepath(strwikidataid, strlang="en"):
+    """Resolve an entity's Wikipedia lead image.
+
+    WIKIDATA-CRAWLER-015 / WIKIPEDIA-CRAWLER-020, 2026-08-17. The image used to be read
+    ONLY from the entity's V1 row, which is exactly what kept the V1 tables alive. It is
+    now read FIRST from T_WC_WIKIPEDIA_PAGE_LANG.MAIN_IMAGE_URL, the home wikipedia-crawler
+    writes to, keyed on (ID_WIKIDATA, LANG).
+
+    The V1 tables stay as a FALLBACK, deliberately, and only until they are dropped: the
+    new source covers more than the old one (141 424 films in English against 125 866),
+    but a handful of entities crawled before the column existed have no value yet. Falling
+    back costs one query on a miss and guarantees this change removes no image from any
+    screen. Delete the fallback list when V1 goes.
+
+    strlang matters now, where V1 could not carry it: V1 had ONE image column per entity
+    while the crawler runs once per language, so the second language overwrote the first
+    (collection 4845 lost its English image to a French portal banner). Callers that want
+    a localized image pass strlang; the default keeps every existing caller unchanged.
+    """
     if not strwikidataid:
         return ""
     cursor2 = cp.connectioncp.cursor()
+    strsqlpagelang = """
+SELECT MAIN_IMAGE_URL AS WIKIPEDIA_IMAGE_PATH
+FROM   T_WC_WIKIPEDIA_PAGE_LANG
+WHERE  ID_WIKIDATA = %s
+  AND  LANG = %s
+  AND  MAIN_IMAGE_URL IS NOT NULL
+  AND  MAIN_IMAGE_URL <> ''
+LIMIT 1
+"""
+    cursor2.execute(strsqlpagelang, (strwikidataid, strlang))
+    row = cursor2.fetchone()
+    if row and row.get('WIKIPEDIA_IMAGE_PATH'):
+        return row['WIKIPEDIA_IMAGE_PATH']
+    # Fallback on the V1 rows, to be removed with them.
     arrtables = [
         ("T_WC_WIKIDATA_ITEM_V1", "WIKIPEDIA_IMAGE_PATH"),
         ("T_WC_WIKIDATA_MOVIE_V1", "WIKIPEDIA_POSTER_PATH"),
