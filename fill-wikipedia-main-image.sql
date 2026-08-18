@@ -1,0 +1,298 @@
+-- =============================================================================
+-- Fill WIKIPEDIA_MAIN_IMAGE_URL / _FR on the T2S entity tables
+--
+-- Source: T_WC_WIKIPEDIA_PAGE_LANG.MAIN_IMAGE_URL, written per (ID_WIKIDATA, LANG)
+-- by wikipedia-crawler (WIKIPEDIA-CRAWLER-020). Target: the serving copy in T2S,
+-- where the 172 consumer read sites already look.
+--
+-- Run AFTER migration-wikipedia-main-image.sql, then on every preprocessing pass.
+--
+-- TWO RULES, both deliberate:
+--
+--  1. NEVER BLANK. The WHERE clause keeps rows whose source image is empty from
+--     erasing a value a previous pass had found. Same rule the crawler applies to
+--     its own writes: "never a guess, never a blanking of what a previous
+--     successful crawl had found". A crawl that failed today must not cost the
+--     image found last week.
+--
+--  2. ONE STATEMENT PER LANGUAGE. en and fr are separate columns on purpose, so
+--     they are separate updates. Do not try to pivot them in a single join: that
+--     is exactly the shortcut that made V1 lose the English image of collection
+--     4845 to a French portal banner.
+--
+-- Idempotent, and safe to re-run. Measured 2026-08-17 before the first run: of the
+-- 125 866 movies served by V1, 124 (0,098 %) had no image on the source side.
+-- =============================================================================
+
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+SET SESSION max_statement_time = 0;
+
+
+-- ---------- T_WC_T2S_MOVIE ----------
+UPDATE T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_SERIE ----------
+UPDATE T_WC_T2S_SERIE t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_SERIE t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_PERSON ----------
+UPDATE T_WC_T2S_PERSON t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_PERSON t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_SEASON ----------
+UPDATE T_WC_T2S_SEASON t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_SEASON t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_EPISODE ----------
+UPDATE T_WC_T2S_EPISODE t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_EPISODE t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_CHARACTER ----------
+UPDATE T_WC_T2S_CHARACTER t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_CHARACTER t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_ITEM ----------
+UPDATE T_WC_T2S_ITEM t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_ITEM t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_AWARD ----------
+UPDATE T_WC_T2S_AWARD t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_AWARD t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_NOMINATION ----------
+UPDATE T_WC_T2S_NOMINATION t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_NOMINATION t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_DEATH ----------
+UPDATE T_WC_T2S_DEATH t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_DEATH t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_GROUP ----------
+UPDATE T_WC_T2S_GROUP t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_GROUP t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_MOVEMENT ----------
+UPDATE T_WC_T2S_MOVEMENT t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_MOVEMENT t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_COLLECTION ----------
+UPDATE T_WC_T2S_COLLECTION t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_COLLECTION t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_LIST ----------
+UPDATE T_WC_T2S_LIST t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_LIST t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_TOPIC ----------
+UPDATE T_WC_T2S_TOPIC t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_TOPIC t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- T_WC_T2S_TECHNICAL ----------
+UPDATE T_WC_T2S_TECHNICAL t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'en'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+UPDATE T_WC_T2S_TECHNICAL t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = 'fr'
+SET t2s.WIKIPEDIA_MAIN_IMAGE_URL_FR = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '';
+
+
+-- ---------- Controle ----------
+-- Par table : combien de lignes servies en en, en fr, et combien dans aucune des
+-- deux langues alors que l'entite a bien une page Wikipedia. La derniere colonne
+-- est celle a surveiller d'un passage a l'autre : elle ne doit que decroitre.
+SELECT 'MOVIE' AS entite,
+       SUM(COALESCE(WIKIPEDIA_MAIN_IMAGE_URL,'')    <> '') AS servies_en,
+       SUM(COALESCE(WIKIPEDIA_MAIN_IMAGE_URL_FR,'') <> '') AS servies_fr,
+       COUNT(*)                                            AS lignes
+FROM   T_WC_T2S_MOVIE
+UNION ALL SELECT 'SERIE',  SUM(COALESCE(WIKIPEDIA_MAIN_IMAGE_URL,'')<>''), SUM(COALESCE(WIKIPEDIA_MAIN_IMAGE_URL_FR,'')<>''), COUNT(*) FROM T_WC_T2S_SERIE
+UNION ALL SELECT 'PERSON', SUM(COALESCE(WIKIPEDIA_MAIN_IMAGE_URL,'')<>''), SUM(COALESCE(WIKIPEDIA_MAIN_IMAGE_URL_FR,'')<>''), COUNT(*) FROM T_WC_T2S_PERSON
+UNION ALL SELECT 'ITEM',   SUM(COALESCE(WIKIPEDIA_MAIN_IMAGE_URL,'')<>''), SUM(COALESCE(WIKIPEDIA_MAIN_IMAGE_URL_FR,'')<>''), COUNT(*) FROM T_WC_T2S_ITEM;

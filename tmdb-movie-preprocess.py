@@ -109,7 +109,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 70: 'T2S_EVALUATION_ASSERTION_REFRESH'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -135,6 +135,11 @@ try:
             # living evals from ASSERTION_REFRESH_SQL, on demand (e.g. right after seeding
             # new showcase samples). Run with TMDB_PREPROCESS_SCOPE=assertion-refresh.
             arrprocessscopeassertionrefresh = {70: 'T2S_EVALUATION_ASSERTION_REFRESH'}
+            # Wikipedia main image only (Process 71): re-copy the lead image from
+            # T_WC_WIKIPEDIA_PAGE_LANG into the T2S serving columns, on demand, which is
+            # useful right after a wikipedia-crawler pass without replaying the whole ETL.
+            # Run with TMDB_PREPROCESS_SCOPE=wikipedia-main-image.
+            arrprocessscopewikipediamainimage = {71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             # Grounded-neighbour build only (Processes 36-39): rebuild the T2S similar /
             # recommendation tables from the raw T_WC_TMDB_* neighbours, on demand -- handy as a
             # unit test right after creating the four T2S tables, without the whole pipeline.
@@ -150,6 +155,8 @@ try:
                 arrprocessscope = arrprocessscopewikidataall
             elif strprocessscope in ("assertion-refresh", "assertions"):
                 arrprocessscope = arrprocessscopeassertionrefresh
+            elif strprocessscope in ("wikipedia-main-image", "wikipedia-image"):
+                arrprocessscope = arrprocessscopewikipediamainimage
             elif strprocessscope in ("neighbours", "neighbors", "similar-recommendations"):
                 arrprocessscope = arrprocessscopeneighbours
             else:
@@ -7159,6 +7166,61 @@ ORDER BY COMPTE DESC
                     cp.f_setservervariable("strtmdbmoviepreprocessassertionrefreshcount", str(lngrefreshed), "Living-eval assertions refreshed in the last run", 0)
                     cp.f_setservervariable("strtmdbmoviepreprocessassertionrefreshskipped", str(lngskipped), "Living-eval assertions skipped by a guardrail in the last run", 0)
                     print(f"T2S_EVALUATION_ASSERTION_REFRESH complete: {lngrefreshed} refreshed, {lngskipped} skipped")
+                    print(f"Elapsed time: {time.time() - start_time:.2f} seconds")
+                elif intindex == 71:
+                    #----------------------------------------------------
+                    # Wikipedia main image into the T2S serving layer
+                    # (WIKIPEDIA-CRAWLER-020, unblocks WIKIDATA-CRAWLER-015).
+                    #
+                    # The lead image used to live ONLY in the entity's V1 row
+                    # (WIKIPEDIA_POSTER_PATH / _PROFILE_PATH / _IMAGE_PATH), which is
+                    # precisely why the V1 tables could not be dropped. wikipedia-crawler
+                    # now also writes it to its own home, keyed per language, in
+                    # T_WC_WIKIPEDIA_PAGE_LANG.MAIN_IMAGE_URL. This process copies it into
+                    # T2S, where the 172 consumer read sites already look, so each of them
+                    # moves from one local column to another instead of learning a join.
+                    #
+                    # TWO COLUMNS, ONE PER LANGUAGE, one UPDATE each. V1 had a single
+                    # image column while the crawler runs once per language, so the second
+                    # language silently overwrote the first: that is how collection 4845
+                    # lost its English lead image to a French portal banner. Never pivot
+                    # the two languages into a single join.
+                    #
+                    # NEVER BLANK: the WHERE keeps an empty source from erasing what an
+                    # earlier pass had found. A crawl that fails today must not cost the
+                    # image found last week, which is the rule the crawler applies to its
+                    # own writes.
+                    #
+                    # Placed LAST: it reads the T2S rows every other process builds.
+                    # Per-statement try/except so a table missing the columns (migration
+                    # not run yet) logs and is skipped instead of aborting the pipeline.
+                    print("T2S_WIKIPEDIA_MAIN_IMAGE processing")
+                    start_time = time.time()
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copy Wikipedia main image into T2S","Current sub process in the TMDb database preprocess",0)
+                    arrwikipediaimageentities = ["MOVIE","SERIE","PERSON","SEASON","EPISODE","CHARACTER","ITEM","AWARD","NOMINATION","DEATH","GROUP","MOVEMENT","COLLECTION","LIST","TOPIC","TECHNICAL"]
+                    arrwikipediaimagelangs = [("en","WIKIPEDIA_MAIN_IMAGE_URL"),("fr","WIKIPEDIA_MAIN_IMAGE_URL_FR")]
+                    lngwikipediaimagerowstotal = 0
+                    lngwikipediaimageskipped = 0
+                    for strentity in arrwikipediaimageentities:
+                        for strlang, strcolumn in arrwikipediaimagelangs:
+                            strsqlmainimage = f"""
+UPDATE T_WC_T2S_{strentity} t2s
+INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
+    ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
+    AND pl.LANG = '{strlang}'
+SET t2s.{strcolumn} = pl.MAIN_IMAGE_URL
+WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '' """
+                            try:
+                                cursor2.execute(strsqlmainimage)
+                                lngwikipediaimagerows = cursor2.rowcount
+                                cp.connectioncp.commit()
+                                lngwikipediaimagerowstotal += lngwikipediaimagerows
+                                print(f"  T2S_{strentity} [{strlang}]: {lngwikipediaimagerows} row(s)")
+                            except pymysql.MySQLError as e:
+                                lngwikipediaimageskipped += 1
+                                print(f"  T2S_{strentity} [{strlang}]: SKIPPED ({e})")
+                    cp.f_setservervariable("strtmdbmoviepreprocesswikipediamainimagerows", str(lngwikipediaimagerowstotal), "Rows updated with a Wikipedia main image in the last run", 0)
+                    print(f"T2S_WIKIPEDIA_MAIN_IMAGE complete: {lngwikipediaimagerowstotal} row(s), {lngwikipediaimageskipped} statement(s) skipped")
                     print(f"Elapsed time: {time.time() - start_time:.2f} seconds")
                 if telcopy is not None:
                     telcopy.finish()
