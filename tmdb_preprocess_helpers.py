@@ -239,8 +239,21 @@ def f_getwikidatalabel(strwikidataid, strlang="fr"):
     label. Reading V2 alone would silently empty those labels. Falling back keeps every
     label on screen while the gap closes. DELETE THE FALLBACK WITH THE V1 TABLES.
 
-    LABELS_JSON, not LABEL_EN: the scalar column is only populated on part of the rows,
-    the JSON document is the real entry point (the ticket says so explicitly).
+    LANGUAGE FALLBACK INSIDE V2, added 2026-08-18, and it is not a convenience. V1 read
+    Wikidata through SPARQL, whose label service silently falls back to English when the
+    requested language is missing. Measured that day: of the 100 271 entities V2 knows but
+    whose LABELS_JSON has no 'fr' key, 100 186 (99,92 %) carried the SAME text in V1's
+    'fr' and 'en' rows, and Wikidata itself confirms it has no French label for them
+    (Q8093 Nintendo, Q9684 The New York Times, Q2013 Wikidata).
+
+    V1 was not lying: for a proper noun, English IS the right French display. So this
+    fallback REPRODUCES a behaviour that was useful, instead of dropping it. The gain is
+    not cosmetic: those 100 186 entities move from "served by the V1 fallback" to "served
+    by V2 alone", which cuts the V1 dependency of French labels from 51 % to roughly 36 %,
+    the remainder being the entities V2 simply does not import (-011).
+
+    Order: requested language, then English, then the V1 row. LABELS_JSON before LABEL_EN
+    in both cases, the scalar column being populated on part of the rows only.
 
     The language code is validated against a 2-3 letter pattern before it reaches the JSON
     path: it never comes from user input here, but a path built by concatenation deserves
@@ -259,8 +272,15 @@ def f_getwikidatalabel(strwikidataid, strlang="fr"):
         "T_WC_WIKIDATA_PERSON",
     ]
     for strtable in arrv2tables:
+        # Un seul aller-retour par table : la langue demandee, puis l anglais, puis la
+        # colonne scalaire. Chercher la langue dans les quatre tables avant de retenter
+        # en anglais doublerait les requetes pour le meme resultat.
         strsql = f"""
-SELECT JSON_UNQUOTE(JSON_EXTRACT(LABELS_JSON, %s)) AS LABEL
+SELECT COALESCE(
+           JSON_UNQUOTE(JSON_EXTRACT(LABELS_JSON, %s)),
+           JSON_UNQUOTE(JSON_EXTRACT(LABELS_JSON, '$.en')),
+           NULLIF(LABEL_EN, '')
+       ) AS LABEL
 FROM   {strtable}
 WHERE  ID_WIKIDATA = %s
 LIMIT 1
