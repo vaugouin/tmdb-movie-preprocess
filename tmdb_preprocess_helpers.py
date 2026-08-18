@@ -224,7 +224,7 @@ def f_buildcustomaggregatequery(arrsqlsources, stridfield, strscorefield, intsor
     return arrsqlsources[0] + strorderby
 
 
-def f_getwikidatalabel(strwikidataid, strlang="fr"):
+def f_getwikidatalabel(strwikidataid, strlang="fr", blnallentitytables=False):
     """Resolve an entity's label in one language.
 
     WIKIDATA-CRAWLER-017, 2026-08-17. V1 stores one ROW per language
@@ -265,12 +265,30 @@ def f_getwikidatalabel(strwikidataid, strlang="fr"):
         strlang = "fr"
     strjsonpath = "$." + strlang
     cursor2 = cp.connectioncp.cursor()
-    arrv2tables = [
-        "T_WC_WIKIDATA_ITEM",
-        "T_WC_WIKIDATA_MOVIE",
-        "T_WC_WIKIDATA_SERIE",
-        "T_WC_WIKIDATA_PERSON",
-    ]
+    # T_WC_WIKIDATA_ITEM SEULEMENT PAR DEFAUT (TMDB-MOVIE-PREPROCESS-036, 2026-08-18).
+    #
+    # Les appelants de cette fonction resolvent le libelle d une RECOMPENSE, d un GROUPE,
+    # d une NOMINATION ou d un DECES : autant d entites qui vivent dans ITEM. Chercher
+    # aussi dans MOVIE, SERIE et PERSON n avait aucun sens, et c etait dangereux.
+    #
+    # Mesure du 2026-08-18 : 7 805 des 44 084 lignes de T_WC_T2S_AWARD portent un
+    # ID_WIKIDATA qui designe un FILM, sequelle du mecanisme decrit en -036 (la requete
+    # SPARQL de V1 aplatit la valeur principale et ses qualificatifs sous la meme
+    # propriete). L ancien code lisait ITEM_V1 seul, ne trouvait rien, et rendait du vide.
+    # En elargissant a quatre tables, cette fonction aurait trouve le TITRE DU FILM et
+    # l aurait ecrit dans AWARD_NAME_FR : pire qu un vide, car un blanc se remarque et une
+    # valeur plausible et fausse ne se remarque pas. Le controle avant/apres l aurait meme
+    # compte comme un GAIN de remplissage.
+    #
+    # blnallentitytables=True n a de sens que pour un diagnostic qui veut voir ou une
+    # entite se trouve reellement, jamais pour alimenter une colonne.
+    arrv2tables = ["T_WC_WIKIDATA_ITEM"]
+    if blnallentitytables:
+        arrv2tables = arrv2tables + [
+            "T_WC_WIKIDATA_MOVIE",
+            "T_WC_WIKIDATA_SERIE",
+            "T_WC_WIKIDATA_PERSON",
+        ]
     for strtable in arrv2tables:
         # Un seul aller-retour par table : la langue demandee, puis l anglais, puis la
         # colonne scalaire. Chercher la langue dans les quatre tables avant de retenter
