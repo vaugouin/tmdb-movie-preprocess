@@ -224,6 +224,68 @@ def f_buildcustomaggregatequery(arrsqlsources, stridfield, strscorefield, intsor
     return arrsqlsources[0] + strorderby
 
 
+def f_getwikidatalabel(strwikidataid, strlang="fr"):
+    """Resolve an entity's label in one language.
+
+    WIKIDATA-CRAWLER-017, 2026-08-17. V1 stores one ROW per language
+    (T_WC_WIKIDATA_ITEM_V1.LABEL WHERE LANG='fr'); V2 stores one JSON DOCUMENT per
+    entity, LABELS_JSON, holding every language of the dump. This function is the single
+    place that knows the difference, so the callers stop carrying a hand-written SELECT
+    each.
+
+    V2 FIRST, V1 as a fallback, and the fallback is the whole point of doing it this way
+    now. V2 does not carry every entity V1 knows: measured 2026-07-30, a large set of QIDs
+    present in V1 is absent from every V2 table, and almost all of them hold a French
+    label. Reading V2 alone would silently empty those labels. Falling back keeps every
+    label on screen while the gap closes. DELETE THE FALLBACK WITH THE V1 TABLES.
+
+    LABELS_JSON, not LABEL_EN: the scalar column is only populated on part of the rows,
+    the JSON document is the real entry point (the ticket says so explicitly).
+
+    The language code is validated against a 2-3 letter pattern before it reaches the JSON
+    path: it never comes from user input here, but a path built by concatenation deserves
+    the guard anyway.
+    """
+    if not strwikidataid:
+        return ""
+    if not re.fullmatch(r"[a-z]{2,3}", strlang or ""):
+        strlang = "fr"
+    strjsonpath = "$." + strlang
+    cursor2 = cp.connectioncp.cursor()
+    arrv2tables = [
+        "T_WC_WIKIDATA_ITEM",
+        "T_WC_WIKIDATA_MOVIE",
+        "T_WC_WIKIDATA_SERIE",
+        "T_WC_WIKIDATA_PERSON",
+    ]
+    for strtable in arrv2tables:
+        strsql = f"""
+SELECT JSON_UNQUOTE(JSON_EXTRACT(LABELS_JSON, %s)) AS LABEL
+FROM   {strtable}
+WHERE  ID_WIKIDATA = %s
+LIMIT 1
+"""
+        cursor2.execute(strsql, (strjsonpath, strwikidataid))
+        row = cursor2.fetchone()
+        if row and row.get('LABEL'):
+            return row['LABEL']
+    # Fallback on the V1 row, to be removed with the V1 tables.
+    strsqlv1 = """
+SELECT LABEL
+FROM   T_WC_WIKIDATA_ITEM_V1
+WHERE  ID_WIKIDATA = %s
+  AND  LANG = %s
+  AND  LABEL IS NOT NULL
+  AND  LABEL <> ''
+LIMIT 1
+"""
+    cursor2.execute(strsqlv1, (strwikidataid, strlang))
+    row = cursor2.fetchone()
+    if row and row.get('LABEL'):
+        return row['LABEL']
+    return ""
+
+
 def f_getwikidataimagepath(strwikidataid, strlang="en"):
     """Resolve an entity's Wikipedia lead image.
 

@@ -29,6 +29,7 @@ from tmdb_preprocess_helpers import (
     f_buildcustomorderbyclause,
     f_getcustomsortby,
     f_getwikidataimagepath,
+    f_getwikidatalabel,
     f_linktmdbkeywordtowikidata,
     f_tmdbpersonsetusedfortags,
     f_wikidataentitysummary,
@@ -2501,18 +2502,9 @@ SET
                                     strrecordoverview = arrvalues.get("strrecordoverview", "")
                                     strrecordposterpath = arrvalues.get("strrecordposterpath", "")
                                     strrecordwikipediaimagepath = f_getwikidataimagepath(strrecordid)
-                                    strsqlitem = ""
-                                    strsqlitem += "SELECT LABEL "
-                                    strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
-                                    strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'fr'"
-                                    arrvalues = cp.f_fieldsfromquery(
-                                        strsqlitem,
-                                        "strrecordname",
-                                        "LABEL",
-                                        params=(strrecordid,),
-                                        target_dict=None,
-                                    )
-                                    strrecordnamefr = arrvalues.get("strrecordname", "")
+                                    # WIKIDATA-CRAWLER-017 : le libelle FR vient desormais de V2 (LABELS_JSON),
+                                    # V1 ne servant plus que de repli, le temps que le gap d entites se ferme.
+                                    strrecordnamefr = f_getwikidatalabel(strrecordid, "fr")
                                 strrecordgrouptype = "group"
                                 print("Processing record: " + str(strrecordid) + ": " + strrecordname + " (" + strrecordgroupsource + ")")
                                 if target_field_name == "GROUP_NAME":
@@ -2772,18 +2764,9 @@ SET
                         strawardimagepath = arrvalues.get("strawardimagepath", "")
                         strawardimagepath = f_getwikidataimagepath(strawardwikidataid)
 
-                        strsqlitem = ""
-                        strsqlitem += "SELECT LABEL "
-                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
-                        strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'fr'"
-                        arrvalues = cp.f_fieldsfromquery(
-                            strsqlitem,
-                            "strawardnamefr",
-                            "LABEL",
-                            params=(strawardwikidataid,),
-                            target_dict=None,
-                        )
-                        strawardnamefr = arrvalues.get("strawardnamefr", "")
+                        # WIKIDATA-CRAWLER-017 : le libelle FR vient desormais de V2 (LABELS_JSON),
+                        # V1 ne servant plus que de repli, le temps que le gap d entites se ferme.
+                        strawardnamefr = f_getwikidatalabel(strawardwikidataid, "fr")
 
                         print("Processing record: " + str(strawardwikidataid) + ": " + strawardname + " (" + strawardsource + ")")
                         telaward.position(recordid=strawardwikidataid, currentvalue=strawardname, currentprocess=f"{strpropertyid}: Copying from WIKIDATA to T2S_AWARD")
@@ -3083,18 +3066,9 @@ SET
                         strnominationimagepath = arrvalues.get("strnominationimagepath", "")
                         strnominationimagepath = f_getwikidataimagepath(strnominationwikidataid)
 
-                        strsqlitem = ""
-                        strsqlitem += "SELECT LABEL "
-                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
-                        strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'fr'"
-                        arrvalues = cp.f_fieldsfromquery(
-                            strsqlitem,
-                            "strnominationnamefr",
-                            "LABEL",
-                            params=(strnominationwikidataid,),
-                            target_dict=None,
-                        )
-                        strnominationnamefr = arrvalues.get("strnominationnamefr", "")
+                        # WIKIDATA-CRAWLER-017 : le libelle FR vient desormais de V2 (LABELS_JSON),
+                        # V1 ne servant plus que de repli, le temps que le gap d entites se ferme.
+                        strnominationnamefr = f_getwikidatalabel(strnominationwikidataid, "fr")
 
                         print("Processing record: " + str(strnominationwikidataid) + ": " + strnominationname + " (" + strnominationsource + ")")
                         telnomination.position(recordid=strnominationwikidataid, currentvalue=strnominationname, currentprocess=f"{strpropertyid}: Copying from WIKIDATA to T2S_NOMINATION")
@@ -3662,18 +3636,9 @@ SET
                                 strrecordimagepath = arrvalues.get("strrecordimagepath", "")
                                 strrecordimagepath = f_getwikidataimagepath(strrecordid)
 
-                                strsqlitem = ""
-                                strsqlitem += "SELECT LABEL "
-                                strsqlitem += "FROM T_WC_WIKIDATA_ITEM_V1 "
-                                strsqlitem += "WHERE ID_WIKIDATA = %s AND LANG = 'fr'"
-                                arrvalues = cp.f_fieldsfromquery(
-                                    strsqlitem,
-                                    "strrecordnamefr",
-                                    "LABEL",
-                                    params=(strrecordid,),
-                                    target_dict=None,
-                                )
-                                strrecordnamefr = arrvalues.get("strrecordnamefr", "")
+                                # WIKIDATA-CRAWLER-017 : le libelle FR vient desormais de V2 (LABELS_JSON),
+                                # V1 ne servant plus que de repli, le temps que le gap d entites se ferme.
+                                strrecordnamefr = f_getwikidatalabel(strrecordid, "fr")
 
                                 strrecorddeathtype = "death"
                                 print("Processing record: " + str(strrecordid) + ": " + strrecordname + " (" + strrecorddeathsource + ")")
@@ -6508,11 +6473,27 @@ WHERE LANG = 'en'
                         cp.connectioncp.commit()
 
                         strsqlitems = """
+-- WIKIDATA-CRAWLER-017 : le libelle FR vient de V2 (LABELS_JSON, un document par
+-- entite portant toutes les langues), V1 (une ligne par langue) ne servant plus que
+-- de repli, a retirer avec les tables V1.
+--
+-- LEFT JOIN et non INNER : l'ancienne requete ne touchait que les lignes ayant un
+-- libellé FR en V1. Avec deux sources il faut atteindre les lignes servies par l'une
+-- OU l'autre, d'ou les deux jointures gauches et le WHERE final, qui empeche
+-- d'ecrire NULL sur une ligne qu'aucune des deux sources ne couvre. Meme regle de
+-- non-effacement que pour les images : une source vide n'ecrase jamais une valeur.
 UPDATE T_WC_T2S_ITEM_BUILD t2s
-INNER JOIN T_WC_WIKIDATA_ITEM_V1 t
-    ON t2s.ID_WIKIDATA = t.ID_WIKIDATA
-SET t2s.ITEM_LABEL_FR = t.LABEL
-WHERE t.LANG = 'fr'
+LEFT JOIN T_WC_WIKIDATA_ITEM v2
+    ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
+LEFT JOIN T_WC_WIKIDATA_ITEM_V1 t
+    ON t.ID_WIKIDATA = t2s.ID_WIKIDATA
+   AND t.LANG = 'fr'
+SET t2s.ITEM_LABEL_FR = COALESCE(
+        JSON_UNQUOTE(JSON_EXTRACT(v2.LABELS_JSON, '$.fr')),
+        t.LABEL)
+WHERE COALESCE(
+        JSON_UNQUOTE(JSON_EXTRACT(v2.LABELS_JSON, '$.fr')),
+        t.LABEL) IS NOT NULL
 """
                         cursor2.execute(strsqlitems)
                         cp.connectioncp.commit()
