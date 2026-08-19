@@ -30,12 +30,35 @@
 --   V1 . d'ou viennent les entites qui portent desormais un nom francais ?
 --   V2 . LE VERDICT : un titre de film s'affiche-t-il comme nom de prix ?
 --   V3 . le meme test sur les personnes, population plus nombreuse que les films
---   V4 . la prediction de l'hypothese du repli anglais, vraie ou fausse
+--   V4 . la prediction de l hypothese du repli anglais, vraie ou fausse
+--   V5 . les series, population oubliee des deux premieres versions du fichier
+--   V6 . fuite ou residu ? le chiffre qui autorise ou non la suite de la migration
 --
--- COMMENT CONCLURE. V2 et V3 a zero ligne : la restriction a tenu, le gain est
--- reel, -017 est valide cote recompenses. Une seule ligne rendue par V2 ou V3 ou
--- AWARD_NAME_FR egale le titre de l'oeuvre : il faut revenir sur la bascule avant
--- que les onze autres pages d'entite ne soient migrees.
+-- RESULTAT DE LA PREMIERE EXECUTION, 2026-08-20. Le verdict est mixte et il faut
+-- le dire dans cet ordre, parce que l'ordre inverse donnerait une fausse alarme.
+--
+--   LE GAIN EST REEL ET IMPORTANT. Sur 26 507 noms francais, 11 876 (44,8 %) sont
+--   de vraies traductions, et elles sont bonnes : « prix Kan-Kikuchi », « docteur
+--   honoris causa de l'universite libre d'Amsterdam », « Festival de Cannes 2021 »,
+--   « 63e ceremonie des Grammy Awards ». V1 n'en avait pratiquement aucune (85
+--   libelles reellement francais sur 100 271). Les 14 631 autres (55,2 %) sont le
+--   repli anglais : l'hypothese de V4 est donc a moitie vraie, elle explique la
+--   moitie du contenu et pas la totalite.
+--
+--   LES PERSONNES SONT PROPRES. Zero ligne. Les 9 855 entrees de prix qui pointent
+--   une personne ne portent aucun nom francais.
+--
+--   LA CONTAMINATION EXISTE MAIS ELLE EST PETITE. 155 lignes dont l'entite est un
+--   film portent un titre de film comme nom de prix, dont 115 le titre francais :
+--   « Les Buddenbrook », « Encanto : La fantastique famille Madrigal », « Happy
+--   Feet ». C'est deux ordres de grandeur sous les 7 028 redoutes, mais ce n'est
+--   pas zero, et V1 signale 315 series jamais testees, soit le double des films.
+--
+-- CE QUI DECIDE MAINTENANT, c'est V6 et rien d'autre. Fuite : ne migrer aucune
+-- page de plus avant d'avoir revu la fonction. Residu : nettoyer les valeurs
+-- anciennes et poursuivre. Les 470 lignes concernees appartenant toutes a la
+-- population condamnee de TMDB-MOVIE-PREPROCESS-036, la suppression prevue la
+-- reglerait a la racine plutot qu'en surface.
 --
 -- LECTURE SEULE. Executer avec --force -t.
 -- ============================================================================
@@ -166,3 +189,73 @@ WHERE  (a.DELETED IS NULL OR a.DELETED = 0)
   AND  a.AWARD_NAME_FR <> a.AWARD_NAME
 ORDER  BY a.ID_AWARD
 LIMIT  20;
+
+
+-- ############################################################################
+-- V5 . LA POPULATION QUE V2 ET V3 AVAIENT OUBLIEE : LES SERIES
+-- ############################################################################
+-- AJOUTE LE 2026-08-20, APRES LA PREMIERE EXECUTION. V1 a rendu 155 entites film
+-- et 0 personne, mais aussi 315 SERIES, et aucun bloc ne les testait. La plus
+-- grosse population contaminee etait donc hors du champ du fichier cense trancher.
+-- Corrige ici plutot que constate ailleurs.
+
+SELECT '=== V5a . lignes award pointant une serie ET portant un nom FR ===' AS section;
+
+SELECT COUNT(*) AS lignes_award_sur_une_serie_avec_nom_fr,
+       SUM(a.AWARD_NAME_FR = s.LABEL_EN) AS nom_fr_egale_le_titre_en,
+       SUM(a.AWARD_NAME_FR = JSON_UNQUOTE(JSON_EXTRACT(s.LABELS_JSON, '$.fr'))) AS nom_fr_egale_le_titre_fr,
+       315 AS repere_v1_20260820
+FROM   T_WC_T2S_AWARD a
+JOIN   T_WC_WIKIDATA_SERIE s ON s.ID_WIKIDATA = a.ID_WIKIDATA
+WHERE  (a.DELETED IS NULL OR a.DELETED = 0)
+  AND  a.AWARD_NAME_FR IS NOT NULL AND a.AWARD_NAME_FR <> '';
+
+SELECT '=== V5b . les vingt premiers cas ===' AS section;
+
+SELECT a.ID_AWARD, a.ID_WIKIDATA,
+       COALESCE(NULLIF(a.AWARD_NAME,''), '(vide)') AS award_name_en,
+       a.AWARD_NAME_FR,
+       s.LABEL_EN AS titre_de_la_serie_en_v2
+FROM   T_WC_T2S_AWARD a
+JOIN   T_WC_WIKIDATA_SERIE s ON s.ID_WIKIDATA = a.ID_WIKIDATA
+WHERE  (a.DELETED IS NULL OR a.DELETED = 0)
+  AND  a.AWARD_NAME_FR IS NOT NULL AND a.AWARD_NAME_FR <> ''
+LIMIT  20;
+
+
+-- ############################################################################
+-- V6 . LA QUESTION QUI COMMANDE LA SUITE : FUITE OU RESIDU ?
+-- ############################################################################
+-- 155 films et 315 series portent un titre d'oeuvre comme nom de prix. Deux
+-- causes possibles, et elles n'appellent pas du tout la meme decision.
+--
+--   (a) FUITE. Ces entites sont AUSSI mises en cache dans T_WC_WIKIDATA_ITEM.
+--       Restreindre la resolution a ITEM ne protege alors de rien, puisque le
+--       titre du film s'y trouve. Les onze pages de tmdb-front restant a migrer
+--       sont exposees, et il faut revoir la fonction avant d'y toucher.
+--
+--   (b) RESIDU. Ces entites ne sont pas dans ITEM, et les valeurs datent d'avant
+--       la restriction : l'ecriture ne remplace jamais par du vide, donc une
+--       mauvaise valeur ancienne survit. La restriction fonctionne, il ne reste
+--       qu'un nettoyage, et la migration des onze pages peut suivre.
+--
+-- La colonne aussi_dans_item tranche : proche de zero = (b), proche du total =
+-- (a). Ne pas migrer une page de plus avant d'avoir lu ce chiffre.
+
+SELECT '=== V6 . les entites contaminees sont-elles aussi dans ITEM ? ===' AS section;
+
+SELECT 'film' AS type_entite,
+       COUNT(*) AS lignes_contaminees,
+       SUM(EXISTS (SELECT 1 FROM T_WC_WIKIDATA_ITEM i WHERE i.ID_WIKIDATA = a.ID_WIKIDATA)) AS aussi_dans_item
+FROM   T_WC_T2S_AWARD a
+JOIN   T_WC_WIKIDATA_MOVIE m ON m.ID_WIKIDATA = a.ID_WIKIDATA
+WHERE  (a.DELETED IS NULL OR a.DELETED = 0)
+  AND  a.AWARD_NAME_FR IS NOT NULL AND a.AWARD_NAME_FR <> ''
+UNION ALL
+SELECT 'serie',
+       COUNT(*),
+       SUM(EXISTS (SELECT 1 FROM T_WC_WIKIDATA_ITEM i WHERE i.ID_WIKIDATA = a.ID_WIKIDATA))
+FROM   T_WC_T2S_AWARD a
+JOIN   T_WC_WIKIDATA_SERIE s ON s.ID_WIKIDATA = a.ID_WIKIDATA
+WHERE  (a.DELETED IS NULL OR a.DELETED = 0)
+  AND  a.AWARD_NAME_FR IS NOT NULL AND a.AWARD_NAME_FR <> '';
