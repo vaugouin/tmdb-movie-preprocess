@@ -1410,3 +1410,138 @@ def refresh_technical_movie_count(connection):
     )
     cursor.execute(strsql)
     connection.commit()
+
+
+# ---------------------------------------------------------------------------
+# TMDB-MOVIE-PREPROCESS-036 : ce qui est une recompense, et ce qui n'en est pas
+# ---------------------------------------------------------------------------
+
+STR_AWARD_CONE_TABLE = "T_WC_T2S_AWARD_CLASS"
+LNG_AWARD_CONE_FLOOR = 10000
+
+
+def f_buildawardconetable():
+    """Rebuild the award class cone: the P279 transitive closure under Q618779.
+
+    Returns the number of classes loaded.
+
+    Why a materialised table rather than a CTE in the driving query: the closure is
+    walked once per run instead of once per row, and the resulting table is tiny
+    (14 260 classes measured 2026-08-19 against 5 227 784 subclass edges).
+
+    The CAST in the anchor is not decorative. Without it MariaDB types the recursive
+    column on the literal's length and rejects its own Q-ids with ERROR 1406.
+    """
+    connection = cp.connectioncp
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS `" + STR_AWARD_CONE_TABLE + "` ("
+            "`ID_CLASS` VARCHAR(50) NOT NULL,"
+            "`DAT_CREAT` DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            "PRIMARY KEY (`ID_CLASS`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        )
+        cursor.execute("TRUNCATE TABLE `" + STR_AWARD_CONE_TABLE + "`")
+        cursor.execute(
+            "INSERT INTO `" + STR_AWARD_CONE_TABLE + "` (ID_CLASS) "
+            "WITH RECURSIVE cone_award (qid) AS ( "
+            "SELECT CAST(r.qid AS CHAR(50)) COLLATE utf8mb4_unicode_ci AS qid "
+            "FROM (SELECT 'Q618779' AS qid) AS r "
+            "UNION "
+            "SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc "
+            "JOIN cone_award c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0 "
+            ") SELECT qid FROM cone_award"
+        )
+        connection.commit()
+        cursor.execute("SELECT COUNT(*) AS COMPTE FROM `" + STR_AWARD_CONE_TABLE + "`")
+        return int(cursor.fetchone()["COMPTE"])
+    finally:
+        cursor.close()
+
+
+def f_awardconeguard(intprocess, lngfloor=LNG_AWARD_CONE_FLOOR):
+    """Rebuild the cone and say whether the caller may filter with it.
+
+    Returns (blnproceed, lngclasses).
+
+    SKIPPING RATHER THAN RAISING, and it is deliberate. The process loop in
+    tmdb-movie-preprocess.py carries no try around its body, so an exception here
+    would cost the fifty processes that follow: movies, series, people, images,
+    videos, seasons, episodes, assertion refresh. The preprocessing runs daily and
+    nothing downstream reads T_WC_T2S_AWARD or T_WC_T2S_NOMINATION inside the same
+    run, so a skipped day leaves both tables one day stale and costs nothing else.
+
+    THE FLOOR TARGETS THE PARTIAL LOAD, NOT THE EMPTY TABLE. An empty
+    T_WC_WIKIDATA_SUBCLASS is the loud failure and any floor catches it. The
+    dangerous case is the crawler halfway through its reload: the cone then holds a
+    plausible-looking few thousand classes, passes a low floor, and the build
+    deletes every award whose class happened to sit in the missing half of the
+    graph. A partial failure clears the sanity checks a total one would trip.
+
+    SKIPPING QUIETLY IS NOT SKIPPING SILENTLY. The class count, the reason and a
+    consecutive-skip streak all land in server variables. A guard that fires often
+    and says nothing stops being read as a signal, and the tables would freeze for
+    weeks without anyone noticing.
+    """
+    lngclasses = f_buildawardconetable()
+    cp.f_setservervariable(
+        "strtmdbmoviepreprocessawardconeclasses", str(lngclasses),
+        "Classes in the P279 award cone at the last award/nomination build (-036)", 0)
+
+    strstreak = cp.f_getservervariable("strtmdbmoviepreprocessawardconeskipstreak", 0)
+    try:
+        lngstreak = int(str(strstreak).strip() or "0")
+    except ValueError:
+        lngstreak = 0
+
+    if lngclasses < lngfloor:
+        lngstreak += 1
+        strreason = (f"process {intprocess} skipped: award cone holds {lngclasses} classes, "
+                     f"floor is {lngfloor}, T_WC_WIKIDATA_SUBCLASS looks incomplete "
+                     f"(streak {lngstreak})")
+        print(strreason)
+        cp.f_setservervariable("strtmdbmoviepreprocessawardconeskipstreak", str(lngstreak),
+                               "Consecutive runs where the award cone was too small to filter (-036)", 0)
+        cp.f_setservervariable("strtmdbmoviepreprocessawardconeskipreason", strreason,
+                               "Why the last award/nomination build was skipped (-036)", 0)
+        return False, lngclasses
+
+    if lngstreak:
+        cp.f_setservervariable("strtmdbmoviepreprocessawardconeskipstreak", "0",
+                               "Consecutive runs where the award cone was too small to filter (-036)", 0)
+        cp.f_setservervariable("strtmdbmoviepreprocessawardconeskipreason", "",
+                               "Why the last award/nomination build was skipped (-036)", 0)
+    return True, lngclasses
+
+
+# La condition qui distingue une recompense du reste. Elle porte sur la VALEUR du
+# statement (ID_ITEM), la ou la requete pilote ne filtrait que le SUJET, celui qui
+# recoit le prix. Deux termes : la classe est dans le cone, OU l'entite n'a aucune
+# classe. Le second n'est pas un relachement, c'est la protection des 552 lignes
+# sans P31 ou se trouvent de vraies recompenses absentes de V2 (Waldo Salt
+# Screenwriting Award, prix Feneon, Gaudi Awards).
+STR_AWARD_CONE_FILTER_DRIVING = (
+    "AND ( "
+    "EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st "
+    "JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT "
+    "JOIN " + STR_AWARD_CONE_TABLE + " ac ON ac.ID_CLASS = iv.ID_ITEM "
+    "WHERE st.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM AND st.ID_PROPERTY = 'P31') "
+    "OR NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st "
+    "WHERE st.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM AND st.ID_PROPERTY = 'P31') "
+    ") "
+)
+
+# Meme regle, ecrite pour la purge, ou la valeur s'appelle w.ID_ITEM. Les deux
+# expressions doivent dire exactement la meme chose : la purge ne supprime pas ce
+# qui est hors du cone, elle supprime ce que la requete pilote ne produit pas. Si
+# l'une des deux bouge sans l'autre, le processus recree chaque nuit ce qu'il vient
+# d'effacer, ou garde ce qu'il devrait jeter.
+STR_AWARD_CONE_FILTER_PURGE = (
+    "      AND ( EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st2 "
+    "JOIN T_WC_WIKIDATA_ITEM_VALUE iv2 ON iv2.ID_STATEMENT = st2.ID_STATEMENT "
+    "JOIN " + STR_AWARD_CONE_TABLE + " ac2 ON ac2.ID_CLASS = iv2.ID_ITEM "
+    "WHERE st2.ID_WIKIDATA = w.ID_ITEM AND st2.ID_PROPERTY = 'P31') "
+    "OR NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st2 "
+    "WHERE st2.ID_WIKIDATA = w.ID_ITEM AND st2.ID_PROPERTY = 'P31') ) "
+)

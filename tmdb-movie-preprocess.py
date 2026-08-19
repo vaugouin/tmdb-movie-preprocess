@@ -29,6 +29,9 @@ from tmdb_preprocess_helpers import (
     f_buildcustomorderbyclause,
     f_getcustomsortby,
     f_getwikidataimagepath,
+    STR_AWARD_CONE_FILTER_DRIVING,
+    STR_AWARD_CONE_FILTER_PURGE,
+    f_awardconeguard,
     f_getwikidatalabel,
     f_linktmdbkeywordtowikidata,
     f_tmdbpersonsetusedfortags,
@@ -2714,6 +2717,14 @@ SET
                 elif intindex == 44:
                     #----------------------------------------------------
                     print("T2S_AWARD processing")
+                    # TMDB-MOVIE-PREPROCESS-036 : le cone P279 sous Q618779 dit ce qui est une
+                    # recompense. Reconstruit ici depuis T_WC_WIKIDATA_SUBCLASS, que le crawler
+                    # Wikidata reecrit a chaque run, d'ou le garde-fou : en dessous du plancher on
+                    # saute le processus au lieu de lever une erreur, la boucle n'ayant pas de try
+                    # et une erreur coutant les cinquante processus suivants. Voir f_awardconeguard.
+                    blnconeok, lngconeclasses = f_awardconeguard(44)
+                    if not blnconeok:
+                        continue
                     telaward = EntityTelemetry("award", 44, "award")
                     telaward.begin()
 
@@ -2736,6 +2747,9 @@ SET
                     strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND s.ID_WIKIDATA <> '') "
                     strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') "
                     strsql += ") "
+                    # -036 : filtre sur la VALEUR, le prix lui-meme, la ou tout ce qui
+                    # precede ne filtrait que le SUJET, celui qui le recoit.
+                    strsql += STR_AWARD_CONE_FILTER_DRIVING
                     strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
 
                     print(strsql)
@@ -2941,6 +2955,7 @@ WHERE NOT EXISTS (
          OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
          OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '')
       )
+""" + STR_AWARD_CONE_FILTER_PURGE + """
 );
                         """
                         print(strsqldelete)
@@ -3025,6 +3040,14 @@ SET
                 elif intindex == 47:
                     #----------------------------------------------------
                     print("T2S_NOMINATION processing")
+                    # TMDB-MOVIE-PREPROCESS-036 : le cone P279 sous Q618779 dit ce qui est une
+                    # recompense. Reconstruit ici depuis T_WC_WIKIDATA_SUBCLASS, que le crawler
+                    # Wikidata reecrit a chaque run, d'ou le garde-fou : en dessous du plancher on
+                    # saute le processus au lieu de lever une erreur, la boucle n'ayant pas de try
+                    # et une erreur coutant les cinquante processus suivants. Voir f_awardconeguard.
+                    blnconeok, lngconeclasses = f_awardconeguard(47)
+                    if not blnconeok:
+                        continue
                     telnomination = EntityTelemetry("nomination", 47, "nomination")
                     telnomination.begin()
 
@@ -3047,6 +3070,9 @@ SET
                     strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND s.ID_WIKIDATA <> '') "
                     strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') "
                     strsql += ") "
+                    # -036 : filtre sur la VALEUR, le prix lui-meme, la ou tout ce qui
+                    # precede ne filtrait que le SUJET, celui qui le recoit.
+                    strsql += STR_AWARD_CONE_FILTER_DRIVING
                     strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
 
                     print(strsql)
@@ -3252,6 +3278,7 @@ WHERE NOT EXISTS (
          OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
          OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '')
       )
+""" + STR_AWARD_CONE_FILTER_PURGE + """
 );
                         """
                         print(strsqldelete)

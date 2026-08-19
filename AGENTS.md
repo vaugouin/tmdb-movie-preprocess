@@ -75,6 +75,40 @@ Representative `T_WC_T2S_*` targets written: the core entities `T_WC_T2S_MOVIE`,
 
 When changing schema, update the matching DDL in `doc/sql/` and quote only table/column names you have verified in code or DDL.
 
+### `T_WC_T2S_AWARD_CLASS`, and why processes 44 and 47 can skip themselves
+
+Built by `f_awardconeguard()` (`tmdb_preprocess_helpers.py`) at the head of process 44
+and 47, this helper table holds the **P279 transitive closure under `Q618779` (award)**,
+14 260 classes measured 2026-08-19. It answers the question the driving queries could
+not ask before WIKIDATA-CRAWLER-020 loaded the subclass graph: *is this value an award*.
+
+The rule those queries now apply on `ID_ITEM`: keep if the value's `P31` class is in the
+cone, **or** if it has no `P31` at all. The second term is not slack, it protects the 552
+rows with no class where real awards missing from V2 live (Waldo Salt Screenwriting
+Award, prix Fénéon, Gaudí Awards). Measured effect: 16 164 rows kept, 27 920 dropped.
+
+**The same rule lives in four places and they must move together**: the driving query and
+the purge `DELETE` of each process. The purge does not remove what is outside the cone,
+it removes what the driving query did not produce, so if one expression drifts from the
+other the process recreates every night what it has just deleted, or keeps what it should
+drop. Both are built from `STR_AWARD_CONE_FILTER_DRIVING` and `STR_AWARD_CONE_FILTER_PURGE`
+for that reason.
+
+**The guard skips instead of raising, deliberately.** The process loop carries no `try`
+around its body, so an exception in process 44 would cost the fifty processes that follow.
+Nothing else in the run reads `T_WC_T2S_AWARD` or `T_WC_T2S_NOMINATION`, so a skipped day
+simply leaves both tables one day stale, on data that moves very slowly.
+
+**The floor of 10 000 targets the partial load, not the empty table.** An empty
+`T_WC_WIKIDATA_SUBCLASS` is the loud failure that any floor catches. The dangerous case is
+the crawler halfway through its reload: the cone then holds a plausible few thousand
+classes, clears a low floor, and the build deletes every award whose class sat in the
+missing half of the graph.
+
+**Skipping quietly is not skipping silently.** `strtmdbmoviepreprocessawardconeclasses`,
+`...awardconeskipstreak` and `...awardconeskipreason` are written every run. Read the
+streak: one skipped day is invisible, three in a row means the crawler dependency is
+broken and the two tables have been frozen since.
 ## SQL Object Naming Conventions
 
 The shared database follows these conventions (consistent across sibling repos) — keep new objects aligned:
