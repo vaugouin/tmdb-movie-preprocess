@@ -9,7 +9,7 @@
 # Reuses the same image + env file as the main job; TMDB_PREPROCESS_SCOPE is passed via
 # -e so the shared env file serves every job.
 #
-# Prerequisite, once: migration-wikipedia-main-image.sql applied on the live DB. Without
+# Prerequisite, once: doc/sql/migration-wikipedia-main-image.sql applied on the live DB. Without
 # it every statement is skipped by the per-statement try/except, which prints 32 SKIPPED
 # lines and updates nothing -- a silence that reads like success, so check the count.
 #

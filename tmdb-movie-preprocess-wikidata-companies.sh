@@ -6,7 +6,7 @@
 # same image and env file; TMDB_PREPROCESS_SCOPE=wikidata-companies (passed via
 # -e, overriding the env file) restricts the run to Process 63 only.
 #
-# PREREQUISITE: apply migration-company-wikidata.sql once on the live DB before
+# PREREQUISITE: apply doc/sql/migration-company-wikidata.sql once on the live DB before
 # the first run (it adds ID_WIKIDATA / WIKIDATA_LABEL / CONFIDENCE /
 # TIM_WIKIPEDIA_SEARCH to T_WC_TMDB_COMPANY).
 #

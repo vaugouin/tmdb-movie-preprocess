@@ -11,7 +11,7 @@
 # kept for targeted / debug runs of a single linker.
 #
 # PREREQUISITE: each linker's schema migration must be applied first (e.g.
-# migration-company-wikidata.sql for Process 63).
+# doc/sql/migration-company-wikidata.sql for Process 63).
 #
 # Schedule this on its own cron cadence (e.g. once a day), independently of the
 # main tmdb-movie-preprocess.sh run.

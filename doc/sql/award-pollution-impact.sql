@@ -18,7 +18,8 @@
 --   I2 . les 30 lignes condamnees les plus referencees, a regarder une par une
 --   I3 . les 552 sans classe : oubli de cache ou vraie pollution ?
 --   I4 . le meme calcul sur T_WC_T2S_NOMINATION, meme mecanisme, meme cone
---   I5 . le contre-test : que reste-t-il d'affichable apres le filtre ?
+--   I5 . le contre-test cote prix : combien de fiches se videraient ?
+--   I6 . le meme contre-test cote nominations, ajoute apres la mesure du 2026-08-20
 --
 -- COMMENT LIRE I1. Si les lignes gardees concentrent la quasi-totalite des liens,
 -- la suppression est indolore et peut se faire. Si les lignes condamnees en
@@ -139,7 +140,7 @@ LEFT   JOIN T_WC_WIKIDATA_ITEM_VALUE iv31 ON iv31.ID_STATEMENT = st31.ID_STATEME
 LEFT   JOIN T_WC_WIKIDATA_ITEM cl ON cl.ID_WIKIDATA = iv31.ID_ITEM
 WHERE  v.dans_le_cone = 0
   AND  v.nb_p31 > 0
-GROUP  BY a.ID_AWARD, a.ID_WIKIDATA, nom, a.AWARD_SOURCE, classe_p31,
+GROUP  BY a.ID_AWARD, a.ID_WIKIDATA, a.AWARD_NAME, a.AWARD_SOURCE,
           lm.n, ls.n, lp.n
 ORDER  BY liens_total DESC
 LIMIT  30;
@@ -290,3 +291,71 @@ FROM   (SELECT sa.ID_SERIE,
         FROM   T_WC_T2S_SERIE_AWARD sa
         WHERE  sa.DELETED IS NULL OR sa.DELETED = 0
         GROUP  BY sa.ID_SERIE) z;
+
+
+-- ############################################################################
+-- I6 . LE MEME CONTRE-TEST SUR LES NOMINATIONS
+-- ############################################################################
+-- AJOUTE LE 2026-08-20, PARCE QUE I4 A INVERSE LE TABLEAU. Sur les recompenses,
+-- le tiers garde porte 73 % des liens et la suppression ne viderait que 1,4 % des
+-- fiches personne. Sur les nominations, le rapport s'inverse : 2 811 lignes
+-- gardees sur 30 602, et les lignes condamnees portent 97 933 liens contre
+-- 49 771. Le fichier mesurait donc les liens perdus sans mesurer les fiches
+-- videes, exactement le defaut que I5 corrige du cote des prix.
+--
+-- Un fort volume de liens condamnes n'est pas une preuve de valeur : ce peut
+-- etre la mesure de la quantite de donnee fausse. Mais on ne peut pas trancher
+-- entre les deux lectures sans savoir combien de fiches se videraient. Ce bloc
+-- le dit, et c'est lui qui autorise ou interdit d'appliquer aux nominations le
+-- filtre valide pour les prix.
+
+SELECT '=== I6 . entites qui perdraient TOUTES leurs nominations ===' AS section;
+
+WITH RECURSIVE cone_award (qid) AS (
+    SELECT CAST(r.qid AS CHAR(50)) COLLATE utf8mb4_unicode_ci AS qid
+    FROM   (SELECT 'Q618779' AS qid) AS r
+    UNION
+    SELECT sc.ID_CHILD
+    FROM   T_WC_WIKIDATA_SUBCLASS sc
+    JOIN   cone_award c ON c.qid = sc.ID_PARENT
+    WHERE  sc.DELETED = 0
+),
+nomination_garde AS (
+    SELECT n.ID_NOMINATION
+    FROM   T_WC_T2S_NOMINATION n
+    JOIN   T_WC_WIKIDATA_STATEMENT st ON st.ID_WIKIDATA = n.ID_WIKIDATA
+                                     AND st.ID_PROPERTY = 'P31'
+    JOIN   T_WC_WIKIDATA_ITEM_VALUE piv ON piv.ID_STATEMENT = st.ID_STATEMENT
+    WHERE  (n.DELETED IS NULL OR n.DELETED = 0)
+      AND  piv.ID_ITEM IN (SELECT qid FROM cone_award)
+    GROUP  BY n.ID_NOMINATION
+)
+SELECT 'personnes' AS entite,
+       COUNT(*)    AS avec_nomination_aujourd_hui,
+       SUM(gardes = 0) AS perdraient_tout,
+       ROUND(100 * SUM(gardes = 0) / COUNT(*), 1) AS pct
+FROM   (SELECT pn.ID_PERSON,
+               SUM(pn.ID_NOMINATION IN (SELECT ID_NOMINATION FROM nomination_garde)) AS gardes
+        FROM   T_WC_T2S_PERSON_NOMINATION pn
+        WHERE  pn.DELETED IS NULL OR pn.DELETED = 0
+        GROUP  BY pn.ID_PERSON) x
+UNION ALL
+SELECT 'films',
+       COUNT(*),
+       SUM(gardes = 0),
+       ROUND(100 * SUM(gardes = 0) / COUNT(*), 1)
+FROM   (SELECT mn.ID_MOVIE,
+               SUM(mn.ID_NOMINATION IN (SELECT ID_NOMINATION FROM nomination_garde)) AS gardes
+        FROM   T_WC_T2S_MOVIE_NOMINATION mn
+        WHERE  mn.DELETED IS NULL OR mn.DELETED = 0
+        GROUP  BY mn.ID_MOVIE) y
+UNION ALL
+SELECT 'series',
+       COUNT(*),
+       SUM(gardes = 0),
+       ROUND(100 * SUM(gardes = 0) / COUNT(*), 1)
+FROM   (SELECT sn.ID_SERIE,
+               SUM(sn.ID_NOMINATION IN (SELECT ID_NOMINATION FROM nomination_garde)) AS gardes
+        FROM   T_WC_T2S_SERIE_NOMINATION sn
+        WHERE  sn.DELETED IS NULL OR sn.DELETED = 0
+        GROUP  BY sn.ID_SERIE) z;

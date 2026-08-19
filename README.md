@@ -89,14 +89,14 @@ pattern to `T_WC_TMDB_COMPANY`. It is network-bound and rate-limited like Proces
 
 **Prerequisite — run the migration once.** Process 63 writes to four new columns
 that do not exist on a fresh `T_WC_TMDB_COMPANY`. Apply
-[`migration-company-wikidata.sql`](migration-company-wikidata.sql) on the live DB
+[`doc/sql/migration-company-wikidata.sql`](doc/sql/migration-company-wikidata.sql) on the live DB
 first (it adds `ID_WIKIDATA`, `WIKIDATA_LABEL`, `CONFIDENCE`,
 `TIM_WIKIPEDIA_SEARCH` + indexes, mirroring `T_WC_TMDB_KEYWORD`). For example, via
 the MariaDB container:
 
 ```bash
 docker exec -i <mariadb-container> \
-    mysql -u<user> -p<password> <dbname> < migration-company-wikidata.sql
+    mysql -u<user> -p<password> <dbname> < doc/sql/migration-company-wikidata.sql
 ```
 
 (or run the same SQL through phpMyAdmin). The canonical schema dump in
@@ -134,7 +134,7 @@ blocklist still applies, so existing behaviour is unchanged.
 > After review, the allowlist can be tuned and the same pattern replicated to
 > networks, genres, and characters. The `tmdb-front` company page already renders
 > the `ID_WIKIDATA` (id + Wikidata media + properties) when present. Review match
-> quality with [`doc/queries/wikidata-company-review.sql`](doc/queries/wikidata-company-review.sql).
+> quality with [`doc/sql/wikidata-company-review.sql`](doc/sql/wikidata-company-review.sql).
 
 ### Decoupled all-Wikidata job (recommended for scheduling)
 

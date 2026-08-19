@@ -809,7 +809,7 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                     # essentially never with non-media brands, so they are TRUSTED like
                     # the strong film types, NOT quarantined. QIDs label-verified
                     # against Wikidata; derived from the missed-P31 review query
-                    # (doc/queries/wikidata-company-missed-p31.sql).
+                    # (doc/sql/wikidata-company-missed-p31.sql).
                     arrcompanybroadcasttypes = {
                         "Q11396960",  # production company
                         "Q10689397",  # television production company
