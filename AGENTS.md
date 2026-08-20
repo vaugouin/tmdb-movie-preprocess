@@ -43,6 +43,13 @@ This repo is parallel to the sibling preprocessing repos `tmdb-person-preprocess
 - **DB access goes through `citizenphil` (`cp`)** — do not open ad-hoc connections. Use `cp.f_getconnection()` for the shared connection and `cp.f_sqlupdatearray(table, dict, where, addstdfields)` for idempotent single-row upserts. Always escape literals with `cp.f_stringtosql()` (note: most bulk SQL is built as f-strings — keep using parameterised/escaped values for any user/source-derived text).
 - **Standard audit columns:** when `f_sqlupdatearray` is called with `intaddstdfields = 1`, it auto-fills `TIM_UPDATED`, `DELETED`, `DAT_CREAT`, `ID_CREATOR`, `ID_OWNER`, `ID_USER_UPDATED` on insert. Pass `0` for tables that don't carry them.
 - **Progress is reported via server variables**, not logs alone: `cp.f_setservervariable(name, value, desc, 0)` persists current process / sub-process / current entity ID to `T_WC_SERVER_VARIABLE` for external monitoring. Keep updating these when you add a step.
+- **Timers: the run clock is `dblrunstarttime` / `dblrunendtime`, never `start_time`.** Four processes
+  keep a local `start_time` for their own elapsed-time print, and they are 20 spaces deep in the same
+  function, so they simply overwrite anything the run level put there. Until 2026-08-21 the total-runtime
+  variable was computed from `start_time` and therefore measured **the last process that had reassigned
+  it**: the run of 2026-08-20, an hour and 27 minutes long, reported 58 seconds. Nothing in the data was
+  wrong, which is why it went unnoticed for so long. If you add a timer, give it a local name and leave
+  the two `dblrun*` alone.
 - **Multiple cursors** (`cursor`, `cursor2` … `cursor5`) are opened up front so independent reads/writes can interleave within one process.
 - **Idempotent upserts:** copy steps use `INSERT … ON DUPLICATE KEY UPDATE` plus a scoped stale-delete (delete rows in the processed ID range that no longer exist in source), so the pipeline is safe to re-run.
 - **Batch / chunk processing:** row-copy processes iterate source IDs in chunks of 1000; `batch_update_data` flushes DataFrame updates in batches of 1000.

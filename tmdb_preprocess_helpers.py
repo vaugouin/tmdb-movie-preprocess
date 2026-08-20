@@ -1507,11 +1507,16 @@ def f_awardconeguard(intprocess, lngfloor=LNG_AWARD_CONE_FLOOR):
                                "Why the last award/nomination build was skipped (-036)", 0)
         return False, lngclasses
 
-    if lngstreak:
-        cp.f_setservervariable("strtmdbmoviepreprocessawardconeskipstreak", "0",
-                               "Consecutive runs where the award cone was too small to filter (-036)", 0)
-        cp.f_setservervariable("strtmdbmoviepreprocessawardconeskipreason", "",
-                               "Why the last award/nomination build was skipped (-036)", 0)
+    # Ecrire 0 SYSTEMATIQUEMENT, et non seulement pour remettre une serie a zero.
+    # Corrige le 2026-08-21 : la premiere execution reelle n'a rien ecrit du tout,
+    # puisque la serie valait deja 0 et que la remise a zero etait conditionnelle. La
+    # variable etait donc absente, et l'absence ne se distingue pas de « n'a jamais
+    # tourne avec ce code ». Un garde-fou dont l'etat sain est invisible ne renseigne
+    # que sur ses echecs, ce qui est precisement l'inverse du but.
+    cp.f_setservervariable("strtmdbmoviepreprocessawardconeskipstreak", "0",
+                           "Consecutive runs where the award cone was too small to filter (-036)", 0)
+    cp.f_setservervariable("strtmdbmoviepreprocessawardconeskipreason", "",
+                           "Why the last award/nomination build was skipped (-036)", 0)
     return True, lngclasses
 
 

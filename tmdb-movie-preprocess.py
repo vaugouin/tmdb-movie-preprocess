@@ -88,7 +88,12 @@ try:
             cursor3 = conn.cursor()
             cursor4 = conn.cursor()
             cursor5 = conn.cursor()
-            start_time = time.time()
+            # L'horloge du RUN porte un nom qui lui est propre depuis le 2026-08-21. Elle
+            # s'appelait start_time, comme les quatre chronometres locaux des processus qui
+            # l'ecrasaient au passage : le calcul de duree totale, en fin de fichier, mesurait
+            # donc le dernier processus a l'avoir reaffectee. Le run du 2026-08-20, long d'1 h 27,
+            # s'est ainsi declare long de 58 secondes. Meme raison pour dblrunendtime.
+            dblrunstarttime = time.time()
             strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
             cp.f_setservervariable("strtmdbmoviepreprocessstartdatetime",strnow,"Date and time of the last start of the TMDb database preprocess",0)
             strprocessesexecutedprevious = cp.f_getservervariable("strtmdbmoviepreprocessprocessesexecuted",0)
@@ -7356,8 +7361,8 @@ WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '' """
             strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
             cp.f_setservervariable("strtmdbmoviepreprocessenddatetime",strnow,"Date and time of the TMDb database preprocess ending",0)
             # Calculate total runtime and convert to readable format
-            end_time = time.time()
-            strtotalruntime = int(end_time - start_time)  # Total runtime in seconds
+            dblrunendtime = time.time()
+            strtotalruntime = int(dblrunendtime - dblrunstarttime)  # Total runtime in seconds
             readable_duration = cp.convert_seconds_to_duration(strtotalruntime)
             cp.f_setservervariable("strtmdbmoviepreprocesstotalruntime",readable_duration,strtotalruntimedesc,0)
             print(f"Total runtime: {strtotalruntime} seconds ({readable_duration})")
