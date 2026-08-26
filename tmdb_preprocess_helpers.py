@@ -1560,11 +1560,21 @@ STR_AWARD_CONE_FILTER_PURGE = (
 # choix doit etre le meme d'une execution a l'autre, sinon la colonne change de
 # valeur sans que rien n'ait bouge dans Wikidata.
 #
-# La regle de choix : le rang que Wikidata declare le meilleur, puis l'ordre
-# d'affichage, puis l'identifiant du statement pour trancher les ex aequo. Les deux
-# premiers criteres sont nullables, d'ou les COALESCE : sans eux, une valeur sans
-# ordre d'affichage passerait DEVANT une valeur ordonnee, ce qui est l'inverse de
-# l'intention.
+# La regle de choix, corrigee le 2026-08-26 par la recette elle-meme. La premiere
+# version triait sur IS_BEST_VALUE puis DISPLAY_ORDER : la section B a montre que
+# ces deux colonnes sont VIDES pour les quatre proprietes, et l'ETL confirme
+# pourquoi, il les ecrit en dur a None (wikidata_dump_etl.py:880-881). Deux criteres
+# sur trois etaient donc morts, et le choix tombait en realite sur ID_STATEMENT seul.
+#
+# La colonne reellement remplie est RANK, et elle vaut mieux que les deux autres
+# puisqu'elle porte le jugement de Wikidata elle-meme. D'ou la regle actuelle :
+#   1. on ECARTE 'deprecated', un rang qui signifie « Wikidata tient cette valeur
+#      pour fausse ». L'ancienne regle pouvait la choisir, et c'etait un defaut de
+#      correction, pas un detail de tri.
+#   2. 'preferred' passe devant le reste.
+#   3. a egalite, ID_STATEMENT, qui suit l'ordre des claims dans le dump, c'est-a-dire
+#      l'ordre d'affichage de Wikidata. C'est le remplacant naturel de DISPLAY_ORDER,
+#      tant que celui-ci reste vide.
 #
 # Ce n'est PAS une reproduction de V1, et il faut le savoir avant de comparer. V1
 # gardait la DERNIERE valeur renvoyee par SPARQL (sparql-crawler.py:1323 : une
@@ -1618,9 +1628,9 @@ def f_wikidatabestvaluesql(strpropertyid, strvaluetable, strvaluecolumn, strsubj
         f"ON {strvaluealias}.ID_STATEMENT = {strprefix}.ID_STATEMENT "
         f"WHERE {strprefix}.ID_WIKIDATA = {strsubjectexpr} "
         f"AND {strprefix}.ID_PROPERTY = '{strpropertyid}' "
+        f"AND ({strprefix}.`RANK` IS NULL OR {strprefix}.`RANK` <> 'deprecated') "
         f"{strguard}"
-        f"ORDER BY COALESCE({strprefix}.IS_BEST_VALUE, 0) DESC, "
-        f"COALESCE({strprefix}.DISPLAY_ORDER, 2147483647) ASC, "
+        f"ORDER BY ({strprefix}.`RANK` = 'preferred') DESC, "
         f"{strprefix}.ID_STATEMENT ASC "
         f"LIMIT 1)"
     )

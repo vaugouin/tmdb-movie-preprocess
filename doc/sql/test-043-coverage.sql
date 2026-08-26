@@ -60,6 +60,7 @@ LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             FROM T_WC_WIKIDATA_STATEMENT st
             JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = st.ID_STATEMENT
             WHERE st.ID_PROPERTY = 'P11460'
+              AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
               AND CHAR_LENGTH(ev.VALUE_EXTERNAL_ID) <= 50 ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
 
@@ -82,6 +83,7 @@ LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             FROM T_WC_WIKIDATA_STATEMENT st
             JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = st.ID_STATEMENT
             WHERE st.ID_PROPERTY = 'P9584'
+              AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
               AND ev.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
 
@@ -100,6 +102,7 @@ LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             FROM T_WC_WIKIDATA_STATEMENT st
             JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = st.ID_STATEMENT
             WHERE st.ID_PROPERTY = 'P12279'
+              AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
               AND ev.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
 
@@ -117,7 +120,8 @@ INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             FROM T_WC_WIKIDATA_STATEMENT st
             JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT
-            WHERE st.ID_PROPERTY = 'P31' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
+            WHERE st.ID_PROPERTY = 'P31'
+              AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated') ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> '';
 
 
@@ -136,6 +140,7 @@ LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             FROM T_WC_WIKIDATA_STATEMENT st
             JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = st.ID_STATEMENT
             WHERE st.ID_PROPERTY = 'P11460'
+              AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
               AND CHAR_LENGTH(ev.VALUE_EXTERNAL_ID) <= 50 ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
 
@@ -153,7 +158,8 @@ INNER JOIN T_WC_WIKIDATA_SERIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             FROM T_WC_WIKIDATA_STATEMENT st
             JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT
-            WHERE st.ID_PROPERTY = 'P31' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
+            WHERE st.ID_PROPERTY = 'P31'
+              AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated') ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> '';
 
 
@@ -171,7 +177,8 @@ INNER JOIN T_WC_WIKIDATA_PERSON_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             FROM T_WC_WIKIDATA_STATEMENT st
             JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT
-            WHERE st.ID_PROPERTY = 'P31' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
+            WHERE st.ID_PROPERTY = 'P31'
+              AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated') ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
   AND t2s.ID_WIKIDATA IS NOT NULL AND t2s.ID_WIKIDATA <> '';
 
@@ -190,10 +197,21 @@ WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
 
 SELECT 'B. Entites portant plus d une valeur pour la propriete' AS SECTION;
 
-SELECT st.ID_PROPERTY                                  AS PROPRIETE,
-       COUNT(DISTINCT st.ID_WIKIDATA)                  AS ENTITES,
-       COUNT(*)                                        AS STATEMENTS,
-       SUM(st.IS_BEST_VALUE = 1)                       AS MARQUES_MEILLEURS
+-- Le premier passage du 2026-08-26 a rendu MARQUES_MEILLEURS a NULL sur les quatre
+-- proprietes : IS_BEST_VALUE et DISPLAY_ORDER ne sont JAMAIS remplies, l'ETL les
+-- ecrit en dur a None (wikidata_dump_etl.py:880-881). La regle de choix a ete
+-- refaite sur RANK, seule colonne d'ordonnancement reellement alimentee. Cette
+-- section mesure donc RANK, et verifie que les deux autres restent bien vides :
+-- le jour ou elles se remplissent, la regle merite d'etre revue.
+SELECT st.ID_PROPERTY                        AS PROPRIETE,
+       COUNT(DISTINCT st.ID_WIKIDATA)        AS ENTITES,
+       COUNT(*)                              AS STATEMENTS,
+       SUM(st.`RANK` = 'preferred')          AS RANG_PREFERE,
+       SUM(st.`RANK` = 'normal')             AS RANG_NORMAL,
+       SUM(st.`RANK` = 'deprecated')         AS RANG_DEPRECIE,
+       SUM(st.`RANK` IS NULL)                AS RANG_ABSENT,
+       SUM(st.IS_BEST_VALUE IS NOT NULL)     AS BEST_VALUE_REMPLI,
+       SUM(st.DISPLAY_ORDER IS NOT NULL)     AS DISPLAY_ORDER_REMPLI
 FROM T_WC_WIKIDATA_STATEMENT st
 WHERE st.ID_PROPERTY IN ('P11460','P9584','P12279','P31')
 GROUP BY st.ID_PROPERTY
@@ -242,8 +260,8 @@ FROM ( SELECT t2s.ID_WIKIDATA,
                 JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE scrv ON scrv.ID_STATEMENT = scr.ID_STATEMENT
                 WHERE scr.ID_WIKIDATA = t2s.ID_WIKIDATA AND scr.ID_PROPERTY = 'P9584'
                   AND scrv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
-                ORDER BY COALESCE(scr.IS_BEST_VALUE, 0) DESC,
-                         COALESCE(scr.DISPLAY_ORDER, 2147483647) ASC, scr.ID_STATEMENT ASC
+                  AND (scr.`RANK` IS NULL OR scr.`RANK` <> 'deprecated')
+                ORDER BY (scr.`RANK` = 'preferred') DESC, scr.ID_STATEMENT ASC
                 LIMIT 1 ) AS V2VAL
        FROM T_WC_T2S_MOVIE t2s
        INNER JOIN T_WC_WIKIDATA_MOVIE_V1 wd ON wd.ID_WIKIDATA = t2s.ID_WIKIDATA
@@ -262,8 +280,8 @@ FROM ( SELECT t2s.ID_WIKIDATA,
                 JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE scrv ON scrv.ID_STATEMENT = scr.ID_STATEMENT
                 WHERE scr.ID_WIKIDATA = t2s.ID_WIKIDATA AND scr.ID_PROPERTY = 'P9584'
                   AND scrv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
-                ORDER BY COALESCE(scr.IS_BEST_VALUE, 0) DESC,
-                         COALESCE(scr.DISPLAY_ORDER, 2147483647) ASC, scr.ID_STATEMENT ASC
+                  AND (scr.`RANK` IS NULL OR scr.`RANK` <> 'deprecated')
+                ORDER BY (scr.`RANK` = 'preferred') DESC, scr.ID_STATEMENT ASC
                 LIMIT 1 ) AS V2VAL
        FROM T_WC_T2S_MOVIE t2s
        INNER JOIN T_WC_WIKIDATA_MOVIE_V1 wd ON wd.ID_WIKIDATA = t2s.ID_WIKIDATA
@@ -285,8 +303,8 @@ FROM ( SELECT t2s.ID_WIKIDATA,
                 FROM T_WC_WIKIDATA_STATEMENT sio
                 JOIN T_WC_WIKIDATA_ITEM_VALUE siov ON siov.ID_STATEMENT = sio.ID_STATEMENT
                 WHERE sio.ID_WIKIDATA = t2s.ID_WIKIDATA AND sio.ID_PROPERTY = 'P31'
-                ORDER BY COALESCE(sio.IS_BEST_VALUE, 0) DESC,
-                         COALESCE(sio.DISPLAY_ORDER, 2147483647) ASC, sio.ID_STATEMENT ASC
+                  AND (sio.`RANK` IS NULL OR sio.`RANK` <> 'deprecated')
+                ORDER BY (sio.`RANK` = 'preferred') DESC, sio.ID_STATEMENT ASC
                 LIMIT 1 ) AS V2VAL
        FROM T_WC_T2S_MOVIE t2s
        WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
@@ -303,8 +321,8 @@ FROM ( SELECT ( SELECT siov.ID_ITEM
                 FROM T_WC_WIKIDATA_STATEMENT sio
                 JOIN T_WC_WIKIDATA_ITEM_VALUE siov ON siov.ID_STATEMENT = sio.ID_STATEMENT
                 WHERE sio.ID_WIKIDATA = t2s.ID_WIKIDATA AND sio.ID_PROPERTY = 'P31'
-                ORDER BY COALESCE(sio.IS_BEST_VALUE, 0) DESC,
-                         COALESCE(sio.DISPLAY_ORDER, 2147483647) ASC, sio.ID_STATEMENT ASC
+                  AND (sio.`RANK` IS NULL OR sio.`RANK` <> 'deprecated')
+                ORDER BY (sio.`RANK` = 'preferred') DESC, sio.ID_STATEMENT ASC
                 LIMIT 1 ) AS V2VAL
        FROM T_WC_T2S_MOVIE t2s
        WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
@@ -349,12 +367,23 @@ SELECT ev.VALUE_EXTERNAL_ID, CHAR_LENGTH(ev.VALUE_EXTERNAL_ID) AS LONGUEUR, COUN
 FROM T_WC_WIKIDATA_STATEMENT st
 JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = st.ID_STATEMENT
 WHERE st.ID_PROPERTY = 'P11460'
+              AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
   AND CHAR_LENGTH(ev.VALUE_EXTERNAL_ID) > 50
 GROUP BY ev.VALUE_EXTERNAL_ID
 ORDER BY LONGUEUR DESC
 LIMIT 20;
 
-SELECT 'D2. Zeros presents dans T2S (attendu : 0 avant comme apres)' AS SECTION;
+-- ⚠ L'ATTENDU ANNONCE ICI ETAIT FAUX, et le premier passage l'a corrige. Avant
+-- bascule, T_WC_T2S_MOVIE porte 247 392 zeros sur ID_CRITERION et 247 839 sur
+-- ID_CRITERION_SPINE : V1 range 0, et non NULL, pour « ce film n'est pas chez
+-- Criterion », et l'UPDATE recopiait ce 0. C'est la source exacte de l'artefact qui
+-- avait fait annoncer « 0 Criterion retrouve sur 19 924 » : un IS NOT NULL comptait
+-- ces 247 392 zeros comme des valeurs.
+--
+-- Apres bascule, la sous-requete rend NULL quand aucun statement n'existe. Les deux
+-- compteurs doivent donc tomber a ZERO. Ce n'est pas une perte de donnee, c'est la
+-- disparition d'une fausse presence : 0 n'a jamais designe un film Criterion.
+SELECT 'D2. Zeros presents dans T2S (0 attendu APRES seulement, voir ci-dessus)' AS SECTION;
 
 SELECT SUM(ID_CRITERION = 0)       AS CRITERION_ZERO,
        SUM(ID_CRITERION_SPINE = 0) AS SPINE_ZERO
@@ -408,6 +437,6 @@ WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
               FROM T_WC_WIKIDATA_STATEMENT sio
               JOIN T_WC_WIKIDATA_ITEM_VALUE siov ON siov.ID_STATEMENT = sio.ID_STATEMENT
               WHERE sio.ID_WIKIDATA = t2s.ID_WIKIDATA AND sio.ID_PROPERTY = 'P31'
-              ORDER BY COALESCE(sio.IS_BEST_VALUE, 0) DESC,
-                       COALESCE(sio.DISPLAY_ORDER, 2147483647) ASC, sio.ID_STATEMENT ASC
+                AND (sio.`RANK` IS NULL OR sio.`RANK` <> 'deprecated')
+              ORDER BY (sio.`RANK` = 'preferred') DESC, sio.ID_STATEMENT ASC
               LIMIT 1 ) );
