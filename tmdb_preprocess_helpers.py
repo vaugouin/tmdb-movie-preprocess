@@ -1550,3 +1550,92 @@ STR_AWARD_CONE_FILTER_PURGE = (
     "OR NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st2 "
     "WHERE st2.ID_WIKIDATA = w.ID_ITEM AND st2.ID_PROPERTY = 'P31') ) "
 )
+
+
+# ---- TMDB-MOVIE-PREPROCESS-043 : lire UNE valeur de statement V2 ---------------------
+#
+# V1 rangeait un fait par colonne, une valeur par entite. V2 range les faits en
+# statements, et rien n'interdit qu'une entite en porte plusieurs pour la meme
+# propriete. Les colonnes T2S visees sont scalaires : il faut donc CHOISIR, et le
+# choix doit etre le meme d'une execution a l'autre, sinon la colonne change de
+# valeur sans que rien n'ait bouge dans Wikidata.
+#
+# La regle de choix : le rang que Wikidata declare le meilleur, puis l'ordre
+# d'affichage, puis l'identifiant du statement pour trancher les ex aequo. Les deux
+# premiers criteres sont nullables, d'ou les COALESCE : sans eux, une valeur sans
+# ordre d'affichage passerait DEVANT une valeur ordonnee, ce qui est l'inverse de
+# l'intention.
+#
+# Ce n'est PAS une reproduction de V1, et il faut le savoir avant de comparer. V1
+# gardait la DERNIERE valeur renvoyee par SPARQL (sparql-crawler.py:1323 : une
+# affectation dans une boucle, sans regle de tri), c'est-a-dire une valeur
+# arbitraire. Il n'existe donc aucune valeur V1 a retrouver a l'identique : la
+# recette porte sur la couverture, jamais sur l'egalite valeur par valeur.
+#
+# Pas de filtre DELETED, volontairement : STR_AWARD_CONE_FILTER_DRIVING n'en pose
+# pas non plus, et deux lectures V2 qui ne filtrent pas pareil finissent par
+# diverger sans que personne ne s'en apercoive.
+STR_WD_PROPERTY_INSTANCE_OF = "P31"
+STR_WD_PROPERTY_PLEX = "P11460"
+STR_WD_PROPERTY_CRITERION = "P9584"
+STR_WD_PROPERTY_CRITERION_SPINE = "P12279"
+
+
+def f_wikidatabestvaluesql(strpropertyid, strvaluetable, strvaluecolumn, strsubjectexpr,
+                           blnnumeric=False, strprefix="sv", intmaxlength=0):
+    """Sous-requete correlee rendant UNE valeur de statement V2, ou NULL.
+
+    strsubjectexpr est l'expression SQL qui designe le sujet dans la requete
+    englobante (par exemple "t2s.ID_WIKIDATA"). strprefix distingue les alias
+    quand plusieurs appels cohabitent dans la meme requete : ils sont dans des
+    sous-requetes disjointes, mais un alias unique reste plus lisible a l'EXPLAIN.
+    """
+    strvaluealias = strprefix + "v"
+    strvalueexpr = f"{strvaluealias}.{strvaluecolumn}"
+    strguard = ""
+    if blnnumeric:
+        # Un identifiant externe est du TEXTE. Le couler dans une colonne INT sans
+        # garde rend 0 pour toute valeur non numerique, et un 0 se lit comme
+        # « present » par un IS NOT NULL distrait : c'est exactement l'artefact qui
+        # avait fait annoncer « 0 Criterion retrouve sur 19 924 » alors que le vrai
+        # chiffre etait 1 673 sur 1 673. On ecarte la valeur plutot que de la
+        # convertir en zero.
+        strguard = f"AND {strvaluealias}.{strvaluecolumn} REGEXP '^[0-9]+$' "
+        strvalueexpr = f"CAST({strvalueexpr} AS UNSIGNED)"
+    if intmaxlength:
+        # La valeur externe V2 est en varchar(1200), les colonnes T2S visees sont bien
+        # plus courtes. Une valeur trop longue ferait tronquer en silence, ou avorter le
+        # processus si le serveur est en mode strict, et un processus de nuit qui
+        # s'arrete sur une ligne aberrante coute la totalite des processus suivants. On
+        # ecarte donc la valeur, comme on ecarte une valeur non numerique : la recette
+        # (test-043-coverage.sql, section D3) compte ce qui est ecarte, pour que le choix
+        # reste visible plutot que silencieux.
+        strguard += f"AND CHAR_LENGTH({strvaluealias}.{strvaluecolumn}) <= {intmaxlength} "
+    return (
+        f"(SELECT {strvalueexpr} "
+        f"FROM T_WC_WIKIDATA_STATEMENT {strprefix} "
+        f"JOIN {strvaluetable} {strvaluealias} "
+        f"ON {strvaluealias}.ID_STATEMENT = {strprefix}.ID_STATEMENT "
+        f"WHERE {strprefix}.ID_WIKIDATA = {strsubjectexpr} "
+        f"AND {strprefix}.ID_PROPERTY = '{strpropertyid}' "
+        f"{strguard}"
+        f"ORDER BY COALESCE({strprefix}.IS_BEST_VALUE, 0) DESC, "
+        f"COALESCE({strprefix}.DISPLAY_ORDER, 2147483647) ASC, "
+        f"{strprefix}.ID_STATEMENT ASC "
+        f"LIMIT 1)"
+    )
+
+
+def f_wikidatainstanceofsql(strsubjectexpr, strprefix="sio"):
+    """INSTANCE_OF (P31) : la classe principale de l'entite, ou NULL."""
+    return f_wikidatabestvaluesql(STR_WD_PROPERTY_INSTANCE_OF,
+                                  "T_WC_WIKIDATA_ITEM_VALUE", "ID_ITEM",
+                                  strsubjectexpr, False, strprefix)
+
+
+def f_wikidataexternalidsql(strpropertyid, strsubjectexpr, blnnumeric=False, strprefix="sx",
+                            intmaxlength=0):
+    """Un identifiant externe (Plex, Criterion, ...), ou NULL."""
+    return f_wikidatabestvaluesql(strpropertyid,
+                                  "T_WC_WIKIDATA_EXTERNAL_ID_VALUE", "VALUE_EXTERNAL_ID",
+                                  strsubjectexpr, blnnumeric, strprefix, intmaxlength)

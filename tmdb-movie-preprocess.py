@@ -33,6 +33,11 @@ from tmdb_preprocess_helpers import (
     STR_AWARD_CONE_FILTER_PURGE,
     f_awardconeguard,
     f_getwikidatalabel,
+    f_wikidataexternalidsql,
+    f_wikidatainstanceofsql,
+    STR_WD_PROPERTY_CRITERION,
+    STR_WD_PROPERTY_CRITERION_SPINE,
+    STR_WD_PROPERTY_PLEX,
     f_linktmdbkeywordtowikidata,
     f_tmdbpersonsetusedfortags,
     f_wikidataentitysummary,
@@ -4089,17 +4094,34 @@ ON DUPLICATE KEY UPDATE
                             cursor2.execute(strsqlmovies)
                             cp.connectioncp.commit()
 
-                            # Wikidata V1 enrichment
+                            # ---- TMDB-MOVIE-PREPROCESS-043 : enrichissement Wikidata, V1 vers V2 ----
+                            # Quatre colonnes passent aux statements V2 : Plex, les deux Criterion et
+                            # INSTANCE_OF. La regle de choix d'une valeur unique, et pourquoi il faut
+                            # en avoir une, sont expliquees sur f_wikidatabestvaluesql.
+                            #
+                            # ALIASES disparait de l'UPDATE : donnee morte, V1 ne la collecte plus
+                            # (arbitrage du 2026-08-17). La colonne T2S garde donc sa derniere valeur.
+                            # La supprimer est une decision de schema, pas de ce ticket.
+                            #
+                            # La jointure sur V1 RESTE, et ce n'est pas un oubli. WIKIDATA_TITLE est un
+                            # libelle, bloque par WIKIDATA-CRAWLER-017 (voir -042). Tant qu'elle tient,
+                            # la population enrichie reste celle de V1. Changer les colonnes ET la
+                            # population dans le meme pas rendrait la comparaison avant/apres
+                            # illisible : on ne saurait plus si un ecart vient de la nouvelle source
+                            # ou de lignes nouvellement eligibles. La jointure tombera avec -042.
+                            strsqlplex = f_wikidataexternalidsql(STR_WD_PROPERTY_PLEX, "t2s.ID_WIKIDATA", False, "spx", 50)
+                            strsqlcriterion = f_wikidataexternalidsql(STR_WD_PROPERTY_CRITERION, "t2s.ID_WIKIDATA", True, "scr")
+                            strsqlspine = f_wikidataexternalidsql(STR_WD_PROPERTY_CRITERION_SPINE, "t2s.ID_WIKIDATA", True, "scs")
+                            strsqlinstanceof = f_wikidatainstanceofsql("t2s.ID_WIKIDATA", "sio")
                             strsqlmovies = f"""
 UPDATE T_WC_T2S_MOVIE t2s
 INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 SET t2s.WIKIDATA_TITLE = w.TITLE,
-    t2s.ALIASES = w.ALIASES,
-    t2s.PLEX_MEDIA_KEY = w.PLEX_MEDIA_KEY,
-    t2s.ID_CRITERION = w.ID_CRITERION,
-    t2s.ID_CRITERION_SPINE = w.ID_CRITERION_SPINE,
-    t2s.INSTANCE_OF = w.INSTANCE_OF
+    t2s.PLEX_MEDIA_KEY = {strsqlplex},
+    t2s.ID_CRITERION = {strsqlcriterion},
+    t2s.ID_CRITERION_SPINE = {strsqlspine},
+    t2s.INSTANCE_OF = {strsqlinstanceof}
 WHERE t2s.ID_MOVIE BETWEEN {lngmovierangestart} AND {lngmovierangeend}
     AND t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
@@ -4261,14 +4283,18 @@ WHERE t2s.ID_IMDB IS NOT NULL
                         cursor2.execute(strsqlseries)
                         cp.connectioncp.commit()
 
-                        strsqlseries = """
+                        # TMDB-MOVIE-PREPROCESS-043 : jumeau du bloc film, memes regles et memes
+                        # raisons (voir le commentaire du processus 4). La serie n'a pas de
+                        # Criterion : deux colonnes seulement passent en V2.
+                        strsqlplex = f_wikidataexternalidsql(STR_WD_PROPERTY_PLEX, "t2s.ID_WIKIDATA", False, "spx", 50)
+                        strsqlinstanceof = f_wikidatainstanceofsql("t2s.ID_WIKIDATA", "sio")
+                        strsqlseries = f"""
 UPDATE T_WC_T2S_SERIE t2s
 INNER JOIN T_WC_WIKIDATA_SERIE_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 SET t2s.WIKIDATA_TITLE = w.TITLE,
-    t2s.ALIASES = w.ALIASES,
-    t2s.PLEX_MEDIA_KEY = w.PLEX_MEDIA_KEY,
-    t2s.INSTANCE_OF = w.INSTANCE_OF
+    t2s.PLEX_MEDIA_KEY = {strsqlplex},
+    t2s.INSTANCE_OF = {strsqlinstanceof}
 WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
                         cursor2.execute(strsqlseries)
@@ -4425,13 +4451,16 @@ WHERE src.ID_PERSON IS NULL """
 
                         # ---- Enrichment: full-table set-based pass, ONCE (was per-chunk) ---------
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Enrich T2S_PERSON (Wikidata)","Current sub process in the TMDb database person preprocess",0)
-                        strsqlpersons = """
+                        # TMDB-MOVIE-PREPROCESS-043 : troisieme jumeau (voir le processus 4).
+                        # Une seule colonne passe en V2, INSTANCE_OF ; WIKIDATA_NAME est un
+                        # libelle et reste sur V1 jusqu'a WIKIDATA-CRAWLER-017.
+                        strsqlinstanceof = f_wikidatainstanceofsql("t2s.ID_WIKIDATA", "sio")
+                        strsqlpersons = f"""
 UPDATE T_WC_T2S_PERSON t2s
 INNER JOIN T_WC_WIKIDATA_PERSON_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 SET t2s.WIKIDATA_NAME = w.NAME,
-    t2s.ALIASES = w.ALIASES,
-    t2s.INSTANCE_OF = w.INSTANCE_OF
+    t2s.INSTANCE_OF = {strsqlinstanceof}
 WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> ''
     AND t2s.ID_WIKIDATA IS NOT NULL
