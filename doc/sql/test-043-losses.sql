@@ -2,22 +2,25 @@
 -- TMDB-MOVIE-PREPROCESS-043 : d'ou viennent les pertes annoncees par la recette
 -- ============================================================================
 --
--- CE QUE LE PREMIER PASSAGE A DIT. La recette (test-043-coverage.sql, 2026-08-26)
--- annonce quatre colonnes ou V2 couvre MOINS que V1 :
+-- CE QUE LA RECETTE A DIT (test-043-coverage.sql, second passage du 2026-08-26,
+-- apres correction de la regle de choix sur RANK) :
 --
---   film      PLEX_MEDIA_KEY   180 012 -> 179 805   perte 234, gain 27
---   film      INSTANCE_OF      248 979 -> 248 583   perte 400, gain 4
---   serie     INSTANCE_OF       50 691 ->  50 615   perte 76,  gain 0
+--   film      PLEX_MEDIA_KEY   180 012 -> 179 745   perte 291,   gain 24
+--   film      INSTANCE_OF      248 979 -> 248 583   perte 400,   gain 4
+--   serie     PLEX_MEDIA_KEY    35 954 ->  36 400   perte 115,   gain 561
+--   serie     INSTANCE_OF       50 691 ->  50 615   perte 76,    gain 0
 --   personne  INSTANCE_OF      320 101 -> 319 557   perte 1 105, gain 561
 --
---   film      ID_CRITERION       1 664 ->   1 669   perte 0, gain 5
---   film      ID_CRITERION_SPINE 1 218 ->   1 222   perte 0, gain 4
---   serie     PLEX_MEDIA_KEY    35 954 ->  36 428   perte 105, gain 579
+--   film      ID_CRITERION       1 664 ->   1 669   perte 0,     gain 5
+--   film      ID_CRITERION_SPINE 1 218 ->   1 222   perte 0,     gain 4
 --
--- Les trois dernieres lignes sont des gains nets et ne posent pas de question. Les
--- quatre premieres si, et le critere d'acceptance ecrit dans le ticket (« superieur
--- ou egal ») n'est PAS tenu pour elles. Avant de le relacher, il faut savoir de quoi
--- ces pertes sont faites.
+-- Les deux lignes Criterion sont des gains nets sans une seule perte, et ne posent
+-- aucune question. Les cinq autres perdent quelque chose, y compris le Plex des
+-- series qui gagne pourtant 446 lignes nettes : un gain net COMPENSE une perte, il ne
+-- l'EXPLIQUE pas. C'est la raison d'etre de la section 1E, ajoutee apres coup.
+--
+-- Le critere d'acceptance ecrit dans le ticket (« superieur ou egal ») n'est donc pas
+-- tenu. Avant de le relacher, il faut savoir de quoi ces pertes sont faites.
 --
 -- LA QUESTION QUE CE FICHIER TRANCHE, et elle n'a qu'un enjeu : est-ce que ces
 -- entites sont ABSENTES DE V2, ou est-ce que V2 les connait sans porter la
@@ -48,7 +51,7 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 --                  trop longue pour la colonne cible).
 -- ============================================================================
 
-SELECT '1A. FILM, les 234 pertes sur PLEX_MEDIA_KEY' AS SECTION;
+SELECT '1A. FILM, les 291 pertes sur PLEX_MEDIA_KEY' AS SECTION;
 
 SELECT CASE
          WHEN NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s
@@ -154,6 +157,40 @@ GROUP BY CAUSE
 ORDER BY ENTITES DESC;
 
 
+SELECT '1E. SERIE, les 115 pertes sur PLEX_MEDIA_KEY' AS SECTION;
+
+-- Ajoutee le 2026-08-26, apres coup. Cette colonne avait ete laissee de cote au
+-- premier tour parce qu'elle GAGNE 446 lignes nettes : la perte y est noyee dans un
+-- benefice. Mais un gain net ne dit rien de ce qui est perdu, il le compense
+-- seulement, et compenser n'est pas expliquer. Meme decomposition que 1A.
+SELECT CASE
+         WHEN NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s
+                          WHERE s.ID_WIKIDATA = t2s.ID_WIKIDATA)
+           THEN 'HORS PERIMETRE'
+         WHEN NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s
+                          WHERE s.ID_WIKIDATA = t2s.ID_WIKIDATA AND s.ID_PROPERTY = 'P11460')
+           THEN 'SANS PROPRIETE'
+         WHEN NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s
+                          WHERE s.ID_WIKIDATA = t2s.ID_WIKIDATA AND s.ID_PROPERTY = 'P11460'
+                            AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated'))
+           THEN 'RANG DEPRECIE'
+         ELSE 'GARDE'
+       END AS CAUSE,
+       COUNT(*) AS ENTITES
+FROM T_WC_T2S_SERIE t2s
+INNER JOIN T_WC_WIKIDATA_SERIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+  AND w.PLEX_MEDIA_KEY IS NOT NULL AND w.PLEX_MEDIA_KEY <> ''
+  AND NOT EXISTS ( SELECT 1
+                   FROM T_WC_WIKIDATA_STATEMENT s
+                   JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = s.ID_STATEMENT
+                   WHERE s.ID_WIKIDATA = t2s.ID_WIKIDATA AND s.ID_PROPERTY = 'P11460'
+                     AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')
+                     AND CHAR_LENGTH(ev.VALUE_EXTERNAL_ID) <= 50 )
+GROUP BY CAUSE
+ORDER BY ENTITES DESC;
+
+
 -- ============================================================================
 -- 2. DIX PERDUS A REGARDER, pour mettre des noms sur les chiffres
 -- ============================================================================
@@ -195,6 +232,29 @@ WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
                    WHERE s.ID_WIKIDATA = t2s.ID_WIKIDATA AND s.ID_PROPERTY = 'P31'
                      AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated') )
 ORDER BY t2s.ID_PERSON ASC
+LIMIT 10;
+
+
+SELECT '2C. SERIE, dix titres perdant PLEX_MEDIA_KEY' AS SECTION;
+
+-- Le mot « perte » ne veut pas dire la meme chose selon le titre : dix series
+-- confidentielles ne se traitent pas comme dix series regardees. CLE_V1 est affichee
+-- parce qu'une cle Plex pointe vers une bibliotheque personnelle et qu'elle peut
+-- avoir ete retiree de Wikidata pour cette raison meme.
+SELECT t2s.ID_WIKIDATA, w.TITLE, w.PLEX_MEDIA_KEY AS CLE_V1,
+       EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s
+               WHERE s.ID_WIKIDATA = t2s.ID_WIKIDATA) AS CONNU_DE_V2
+FROM T_WC_T2S_SERIE t2s
+INNER JOIN T_WC_WIKIDATA_SERIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+  AND w.PLEX_MEDIA_KEY IS NOT NULL AND w.PLEX_MEDIA_KEY <> ''
+  AND NOT EXISTS ( SELECT 1
+                   FROM T_WC_WIKIDATA_STATEMENT s
+                   JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = s.ID_STATEMENT
+                   WHERE s.ID_WIKIDATA = t2s.ID_WIKIDATA AND s.ID_PROPERTY = 'P11460'
+                     AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')
+                     AND CHAR_LENGTH(ev.VALUE_EXTERNAL_ID) <= 50 )
+ORDER BY t2s.ID_SERIE ASC
 LIMIT 10;
 
 
