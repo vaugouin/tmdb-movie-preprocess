@@ -427,9 +427,68 @@ SELECT 'T2S_PERSON', COUNT(*), NULL, NULL, NULL,
 FROM T_WC_T2S_PERSON
 WHERE ID_IMDB IS NOT NULL AND ID_IMDB <> '';
 
-SELECT 'E2. Lignes ou T2S ne correspond pas a ce que V2 donnerait (attendu : 0)' AS SECTION;
+SELECT 'E2. Lignes ou T2S ne dit pas ce que V2 donnerait (attendu : 0 partout)' AS SECTION;
 
-SELECT COUNT(*) AS DIVERGENCES
+-- ⚠ C'EST ICI QUE SE JOUE LA RECETTE, et non en E1. E1 compte des volumes sur une
+-- population legerement plus large que celle de l'UPDATE, donc ses chiffres approchent
+-- V2_REMPLI sans devoir l'egaler. E2 compare LIGNE A LIGNE, sur exactement la
+-- population enrichie, ce que la colonne T2S contient et ce que la sous-requete du
+-- code aurait produit. Zero partout veut dire que le code a fait ce qu'il annonce.
+--
+-- Etendue le 2026-08-27 aux QUATRE colonnes et aux TROIS tables : la version
+-- precedente ne verifiait que INSTANCE_OF sur les films, soit une colonne sur quatre.
+-- Une recette qui ne controle qu'un quart de ce qu'elle a change n'est pas une recette.
+--
+-- Un chiffre non nul ne dit pas encore ou est la faute : relire la colonne concernee
+-- dans f_wikidatabestvaluesql, puis verifier que le passage de nuit a bien tourne avec
+-- le code courant. La section D2 repond a cette seconde question a elle seule.
+
+SELECT 'T_WC_T2S_MOVIE.PLEX_MEDIA_KEY' AS COLONNE, COUNT(*) AS DIVERGENCES
+FROM T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+  AND NOT ( t2s.PLEX_MEDIA_KEY <=> ( SELECT spxv.VALUE_EXTERNAL_ID
+              FROM T_WC_WIKIDATA_STATEMENT spx
+              JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE spxv ON spxv.ID_STATEMENT = spx.ID_STATEMENT
+              WHERE spx.ID_WIKIDATA = t2s.ID_WIKIDATA AND spx.ID_PROPERTY = 'P11460'
+                AND (spx.`RANK` IS NULL OR spx.`RANK` <> 'deprecated')
+                  AND CHAR_LENGTH(spxv.VALUE_EXTERNAL_ID) <= 50
+              ORDER BY (spx.`RANK` = 'preferred') DESC, spx.ID_STATEMENT ASC
+              LIMIT 1 ) )
+
+UNION ALL
+
+SELECT 'T_WC_T2S_MOVIE.ID_CRITERION' AS COLONNE, COUNT(*) AS DIVERGENCES
+FROM T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+  AND NOT ( t2s.ID_CRITERION <=> ( SELECT CAST(scrv.VALUE_EXTERNAL_ID AS UNSIGNED)
+              FROM T_WC_WIKIDATA_STATEMENT scr
+              JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE scrv ON scrv.ID_STATEMENT = scr.ID_STATEMENT
+              WHERE scr.ID_WIKIDATA = t2s.ID_WIKIDATA AND scr.ID_PROPERTY = 'P9584'
+                AND (scr.`RANK` IS NULL OR scr.`RANK` <> 'deprecated')
+                  AND scrv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+              ORDER BY (scr.`RANK` = 'preferred') DESC, scr.ID_STATEMENT ASC
+              LIMIT 1 ) )
+
+UNION ALL
+
+SELECT 'T_WC_T2S_MOVIE.ID_CRITERION_SPINE' AS COLONNE, COUNT(*) AS DIVERGENCES
+FROM T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+  AND NOT ( t2s.ID_CRITERION_SPINE <=> ( SELECT CAST(scsv.VALUE_EXTERNAL_ID AS UNSIGNED)
+              FROM T_WC_WIKIDATA_STATEMENT scs
+              JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE scsv ON scsv.ID_STATEMENT = scs.ID_STATEMENT
+              WHERE scs.ID_WIKIDATA = t2s.ID_WIKIDATA AND scs.ID_PROPERTY = 'P12279'
+                AND (scs.`RANK` IS NULL OR scs.`RANK` <> 'deprecated')
+                  AND scsv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+              ORDER BY (scs.`RANK` = 'preferred') DESC, scs.ID_STATEMENT ASC
+              LIMIT 1 ) )
+
+UNION ALL
+
+SELECT 'T_WC_T2S_MOVIE.INSTANCE_OF' AS COLONNE, COUNT(*) AS DIVERGENCES
 FROM T_WC_T2S_MOVIE t2s
 INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
@@ -439,4 +498,50 @@ WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
               WHERE sio.ID_WIKIDATA = t2s.ID_WIKIDATA AND sio.ID_PROPERTY = 'P31'
                 AND (sio.`RANK` IS NULL OR sio.`RANK` <> 'deprecated')
               ORDER BY (sio.`RANK` = 'preferred') DESC, sio.ID_STATEMENT ASC
-              LIMIT 1 ) );
+              LIMIT 1 ) )
+
+UNION ALL
+
+SELECT 'T_WC_T2S_SERIE.PLEX_MEDIA_KEY' AS COLONNE, COUNT(*) AS DIVERGENCES
+FROM T_WC_T2S_SERIE t2s
+INNER JOIN T_WC_WIKIDATA_SERIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+  AND NOT ( t2s.PLEX_MEDIA_KEY <=> ( SELECT spxv.VALUE_EXTERNAL_ID
+              FROM T_WC_WIKIDATA_STATEMENT spx
+              JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE spxv ON spxv.ID_STATEMENT = spx.ID_STATEMENT
+              WHERE spx.ID_WIKIDATA = t2s.ID_WIKIDATA AND spx.ID_PROPERTY = 'P11460'
+                AND (spx.`RANK` IS NULL OR spx.`RANK` <> 'deprecated')
+                  AND CHAR_LENGTH(spxv.VALUE_EXTERNAL_ID) <= 50
+              ORDER BY (spx.`RANK` = 'preferred') DESC, spx.ID_STATEMENT ASC
+              LIMIT 1 ) )
+
+UNION ALL
+
+SELECT 'T_WC_T2S_SERIE.INSTANCE_OF' AS COLONNE, COUNT(*) AS DIVERGENCES
+FROM T_WC_T2S_SERIE t2s
+INNER JOIN T_WC_WIKIDATA_SERIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+  AND NOT ( t2s.INSTANCE_OF <=> ( SELECT siov.ID_ITEM
+              FROM T_WC_WIKIDATA_STATEMENT sio
+              JOIN T_WC_WIKIDATA_ITEM_VALUE siov ON siov.ID_STATEMENT = sio.ID_STATEMENT
+              WHERE sio.ID_WIKIDATA = t2s.ID_WIKIDATA AND sio.ID_PROPERTY = 'P31'
+                AND (sio.`RANK` IS NULL OR sio.`RANK` <> 'deprecated')
+              ORDER BY (sio.`RANK` = 'preferred') DESC, sio.ID_STATEMENT ASC
+              LIMIT 1 ) )
+
+UNION ALL
+
+SELECT 'T_WC_T2S_PERSON.INSTANCE_OF' AS COLONNE, COUNT(*) AS DIVERGENCES
+FROM T_WC_T2S_PERSON t2s
+INNER JOIN T_WC_WIKIDATA_PERSON_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+  AND NOT ( t2s.INSTANCE_OF <=> ( SELECT siov.ID_ITEM
+              FROM T_WC_WIKIDATA_STATEMENT sio
+              JOIN T_WC_WIKIDATA_ITEM_VALUE siov ON siov.ID_STATEMENT = sio.ID_STATEMENT
+              WHERE sio.ID_WIKIDATA = t2s.ID_WIKIDATA AND sio.ID_PROPERTY = 'P31'
+                AND (sio.`RANK` IS NULL OR sio.`RANK` <> 'deprecated')
+              ORDER BY (sio.`RANK` = 'preferred') DESC, sio.ID_STATEMENT ASC
+              LIMIT 1 ) )
+  AND t2s.ID_WIKIDATA IS NOT NULL AND t2s.ID_WIKIDATA <> ''
+
+ORDER BY DIVERGENCES DESC;
