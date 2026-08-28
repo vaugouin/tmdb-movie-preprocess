@@ -1520,36 +1520,12 @@ def f_awardconeguard(intprocess, lngfloor=LNG_AWARD_CONE_FLOOR):
     return True, lngclasses
 
 
-# La condition qui distingue une recompense du reste. Elle porte sur la VALEUR du
-# statement (ID_ITEM), la ou la requete pilote ne filtrait que le SUJET, celui qui
-# recoit le prix. Deux termes : la classe est dans le cone, OU l'entite n'a aucune
-# classe. Le second n'est pas un relachement, c'est la protection des 552 lignes
-# sans P31 ou se trouvent de vraies recompenses absentes de V2 (Waldo Salt
-# Screenwriting Award, prix Feneon, Gaudi Awards).
-STR_AWARD_CONE_FILTER_DRIVING = (
-    "AND ( "
-    "EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st "
-    "JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT "
-    "JOIN " + STR_AWARD_CONE_TABLE + " ac ON ac.ID_CLASS = iv.ID_ITEM "
-    "WHERE st.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM AND st.ID_PROPERTY = 'P31') "
-    "OR NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st "
-    "WHERE st.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM AND st.ID_PROPERTY = 'P31') "
-    ") "
-)
-
-# Meme regle, ecrite pour la purge, ou la valeur s'appelle w.ID_ITEM. Les deux
-# expressions doivent dire exactement la meme chose : la purge ne supprime pas ce
-# qui est hors du cone, elle supprime ce que la requete pilote ne produit pas. Si
-# l'une des deux bouge sans l'autre, le processus recree chaque nuit ce qu'il vient
-# d'effacer, ou garde ce qu'il devrait jeter.
-STR_AWARD_CONE_FILTER_PURGE = (
-    "      AND ( EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st2 "
-    "JOIN T_WC_WIKIDATA_ITEM_VALUE iv2 ON iv2.ID_STATEMENT = st2.ID_STATEMENT "
-    "JOIN " + STR_AWARD_CONE_TABLE + " ac2 ON ac2.ID_CLASS = iv2.ID_ITEM "
-    "WHERE st2.ID_WIKIDATA = w.ID_ITEM AND st2.ID_PROPERTY = 'P31') "
-    "OR NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st2 "
-    "WHERE st2.ID_WIKIDATA = w.ID_ITEM AND st2.ID_PROPERTY = 'P31') ) "
-)
+# Les deux constantes STR_AWARD_CONE_FILTER_DRIVING et _PURGE vivaient ici. Elles
+# lisaient T_WC_WIKIDATA_ITEM_PROPERTY, que les processus 44 et 47 n'interrogent
+# plus depuis TMDB-MOVIE-PREPROCESS-039, et disaient la meme regle deux fois.
+# Retirees le 2026-08-28 plutot que laissees en decoration : une constante morte
+# qui contredit la fonction vivante est un piege pose pour le prochain lecteur.
+# La regle unique est f_awardconefilter(), plus bas.
 
 
 # ---- TMDB-MOVIE-PREPROCESS-043 : lire UNE valeur de statement V2 ---------------------
@@ -1582,7 +1558,7 @@ STR_AWARD_CONE_FILTER_PURGE = (
 # arbitraire. Il n'existe donc aucune valeur V1 a retrouver a l'identique : la
 # recette porte sur la couverture, jamais sur l'egalite valeur par valeur.
 #
-# Pas de filtre DELETED, volontairement : STR_AWARD_CONE_FILTER_DRIVING n'en pose
+# Pas de filtre DELETED, volontairement : f_awardconefilter() n'en pose
 # pas non plus, et deux lectures V2 qui ne filtrent pas pareil finissent par
 # diverger sans que personne ne s'en apercoive.
 STR_WD_PROPERTY_INSTANCE_OF = "P31"
@@ -1656,3 +1632,128 @@ def f_wikidataexternalidsql(strpropertyid, strsubjectexpr, blnnumeric=False, str
     return f_wikidatabestvaluesql(strpropertyid,
                                   "T_WC_WIKIDATA_EXTERNAL_ID_VALUE", "VALUE_EXTERNAL_ID",
                                   strsubjectexpr, blnnumeric, strprefix, intmaxlength)
+
+
+# ---- TMDB-MOVIE-PREPROCESS-039 : le cone, ecrit une seule fois -----------------------
+#
+# STR_AWARD_CONE_FILTER_DRIVING et STR_AWARD_CONE_FILTER_PURGE disaient la meme regle
+# deux fois, et leur propre commentaire avertissait du danger : si l'une bouge sans
+# l'autre, le processus recree chaque nuit ce qu'il vient d'effacer. Un avertissement
+# n'est pas une protection. La regle s'ecrit desormais UNE fois, et les deux appelants
+# ne fournissent que l'expression qui designe la valeur chez eux.
+#
+# ⚠ COLLISION D'ALIAS. Le filtre utilise 'st' et 'iv' a l'interieur de ses
+# sous-requetes. La requete qui l'accueille ne doit donc PAS employer ces deux alias,
+# sans quoi la sous-requete correlerait sur elle-meme au lieu de la requete englobante,
+# en silence et sans erreur SQL. Les appelants V2 emploient 'sa'/'av' cote pilote et
+# 'w'/'wv' cote purge.
+def f_awardconefilter(strvalueexpr):
+    """La condition qui distingue une recompense du reste, sur la VALEUR du statement.
+
+    Deux termes : la classe de la valeur est dans le cone P279 sous Q618779, OU
+    l'entite n'a aucune classe. Le second n'est pas un relachement, c'est la
+    protection des 552 lignes sans P31 ou se trouvent de vraies recompenses absentes
+    de V2 (Waldo Salt Screenwriting Award, prix Feneon, Gaudi Awards).
+    """
+    return (
+        "AND ( "
+        "EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st "
+        "JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT "
+        "JOIN " + STR_AWARD_CONE_TABLE + " ac ON ac.ID_CLASS = iv.ID_ITEM "
+        f"WHERE st.ID_WIKIDATA = {strvalueexpr} AND st.ID_PROPERTY = 'P31') "
+        "OR NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st "
+        f"WHERE st.ID_WIKIDATA = {strvalueexpr} AND st.ID_PROPERTY = 'P31') "
+        ") "
+    )
+
+
+def f_awarddrivingsql():
+    """L'ensemble pilote des prix et des nominations, lu dans les statements V2.
+
+    V1 lisait T_WC_WIKIDATA_ITEM_PROPERTY, qui APLATIT la valeur principale et les
+    valeurs de tous les qualificatifs sous le meme identifiant de propriete : la
+    requete SPARQL laissait ?ps non contraint (sparql-crawler.py:316-318). Sous P166
+    cohabitaient donc la recompense, la ceremonie qui l'a remise et l'oeuvre pour
+    laquelle elle l'a ete, toutes trois rangees comme des prix. En V2 la valeur
+    principale et les qualificatifs sont des colonnes distinctes : la confusion n'a
+    plus lieu d'etre, elle ne se filtre plus, elle n'existe plus.
+
+    Le pre-filtre sur les entites T2S liees est conserve tel quel, il est bon et sans
+    rapport avec V1 : une recompense dont aucun laureat n'est suivi ne produit aucun
+    lien et n'est que du bruit.
+    """
+    return (
+        "SELECT DISTINCT av.ID_ITEM "
+        "FROM T_WC_WIKIDATA_STATEMENT sa "
+        "JOIN T_WC_WIKIDATA_ITEM_VALUE av ON av.ID_STATEMENT = sa.ID_STATEMENT "
+        "WHERE sa.ID_PROPERTY = %s "
+        "AND (sa.`RANK` IS NULL OR sa.`RANK` <> 'deprecated') "
+        "AND ( "
+        "EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = sa.ID_WIKIDATA AND m.ID_WIKIDATA <> '') "
+        "OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = sa.ID_WIKIDATA AND s.ID_WIKIDATA <> '') "
+        "OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = sa.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') "
+        ") "
+        + f_awardconefilter("av.ID_ITEM")
+        + "ORDER BY av.ID_ITEM ASC "
+    )
+
+
+def f_awardpurgesql(strtablename):
+    """La purge, exact inverse du pilote ci-dessus.
+
+    Les deux DOIVENT designer le meme ensemble. Elles partagent desormais le meme
+    filtre de cone et la meme exclusion des rangs deprecies, ce qui rend l'ecart
+    structurellement impossible plutot que seulement deconseille.
+    """
+    return (
+        f"DELETE FROM {strtablename}\n"
+        "WHERE NOT EXISTS (\n"
+        "    SELECT 1\n"
+        "    FROM T_WC_WIKIDATA_STATEMENT w\n"
+        "    JOIN T_WC_WIKIDATA_ITEM_VALUE wv ON wv.ID_STATEMENT = w.ID_STATEMENT\n"
+        f"    WHERE w.ID_PROPERTY = {strtablename}.AWARD_SOURCE\n"
+        f"      AND wv.ID_ITEM = {strtablename}.ID_WIKIDATA\n"
+        "      AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated')\n"
+        "      AND (\n"
+        "            EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = w.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')\n"
+        "         OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')\n"
+        "         OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '')\n"
+        "      )\n"
+        "      " + f_awardconefilter("wv.ID_ITEM") + "\n"
+        ");"
+    )
+
+
+def f_awardlinksql(strt2stable, stralias, stridcolumn, strsortcolumn):
+    """Qui a recu ce prix : les entites T2S liees a une recompense, lues en V2.
+
+    TMDB-MOVIE-PREPROCESS-039. Migrer l'ensemble pilote sans migrer ces requetes
+    laisserait le processus lire V2 pour decider ce QU'EST une recompense et V1 pour
+    decider QUI l'a recue. Deux sources pour un meme fait, donc deux couvertures et
+    des comptes qui ne se recoupent pas : c'est pire que l'un ou l'autre etat pur.
+
+    L'ORDRE DES TABLES A CHANGE, ET C'EST DELIBERE. L'ancienne requete partait de
+    T_WC_WIKIDATA_ITEM_PROPERTY, ou (ID_PROPERTY, ID_ITEM) menait droit au but. En V2
+    ces deux colonnes vivent dans deux tables : la selectivite est du cote de la
+    VALEUR (lv.ID_ITEM, indexe), la propriete seule ne filtrant presque rien sur des
+    millions de statements. On part donc de la valeur, puis on remonte au statement
+    par sa cle primaire.
+
+    Le STRAIGHT_JOIN vers la table T2S est conserve : il existait pour empecher
+    l'optimiseur de commencer par elle, correctif d'un plan errone constate en
+    production, et cette raison n'a pas bouge. Relancer ANALYZE TABLE sur les tables
+    V2 et verifier le temps des processus 44 et 47, pas seulement leur resultat.
+
+    L'ordre des %s est inchange, (propriete, item), pour que les appelants n'aient
+    pas a bouger : les marqueurs se lient dans l'ordre du texte, pas des jointures.
+    """
+    return (
+        f"SELECT DISTINCT {stralias}.{stridcolumn}, {stralias}.{strsortcolumn} "
+        "FROM T_WC_WIKIDATA_ITEM_VALUE lv "
+        "JOIN T_WC_WIKIDATA_STATEMENT sl ON sl.ID_STATEMENT = lv.ID_STATEMENT "
+        f"STRAIGHT_JOIN {strt2stable} {stralias} ON {stralias}.ID_WIKIDATA = sl.ID_WIKIDATA "
+        "WHERE sl.ID_PROPERTY = %s AND lv.ID_ITEM = %s "
+        "AND (sl.`RANK` IS NULL OR sl.`RANK` <> 'deprecated') "
+        f"AND {stralias}.ID_WIKIDATA IS NOT NULL AND {stralias}.ID_WIKIDATA <> '' "
+        f"ORDER BY {stralias}.{strsortcolumn} DESC, {stralias}.{stridcolumn} ASC "
+    )

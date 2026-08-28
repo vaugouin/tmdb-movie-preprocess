@@ -29,9 +29,10 @@ from tmdb_preprocess_helpers import (
     f_buildcustomorderbyclause,
     f_getcustomsortby,
     f_getwikidataimagepath,
-    STR_AWARD_CONE_FILTER_DRIVING,
-    STR_AWARD_CONE_FILTER_PURGE,
     f_awardconeguard,
+    f_awarddrivingsql,
+    f_awardlinksql,
+    f_awardpurgesql,
     f_getwikidatalabel,
     f_wikidataexternalidsql,
     f_wikidatainstanceofsql,
@@ -2743,24 +2744,12 @@ SET
                     strawardtype = "award"
                     target_field_name = "AWARD_NAME"
 
-                    strsql = ""
-                    # Pre-filter the driving set to only items with >= 1 linked T2S entity (movie,
-                    # series or person). Awards whose recipients are not tracked in the T2S read model
-                    # produce zero links and are noise, so they are skipped here and removed by the
-                    # stale delete at the end of this process. Mirrors the per-item movie/series/person
-                    # link queries below (all join the property table to a T2S table on ID_WIKIDATA).
-                    strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
-                    strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
-                    strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
-                    strsql += "AND ( "
-                    strsql += "EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND m.ID_WIKIDATA <> '') "
-                    strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND s.ID_WIKIDATA <> '') "
-                    strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') "
-                    strsql += ") "
-                    # -036 : filtre sur la VALEUR, le prix lui-meme, la ou tout ce qui
-                    # precede ne filtrait que le SUJET, celui qui le recoit.
-                    strsql += STR_AWARD_CONE_FILTER_DRIVING
-                    strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
+                    # TMDB-MOVIE-PREPROCESS-039 : l'ensemble pilote est lu dans les statements
+                    # V2. Ce n'est pas un debranchement, c'est une correction : ITEM_PROPERTY
+                    # rangeait sous P166 la recompense, la ceremonie et l'oeuvre, indistinctement.
+                    # Toute la requete, pre-filtre T2S et cone compris, vit dans
+                    # f_awarddrivingsql() pour que la purge ne puisse pas en diverger.
+                    strsql = f_awarddrivingsql()
 
                     print(strsql)
                     cursor.execute(strsql, (strpropertyid,))
@@ -2839,13 +2828,7 @@ SET
                         telaward.set_entity_id(lngawardid)
 
                         # Link to movies
-                        strsqlmovies = ""
-                        strsqlmovies += "SELECT DISTINCT m.ID_MOVIE, m.IMDB_RATING_WEIGHTED "
-                        strsqlmovies += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
-                        strsqlmovies += "STRAIGHT_JOIN T_WC_T2S_MOVIE m ON m.ID_WIKIDATA = p.ID_WIKIDATA "
-                        strsqlmovies += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
-                        strsqlmovies += "AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
-                        strsqlmovies += "ORDER BY m.IMDB_RATING_WEIGHTED DESC, m.ID_MOVIE ASC "
+                        strsqlmovies = f_awardlinksql("T_WC_T2S_MOVIE", "m", "ID_MOVIE", "IMDB_RATING_WEIGHTED")
                         cursor2.execute(strsqlmovies, (strpropertyid, strawardwikidataid))
                         results_movies = cursor2.fetchall()
                         lngmoviecount = len(results_movies)
@@ -2871,13 +2854,7 @@ SET
                             cursor2.execute(strsqldelete)
 
                         # Link to series
-                        strsqlseries = ""
-                        strsqlseries += "SELECT DISTINCT s.ID_SERIE, s.IMDB_RATING_WEIGHTED "
-                        strsqlseries += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
-                        strsqlseries += "STRAIGHT_JOIN T_WC_T2S_SERIE s ON s.ID_WIKIDATA = p.ID_WIKIDATA "
-                        strsqlseries += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
-                        strsqlseries += "AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
-                        strsqlseries += "ORDER BY s.IMDB_RATING_WEIGHTED DESC, s.ID_SERIE ASC "
+                        strsqlseries = f_awardlinksql("T_WC_T2S_SERIE", "s", "ID_SERIE", "IMDB_RATING_WEIGHTED")
                         cursor4.execute(strsqlseries, (strpropertyid, strawardwikidataid))
                         results_series = cursor4.fetchall()
                         lngseriecount = len(results_series)
@@ -2903,13 +2880,7 @@ SET
                             cursor2.execute(strsqldelete)
 
                         # Link to persons
-                        strsqlpersons = ""
-                        strsqlpersons += "SELECT DISTINCT p2.ID_PERSON, p2.POPULARITY "
-                        strsqlpersons += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
-                        strsqlpersons += "STRAIGHT_JOIN T_WC_T2S_PERSON p2 ON p2.ID_WIKIDATA = p.ID_WIKIDATA "
-                        strsqlpersons += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
-                        strsqlpersons += "AND p2.ID_WIKIDATA IS NOT NULL AND p2.ID_WIKIDATA <> '' "
-                        strsqlpersons += "ORDER BY p2.POPULARITY DESC, p2.ID_PERSON ASC "
+                        strsqlpersons = f_awardlinksql("T_WC_T2S_PERSON", "p2", "ID_PERSON", "POPULARITY")
                         cursor5.execute(strsqlpersons, (strpropertyid, strawardwikidataid))
                         results_persons = cursor5.fetchall()
                         lngpersoncount = len(results_persons)
@@ -2954,20 +2925,7 @@ SET
                         # row at all, the old NOT EXISTS behaviour) and the "now empty / degraded to zero
                         # tracked recipients" case introduced by pre-filtering the driving query. Orphan
                         # junction rows are cleaned up by the ID_AWARD NOT IN (...) deletes below.
-                        strsqldelete = """DELETE FROM T_WC_T2S_AWARD
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM T_WC_WIKIDATA_ITEM_PROPERTY w
-    WHERE w.ID_PROPERTY = T_WC_T2S_AWARD.AWARD_SOURCE
-      AND w.ID_ITEM = T_WC_T2S_AWARD.ID_WIKIDATA
-      AND (
-            EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = w.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
-         OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
-         OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '')
-      )
-""" + STR_AWARD_CONE_FILTER_PURGE + """
-);
-                        """
+                        strsqldelete = f_awardpurgesql("T_WC_T2S_AWARD")
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
                         telaward.deleted(cursor2.rowcount)
@@ -3066,24 +3024,12 @@ SET
                     strnominationtype = "nomination"
                     target_field_name = "NOMINATION_NAME"
 
-                    strsql = ""
-                    # Pre-filter the driving set to only items with >= 1 linked T2S entity (movie,
-                    # series or person). Nominations whose recipients are not tracked in the T2S read
-                    # model produce zero links and are noise, so they are skipped here and removed by
-                    # the stale delete at the end of this process. Mirrors the per-item link queries
-                    # below (all join the property table to a T2S table on ID_WIKIDATA).
-                    strsql += "SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
-                    strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
-                    strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
-                    strsql += "AND ( "
-                    strsql += "EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND m.ID_WIKIDATA <> '') "
-                    strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND s.ID_WIKIDATA <> '') "
-                    strsql += "OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') "
-                    strsql += ") "
-                    # -036 : filtre sur la VALEUR, le prix lui-meme, la ou tout ce qui
-                    # precede ne filtrait que le SUJET, celui qui le recoit.
-                    strsql += STR_AWARD_CONE_FILTER_DRIVING
-                    strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
+                    # TMDB-MOVIE-PREPROCESS-039 : l'ensemble pilote est lu dans les statements
+                    # V2. Ce n'est pas un debranchement, c'est une correction : ITEM_PROPERTY
+                    # rangeait sous P166 la recompense, la ceremonie et l'oeuvre, indistinctement.
+                    # Toute la requete, pre-filtre T2S et cone compris, vit dans
+                    # f_awarddrivingsql() pour que la purge ne puisse pas en diverger.
+                    strsql = f_awarddrivingsql()
 
                     print(strsql)
                     cursor.execute(strsql, (strpropertyid,))
@@ -3162,13 +3108,7 @@ SET
                         telnomination.set_entity_id(lngnominationid)
 
                         # Link to movies
-                        strsqlmovies = ""
-                        strsqlmovies += "SELECT DISTINCT m.ID_MOVIE, m.IMDB_RATING_WEIGHTED "
-                        strsqlmovies += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
-                        strsqlmovies += "STRAIGHT_JOIN T_WC_T2S_MOVIE m ON m.ID_WIKIDATA = p.ID_WIKIDATA "
-                        strsqlmovies += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
-                        strsqlmovies += "AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
-                        strsqlmovies += "ORDER BY m.IMDB_RATING_WEIGHTED DESC, m.ID_MOVIE ASC "
+                        strsqlmovies = f_awardlinksql("T_WC_T2S_MOVIE", "m", "ID_MOVIE", "IMDB_RATING_WEIGHTED")
                         cursor2.execute(strsqlmovies, (strpropertyid, strnominationwikidataid))
                         results_movies = cursor2.fetchall()
                         lngmoviecount = len(results_movies)
@@ -3194,13 +3134,7 @@ SET
                             cursor2.execute(strsqldelete)
 
                         # Link to series
-                        strsqlseries = ""
-                        strsqlseries += "SELECT DISTINCT s.ID_SERIE, s.IMDB_RATING_WEIGHTED "
-                        strsqlseries += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
-                        strsqlseries += "STRAIGHT_JOIN T_WC_T2S_SERIE s ON s.ID_WIKIDATA = p.ID_WIKIDATA "
-                        strsqlseries += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
-                        strsqlseries += "AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
-                        strsqlseries += "ORDER BY s.IMDB_RATING_WEIGHTED DESC, s.ID_SERIE ASC "
+                        strsqlseries = f_awardlinksql("T_WC_T2S_SERIE", "s", "ID_SERIE", "IMDB_RATING_WEIGHTED")
                         cursor4.execute(strsqlseries, (strpropertyid, strnominationwikidataid))
                         results_series = cursor4.fetchall()
                         lngseriecount = len(results_series)
@@ -3226,13 +3160,7 @@ SET
                             cursor2.execute(strsqldelete)
 
                         # Link to persons
-                        strsqlpersons = ""
-                        strsqlpersons += "SELECT DISTINCT p2.ID_PERSON, p2.POPULARITY "
-                        strsqlpersons += "FROM T_WC_WIKIDATA_ITEM_PROPERTY p "
-                        strsqlpersons += "STRAIGHT_JOIN T_WC_T2S_PERSON p2 ON p2.ID_WIKIDATA = p.ID_WIKIDATA "
-                        strsqlpersons += "WHERE p.ID_PROPERTY = %s AND p.ID_ITEM = %s "
-                        strsqlpersons += "AND p2.ID_WIKIDATA IS NOT NULL AND p2.ID_WIKIDATA <> '' "
-                        strsqlpersons += "ORDER BY p2.POPULARITY DESC, p2.ID_PERSON ASC "
+                        strsqlpersons = f_awardlinksql("T_WC_T2S_PERSON", "p2", "ID_PERSON", "POPULARITY")
                         cursor5.execute(strsqlpersons, (strpropertyid, strnominationwikidataid))
                         results_persons = cursor5.fetchall()
                         lngpersoncount = len(results_persons)
@@ -3277,20 +3205,7 @@ SET
                         # property row at all, the old NOT EXISTS behaviour) and the "now empty / degraded
                         # to zero tracked recipients" case introduced by pre-filtering the driving query.
                         # Orphan junction rows are cleaned up by the ID_NOMINATION NOT IN (...) deletes below.
-                        strsqldelete = """DELETE FROM T_WC_T2S_NOMINATION
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM T_WC_WIKIDATA_ITEM_PROPERTY w
-    WHERE w.ID_PROPERTY = T_WC_T2S_NOMINATION.NOMINATION_SOURCE
-      AND w.ID_ITEM = T_WC_T2S_NOMINATION.ID_WIKIDATA
-      AND (
-            EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = w.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
-         OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
-         OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '')
-      )
-""" + STR_AWARD_CONE_FILTER_PURGE + """
-);
-                        """
+                        strsqldelete = f_awardpurgesql("T_WC_T2S_NOMINATION")
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
                         telnomination.deleted(cursor2.rowcount)
