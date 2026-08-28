@@ -84,7 +84,8 @@ LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = st.ID_STATEMENT
             WHERE st.ID_PROPERTY = 'P9584'
               AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
-              AND ev.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
+              AND ev.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+              AND ev.VALUE_EXTERNAL_ID <> '0' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
 
 UNION ALL
@@ -103,7 +104,8 @@ LEFT JOIN ( SELECT DISTINCT st.ID_WIKIDATA
             JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE ev ON ev.ID_STATEMENT = st.ID_STATEMENT
             WHERE st.ID_PROPERTY = 'P12279'
               AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
-              AND ev.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
+              AND ev.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+              AND ev.VALUE_EXTERNAL_ID <> '0' ) v2 ON v2.ID_WIKIDATA = t2s.ID_WIKIDATA
 WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
 
 UNION ALL
@@ -260,6 +262,7 @@ FROM ( SELECT t2s.ID_WIKIDATA,
                 JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE scrv ON scrv.ID_STATEMENT = scr.ID_STATEMENT
                 WHERE scr.ID_WIKIDATA = t2s.ID_WIKIDATA AND scr.ID_PROPERTY = 'P9584'
                   AND scrv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+              AND scrv.VALUE_EXTERNAL_ID <> '0'
                   AND (scr.`RANK` IS NULL OR scr.`RANK` <> 'deprecated')
                 ORDER BY (scr.`RANK` = 'preferred') DESC, scr.ID_STATEMENT ASC
                 LIMIT 1 ) AS V2VAL
@@ -280,6 +283,7 @@ FROM ( SELECT t2s.ID_WIKIDATA,
                 JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE scrv ON scrv.ID_STATEMENT = scr.ID_STATEMENT
                 WHERE scr.ID_WIKIDATA = t2s.ID_WIKIDATA AND scr.ID_PROPERTY = 'P9584'
                   AND scrv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+              AND scrv.VALUE_EXTERNAL_ID <> '0'
                   AND (scr.`RANK` IS NULL OR scr.`RANK` <> 'deprecated')
                 ORDER BY (scr.`RANK` = 'preferred') DESC, scr.ID_STATEMENT ASC
                 LIMIT 1 ) AS V2VAL
@@ -427,7 +431,13 @@ SELECT 'T2S_PERSON', COUNT(*), NULL, NULL, NULL,
 FROM T_WC_T2S_PERSON
 WHERE ID_IMDB IS NOT NULL AND ID_IMDB <> '';
 
-SELECT 'E2. Lignes ou T2S ne dit pas ce que V2 donnerait (attendu : 0 partout)' AS SECTION;
+-- ⚠ UNE LIGNE D'ECART EST ATTENDUE, ET UNE SEULE. Le passage de nuit du 2026-08-27
+-- a tourne AVANT que le garde « valeur <> 0 » ne soit pose sur les identifiants
+-- numeriques. T_WC_T2S_MOVIE.ID_CRITERION_SPINE porte donc encore un 0 pour
+-- King Kong vs. Godzilla, la ou le code rendrait desormais NULL. Cette ligne doit
+-- afficher 1 aujourd'hui et 0 apres le prochain passage. Toute autre valeur non
+-- nulle, sur n'importe quelle ligne, est un defaut a chercher dans le code.
+SELECT 'E2. Lignes ou T2S ne dit pas ce que V2 donnerait (attendu : 0 partout, sauf SPINE a 1)' AS SECTION;
 
 -- ⚠ C'EST ICI QUE SE JOUE LA RECETTE, et non en E1. E1 compte des volumes sur une
 -- population legerement plus large que celle de l'UPDATE, donc ses chiffres approchent
@@ -468,6 +478,7 @@ WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
               WHERE scr.ID_WIKIDATA = t2s.ID_WIKIDATA AND scr.ID_PROPERTY = 'P9584'
                 AND (scr.`RANK` IS NULL OR scr.`RANK` <> 'deprecated')
                   AND scrv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+              AND scrv.VALUE_EXTERNAL_ID <> '0'
               ORDER BY (scr.`RANK` = 'preferred') DESC, scr.ID_STATEMENT ASC
               LIMIT 1 ) )
 
@@ -483,6 +494,7 @@ WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
               WHERE scs.ID_WIKIDATA = t2s.ID_WIKIDATA AND scs.ID_PROPERTY = 'P12279'
                 AND (scs.`RANK` IS NULL OR scs.`RANK` <> 'deprecated')
                   AND scsv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+              AND scsv.VALUE_EXTERNAL_ID <> '0'
               ORDER BY (scs.`RANK` = 'preferred') DESC, scs.ID_STATEMENT ASC
               LIMIT 1 ) )
 

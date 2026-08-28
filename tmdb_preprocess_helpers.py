@@ -1610,7 +1610,14 @@ def f_wikidatabestvaluesql(strpropertyid, strvaluetable, strvaluecolumn, strsubj
         # avait fait annoncer « 0 Criterion retrouve sur 19 924 » alors que le vrai
         # chiffre etait 1 673 sur 1 673. On ecarte la valeur plutot que de la
         # convertir en zero.
+        # Le REGEXP accepte « 0 », et CAST en fait un zero. Or zero est PRECISEMENT
+        # la valeur sentinelle que V1 utilisait pour dire « absent », celle que cette
+        # migration remplace par NULL. La laisser passer recreerait l'ambiguite qu'on
+        # vient de lever, et sur une seule ligne, ce qui est le pire des cas : trop
+        # rare pour se voir, assez presente pour fausser un tri. Ajoute le 2026-08-27
+        # apres avoir trouve un King Kong vs. Godzilla a numero de collection 0.
         strguard = f"AND {strvaluealias}.{strvaluecolumn} REGEXP '^[0-9]+$' "
+        strguard += f"AND {strvaluealias}.{strvaluecolumn} <> '0' "
         strvalueexpr = f"CAST({strvalueexpr} AS UNSIGNED)"
     if intmaxlength:
         # La valeur externe V2 est en varchar(1200), les colonnes T2S visees sont bien
