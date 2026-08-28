@@ -377,21 +377,39 @@ GROUP BY ev.VALUE_EXTERNAL_ID
 ORDER BY LONGUEUR DESC
 LIMIT 20;
 
--- ⚠ L'ATTENDU ANNONCE ICI ETAIT FAUX, et le premier passage l'a corrige. Avant
--- bascule, T_WC_T2S_MOVIE porte 247 392 zeros sur ID_CRITERION et 247 839 sur
--- ID_CRITERION_SPINE : V1 range 0, et non NULL, pour « ce film n'est pas chez
--- Criterion », et l'UPDATE recopiait ce 0. C'est la source exacte de l'artefact qui
--- avait fait annoncer « 0 Criterion retrouve sur 19 924 » : un IS NOT NULL comptait
--- ces 247 392 zeros comme des valeurs.
+-- ⚠ CETTE SECTION A ANNONCE DEUX ATTENDUS FAUX, ET LA CAUSE EST LA MEME LES DEUX
+-- FOIS : elle comptait sur TOUTE la table, quand l'UPDATE ne touche que les lignes
+-- jointes a V1 et pourvues d'un ID_IMDB. Une mesure prise sur une population plus
+-- large que celle qu'on modifie ne peut pas dire si la modification a marche ; elle
+-- melange ce que le code vient d'ecrire et ce que d'anciennes executions ont laisse.
+-- Corrigee le 2026-08-28 : les deux populations sont desormais comptees SEPAREMENT.
 --
--- Apres bascule, la sous-requete rend NULL quand aucun statement n'existe. Les deux
--- compteurs doivent donc tomber a ZERO. Ce n'est pas une perte de donnee, c'est la
--- disparition d'une fausse presence : 0 n'a jamais designe un film Criterion.
-SELECT 'D2. Zeros presents dans T2S (0 attendu APRES seulement, voir ci-dessus)' AS SECTION;
+-- Ce qu'il faut lire. ENRICHI doit valoir 0 : la, le code a ecrit, et un zero y
+-- serait un defaut. HORS PERIMETRE peut ne pas valoir 0 sans que rien n'aille mal,
+-- ce sont des lignes que l'UPDATE n'atteint pas et qui gardent la valeur d'une
+-- epoque ou V1 rangeait 0. Elles sont inoffensives : le filtre d'appartenance a la
+-- collection s'ecrit ID_CRITERION > 0, qui les exclut de lui-meme.
+--
+-- Historique des mesures : 247 392 et 247 839 zeros avant bascule, 76 et 77 apres,
+-- tous hors perimetre.
+SELECT 'D2. Zeros restants, par population' AS SECTION;
 
-SELECT SUM(ID_CRITERION = 0)       AS CRITERION_ZERO,
-       SUM(ID_CRITERION_SPINE = 0) AS SPINE_ZERO
-FROM T_WC_T2S_MOVIE;
+SELECT 'ENRICHI (attendu : 0)' AS POPULATION,
+       SUM(t2s.ID_CRITERION = 0)       AS CRITERION_ZERO,
+       SUM(t2s.ID_CRITERION_SPINE = 0) AS SPINE_ZERO
+FROM T_WC_T2S_MOVIE t2s
+INNER JOIN T_WC_WIKIDATA_MOVIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE t2s.ID_IMDB IS NOT NULL AND t2s.ID_IMDB <> ''
+
+UNION ALL
+
+SELECT 'HORS PERIMETRE (non nul admis)',
+       SUM(t2s.ID_CRITERION = 0),
+       SUM(t2s.ID_CRITERION_SPINE = 0)
+FROM T_WC_T2S_MOVIE t2s
+LEFT JOIN T_WC_WIKIDATA_MOVIE_V1 w ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
+WHERE w.ID_WIKIDATA IS NULL
+   OR t2s.ID_IMDB IS NULL OR t2s.ID_IMDB = '';
 
 
 -- ============================================================================
