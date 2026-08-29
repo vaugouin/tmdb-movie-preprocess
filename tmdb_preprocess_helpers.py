@@ -1698,8 +1698,13 @@ def f_awarddrivingsql():
     )
 
 
-def f_awardpurgesql(strtablename):
+def f_awardpurgesql(strtablename, strsourcecolumn):
     """La purge, exact inverse du pilote ci-dessus.
+
+    ⚠ La colonne qui porte la propriete source N'A PAS le meme nom dans les deux
+    tables : AWARD_SOURCE pour les prix, NOMINATION_SOURCE pour les nominations. Elle
+    est donc passee en parametre et non deduite du nom de la table. Deduire aurait
+    produit un SQL valide en apparence et faux au premier passage du processus 47.
 
     Les deux DOIVENT designer le meme ensemble. Elles partagent desormais le meme
     filtre de cone et la meme exclusion des rangs deprecies, ce qui rend l'ecart
@@ -1711,7 +1716,7 @@ def f_awardpurgesql(strtablename):
         "    SELECT 1\n"
         "    FROM T_WC_WIKIDATA_STATEMENT w\n"
         "    JOIN T_WC_WIKIDATA_ITEM_VALUE wv ON wv.ID_STATEMENT = w.ID_STATEMENT\n"
-        f"    WHERE w.ID_PROPERTY = {strtablename}.AWARD_SOURCE\n"
+        f"    WHERE w.ID_PROPERTY = {strtablename}.{strsourcecolumn}\n"
         f"      AND wv.ID_ITEM = {strtablename}.ID_WIKIDATA\n"
         "      AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated')\n"
         "      AND (\n"

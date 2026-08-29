@@ -2925,7 +2925,7 @@ SET
                         # row at all, the old NOT EXISTS behaviour) and the "now empty / degraded to zero
                         # tracked recipients" case introduced by pre-filtering the driving query. Orphan
                         # junction rows are cleaned up by the ID_AWARD NOT IN (...) deletes below.
-                        strsqldelete = f_awardpurgesql("T_WC_T2S_AWARD")
+                        strsqldelete = f_awardpurgesql("T_WC_T2S_AWARD", "AWARD_SOURCE")
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
                         telaward.deleted(cursor2.rowcount)
@@ -3205,7 +3205,7 @@ SET
                         # property row at all, the old NOT EXISTS behaviour) and the "now empty / degraded
                         # to zero tracked recipients" case introduced by pre-filtering the driving query.
                         # Orphan junction rows are cleaned up by the ID_NOMINATION NOT IN (...) deletes below.
-                        strsqldelete = f_awardpurgesql("T_WC_T2S_NOMINATION")
+                        strsqldelete = f_awardpurgesql("T_WC_T2S_NOMINATION", "NOMINATION_SOURCE")
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
                         telnomination.deleted(cursor2.rowcount)

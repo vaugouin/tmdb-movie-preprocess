@@ -70,14 +70,37 @@ GROUP BY sa.ID_PROPERTY;
 -- Chaque item present dans le pilote V1 et absent du pilote V2, range dans une cause.
 -- Les trois premieres sont attendues et souhaitees ; la quatrieme ne l'est pas.
 --
--- CEREMONIE        l'item apparait ailleurs comme valeur de P805. C'etait une
---                  ceremonie aplatie sous P166, pas un prix.
--- OEUVRE           l'item apparait ailleurs comme valeur de P1686. C'etait l'oeuvre
---                  pour laquelle le prix a ete remis.
+-- QUALIFICATIF     l'item apparait ailleurs comme valeur d'un QUALIFICATIF, quel
+--                  qu'il soit. C'est la signature de l'aplatissement de V1.
+--
+--                  ⚠ LA PREMIERE VERSION N'ENUMERAIT QUE P805 ET P1686, et laissait
+--                  11 396 items en « inexplique » sur le passage du 2026-08-28.
+--                  Verification a la source : Q8586 Richard Edlund, Q131285 John
+--                  Williams, Q1600325 John Barry, Q542167 Richard Chew. Des
+--                  PERSONNES, toutes P31 = Q5. Ce sont les CO-LAUREATS, nommes en
+--                  qualificatif sur le statement de l'oeuvre, que V1 rangeait comme
+--                  des prix. Enumerer les proprietes revenait a deviner la liste des
+--                  degats ; tester le fait d'etre un qualificatif la mesure. La
+--                  section B0 dit desormais lesquelles, plutot que de les presumer.
 -- HORS PERIMETRE   l'item n'a aucun statement en V2 : il n'a pas ete importe.
 --                  -> WIKIDATA-CRAWLER-011, tranche le 2026-08-28, perte acceptee.
 -- ⚠ INEXPLIQUE     aucune des trois. A regarder une par une avant de basculer.
 -- ============================================================================
+
+SELECT 'B0. Quelles proprietes de qualificatif V1 aplatissait sous P166' AS SECTION;
+
+-- Les items du pilote V1 qui sont, ailleurs, valeur d'un qualificatif : par quelle
+-- propriete ? C'est la carte des degats de l'aplatissement, relevee et non supposee.
+SELECT sq.ID_QUALIFIER_PROPERTY AS PROPRIETE_QUALIFICATIF,
+       COUNT(DISTINCT qv.ID_ITEM) AS ITEMS_DU_PILOTE_V1
+FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq
+JOIN T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE qv
+  ON qv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER
+WHERE EXISTS ( SELECT 1 FROM T_WC_WIKIDATA_ITEM_PROPERTY ip
+               WHERE ip.ID_ITEM = qv.ID_ITEM AND ip.ID_PROPERTY = 'P166' )
+GROUP BY sq.ID_QUALIFIER_PROPERTY
+ORDER BY ITEMS_DU_PILOTE_V1 DESC
+LIMIT 15;
 
 SELECT 'B1. Les items qui quittent le pilote P166, par cause' AS SECTION;
 
@@ -85,13 +108,8 @@ SELECT CASE
          WHEN EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq
                       JOIN T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE qv
                         ON qv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER
-                      WHERE qv.ID_ITEM = d.ID_ITEM AND sq.ID_QUALIFIER_PROPERTY = 'P805')
-           THEN 'CEREMONIE'
-         WHEN EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq
-                      JOIN T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE qv
-                        ON qv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER
-                      WHERE qv.ID_ITEM = d.ID_ITEM AND sq.ID_QUALIFIER_PROPERTY = 'P1686')
-           THEN 'OEUVRE'
+                      WHERE qv.ID_ITEM = d.ID_ITEM)
+           THEN 'QUALIFICATIF'
          WHEN NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s2
                           WHERE s2.ID_WIKIDATA = d.ID_ITEM)
            THEN 'HORS PERIMETRE'
@@ -124,10 +142,15 @@ SELECT 'B2. Vingt items inexpliques a regarder un par un (attendu : peu, ou zero
 -- Q15416 dans SERIES_ROOTS. Q85314819 « 96th Academy Awards » y est, et pas dans le
 -- cache d'items. Ne jamais presupposer la table ou vit un QID.
 SELECT d.ID_ITEM,
-       COALESCE(i.LABEL_EN, se.LABEL_EN, mo.LABEL_EN) AS LIBELLE,
-       CASE WHEN i.ID_WIKIDATA IS NOT NULL THEN 'item'
+       COALESCE(i.LABEL_EN, se.LABEL_EN, mo.LABEL_EN, pr.LABEL_EN,
+                ch.LABEL_EN, ep.LABEL_EN, sn.LABEL_EN) AS LIBELLE,
+       CASE WHEN i.ID_WIKIDATA  IS NOT NULL THEN 'item'
             WHEN se.ID_WIKIDATA IS NOT NULL THEN 'serie'
             WHEN mo.ID_WIKIDATA IS NOT NULL THEN 'film'
+            WHEN pr.ID_WIKIDATA IS NOT NULL THEN 'personne'
+            WHEN ch.ID_WIKIDATA IS NOT NULL THEN 'personnage'
+            WHEN ep.ID_WIKIDATA IS NOT NULL THEN 'episode'
+            WHEN sn.ID_WIKIDATA IS NOT NULL THEN 'saison'
             ELSE 'inconnu' END AS OU
 FROM ( SELECT DISTINCT ip.ID_ITEM
        FROM T_WC_WIKIDATA_ITEM_PROPERTY ip
@@ -148,11 +171,14 @@ FROM ( SELECT DISTINCT ip.ID_ITEM
          AND NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq
                          JOIN T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE qv
                            ON qv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER
-                         WHERE qv.ID_ITEM = ip.ID_ITEM
-                           AND sq.ID_QUALIFIER_PROPERTY IN ('P805','P1686')) ) d
-LEFT JOIN T_WC_WIKIDATA_ITEM  i  ON i.ID_WIKIDATA  = d.ID_ITEM
-LEFT JOIN T_WC_WIKIDATA_SERIE se  ON se.ID_WIKIDATA = d.ID_ITEM
-LEFT JOIN T_WC_WIKIDATA_MOVIE mo  ON mo.ID_WIKIDATA = d.ID_ITEM
+                         WHERE qv.ID_ITEM = ip.ID_ITEM) ) d
+LEFT JOIN T_WC_WIKIDATA_ITEM      i  ON i.ID_WIKIDATA  = d.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_SERIE     se ON se.ID_WIKIDATA = d.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_MOVIE     mo ON mo.ID_WIKIDATA = d.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_PERSON    pr ON pr.ID_WIKIDATA = d.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_CHARACTER ch ON ch.ID_WIKIDATA = d.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_EPISODE   ep ON ep.ID_WIKIDATA = d.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_SEASON    sn ON sn.ID_WIKIDATA = d.ID_ITEM
 LIMIT 20;
 
 
@@ -230,7 +256,7 @@ SELECT 'T_WC_T2S_AWARD' AS TABLE_T2S, COUNT(*) AS LIGNES,
        COUNT(DISTINCT AWARD_SOURCE) AS SOURCES
 FROM T_WC_T2S_AWARD
 UNION ALL
-SELECT 'T_WC_T2S_NOMINATION', COUNT(*), COUNT(DISTINCT AWARD_SOURCE)
+SELECT 'T_WC_T2S_NOMINATION', COUNT(*), COUNT(DISTINCT NOMINATION_SOURCE)
 FROM T_WC_T2S_NOMINATION;
 
 SELECT 'E2. Lignes que le pilote V2 ne produirait plus (attendu : 0, la purge les enleve)' AS SECTION;
@@ -246,18 +272,43 @@ WHERE NOT EXISTS (
       AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated')
       AND ( EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = w.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
          OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
+         OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') ) )
+
+UNION ALL
+
+SELECT 'T_WC_T2S_NOMINATION', COUNT(*)
+FROM T_WC_T2S_NOMINATION a
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM T_WC_WIKIDATA_STATEMENT w
+    JOIN T_WC_WIKIDATA_ITEM_VALUE wv ON wv.ID_STATEMENT = w.ID_STATEMENT
+    WHERE w.ID_PROPERTY = a.NOMINATION_SOURCE
+      AND wv.ID_ITEM = a.ID_WIKIDATA
+      AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated')
+      AND ( EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = w.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
+         OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = w.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
          OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = w.ID_WIKIDATA AND pe.ID_WIKIDATA <> '') ) );
 
-SELECT 'E3. Le cas temoin : Cord Jefferson ne doit plus porter de ceremonie ni d oeuvre' AS SECTION;
+SELECT 'E3. Le cas temoin, un prix et trois qualificatifs la ou V1 voyait quatre prix' AS SECTION;
 
--- Q120175513 Cord Jefferson. En V1, ITEM_PROPERTY lui donnait « 96th Academy Awards »
--- et « American Fiction » comme des P166. En V2 il ne doit rester que des categories
--- de prix, la ceremonie et l'oeuvre ayant rejoint leurs propres colonnes.
+-- Cord Jefferson est Q100146356, verifie a la source le 2026-08-29 (ma premiere
+-- version citait Q120175513, un identifiant que j'avais reconstitue de memoire, et
+-- la section rendait zero ligne sans rien signaler : une recette muette est pire
+-- qu'une recette fausse, elle se lit comme un succes).
+--
+-- Wikidata ne lui donne QU'UN SEUL P166 : Q107258, l'Oscar du meilleur scenario
+-- adapte, portant trois qualificatifs, P1686 l'oeuvre American Fiction, P585 l'annee
+-- et P805 la 96e ceremonie. V1 aplatissait les quatre valeurs au meme rang.
+-- Attendu ici : UNE ligne, Q107258.
 SELECT av.ID_ITEM,
-       COALESCE(i.LABEL_EN, se.LABEL_EN, mo.LABEL_EN) AS LIBELLE
+       COALESCE(i.LABEL_EN, se.LABEL_EN, mo.LABEL_EN, pr.LABEL_EN) AS LIBELLE,
+       ( SELECT GROUP_CONCAT(DISTINCT sq.ID_QUALIFIER_PROPERTY ORDER BY sq.ID_QUALIFIER_PROPERTY)
+         FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq
+         WHERE sq.ID_STATEMENT = sa.ID_STATEMENT ) AS QUALIFICATIFS
 FROM T_WC_WIKIDATA_STATEMENT sa
 JOIN T_WC_WIKIDATA_ITEM_VALUE av ON av.ID_STATEMENT = sa.ID_STATEMENT
-LEFT JOIN T_WC_WIKIDATA_ITEM  i  ON i.ID_WIKIDATA  = av.ID_ITEM
-LEFT JOIN T_WC_WIKIDATA_SERIE se ON se.ID_WIKIDATA = av.ID_ITEM
-LEFT JOIN T_WC_WIKIDATA_MOVIE mo ON mo.ID_WIKIDATA = av.ID_ITEM
-WHERE sa.ID_WIKIDATA = 'Q120175513' AND sa.ID_PROPERTY = 'P166';
+LEFT JOIN T_WC_WIKIDATA_ITEM   i  ON i.ID_WIKIDATA  = av.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_SERIE  se ON se.ID_WIKIDATA = av.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_MOVIE  mo ON mo.ID_WIKIDATA = av.ID_ITEM
+LEFT JOIN T_WC_WIKIDATA_PERSON pr ON pr.ID_WIKIDATA = av.ID_ITEM
+WHERE sa.ID_WIKIDATA = 'Q100146356' AND sa.ID_PROPERTY = 'P166';
