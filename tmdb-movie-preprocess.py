@@ -27,8 +27,10 @@ from tmdb_preprocess_helpers import (
     extract_sound_technology,
     f_buildcustomaggregatequery,
     f_buildcustomorderbyclause,
+    f_customexternalidsourcesql,
     f_getcustomsortby,
     f_getwikidataimagepath,
+    f_parsecustomexternalidproperties,
     f_awardconeguard,
     f_awarddrivingsql,
     f_awardlinksql,
@@ -1736,7 +1738,13 @@ SET
                                         strsqlseries_imdb = "SELECT s.ID_SERIE, FIELD(s.ID_IMDB, " + strfieldorder + ") AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_TMDB_SERIE s INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE s.ID_IMDB IN (" + strimdbidlist + ") AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                                     # Mechanism 2: Wikidata property/item filter from WIKIDATA_PROPERTIES
                                     strwikidataproperties = row['WIKIDATA_PROPERTIES'] or ''
-                                    arrwdtokens = re.findall(r'[PQ]\d+', strwikidataproperties)
+                                    # TMDB-MOVIE-PREPROCESS-044: the mechanism-4 markers are read FIRST and
+                                    # REMOVED from the string. Mechanism 2 then parses the remainder only, so it
+                                    # never mistakes an external-id property for its own filter property, while
+                                    # the Q left in place keeps its role here, illustrating the collection
+                                    # (ID_WIKIDATA and the Wikipedia image).
+                                    strwdmembershipproperty, strwdorderproperty, strwikidataremainder = f_parsecustomexternalidproperties(strwikidataproperties)
+                                    arrwdtokens = re.findall(r'[PQ]\d+', strwikidataremainder)
                                     strwdpropertyid = next((t for t in arrwdtokens if t.startswith('P')), '')
                                     strwditemid = next((t for t in arrwdtokens if t.startswith('Q')), '')
                                     if strwditemid:
@@ -1756,9 +1764,17 @@ SET
                                         strkeywordname = strkeywordmatch.group(1).strip().replace("'", "''")
                                         strsqlmovies_keyword = "SELECT mk.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_TMDB_MOVIE_KEYWORD mk INNER JOIN T_WC_TMDB_KEYWORD k ON mk.ID_KEYWORD = k.ID_KEYWORD INNER JOIN T_WC_TMDB_MOVIE m ON m.ID_MOVIE = mk.ID_MOVIE INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE k.NAME = '" + strkeywordname + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
                                         strsqlseries_keyword = "SELECT sk.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_TMDB_SERIE_KEYWORD sk INNER JOIN T_WC_TMDB_KEYWORD k ON sk.ID_KEYWORD = k.ID_KEYWORD INNER JOIN T_WC_TMDB_SERIE s ON s.ID_SERIE = sk.ID_SERIE INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE k.NAME = '" + strkeywordname + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                                    # Mechanism 4: membership by Wikidata EXTERNAL ID, read in the V2
+                                    # statements (TMDB-MOVIE-PREPROCESS-044). 'ID:P9584' means "every title
+                                    # carrying a Criterion film id", which is how a publisher catalogue is
+                                    # actually defined: by the identifier itself, not by a property pointing at
+                                    # the publisher's item. 'ORDER:P12279' pours the spine number into
+                                    # ORIGINAL_ORDER, which SORT_BY = 1 then sorts, spineless titles last.
+                                    strsqlmovies_externalid = f_customexternalidsourcesql(strwdmembershipproperty, strwdorderproperty, "movie")
+                                    strsqlseries_externalid = f_customexternalidsourcesql(strwdmembershipproperty, strwdorderproperty, "serie")
                                     # Combine mechanisms cumulatively
-                                    arrsqlmovies_sources = [s for s in [strsqlmovies_imdb, strsqlmovies_wikidata, strsqlmovies_keyword] if s]
-                                    arrsqlseries_sources = [s for s in [strsqlseries_imdb, strsqlseries_wikidata, strsqlseries_keyword] if s]
+                                    arrsqlmovies_sources = [s for s in [strsqlmovies_imdb, strsqlmovies_wikidata, strsqlmovies_keyword, strsqlmovies_externalid] if s]
+                                    arrsqlseries_sources = [s for s in [strsqlseries_imdb, strsqlseries_wikidata, strsqlseries_keyword, strsqlseries_externalid] if s]
                                     strsqlmovies = f_buildcustomaggregatequery(arrsqlmovies_sources, "ID_MOVIE", "IMDB_RATING_WEIGHTED", intsortby)
                                     strsqlseries = f_buildcustomaggregatequery(arrsqlseries_sources, "ID_SERIE", "IMDB_RATING_WEIGHTED", intsortby)
                                 if strsqlmovies != "":

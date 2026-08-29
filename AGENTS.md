@@ -70,6 +70,19 @@ Main sub-pipeline families:
 - **Dimension builders from Wikidata properties** — groups (P463/P108/P54), awards (P166), nominations (P1411), deaths (P509/P1196), plus custom-list-driven collections/lists/movements/groups.
 - **Bulk T2S copy + rebuild** — the long tail of `T_WC_TMDB_*` → `T_WC_T2S_*` copies (chunked upsert) and junction/media rebuilds (staging swap).
 
+### Custom lists (`T_WC_CUSTOM_LIST`)
+
+One row = one hand-declared collection / list / movement / group, routed by `TARGET_TABLE` (`1` list → process 42, `2` collection → process 41, `3` group → 43, `4` movement → 45) and only read when `DELETED = 0`. Membership is the union of four **cumulative** mechanisms (`UNION ALL` then `GROUP BY`, see `f_buildcustomaggregatequery`):
+
+1. `ID_IMDB_LIST`, explicit `tt…` ids, their position feeding `ORIGINAL_ORDER`;
+2. `WIKIDATA_PROPERTIES`, a `P… Q…` pair, resolved against the legacy V1 `T_WC_WIKIDATA_ITEM_PROPERTY` (item-valued statements only);
+3. `TMDB_ELEMENTS`, `T_WC_TMDB_KEYWORD.NAME = '…'`;
+4. `WIKIDATA_PROPERTIES` markers `ID:P…` / `ORDER:P…`, membership by **external-id property present**, read in the **V2** statements (TMDB-MOVIE-PREPROCESS-044). Wired into process 41 only for now; `f_customexternalidsourcesql` is entity-agnostic (`movie` / `serie`), so 42 and 45 take two lines each when needed.
+
+`SORT_BY` accepts `1`/`2` (`ORIGINAL_ORDER` asc/desc, NULLs last), `3`/`4` (weighted IMDb rating asc/desc, `4` is the default), `5`/`6` (date asc/desc); `DISPLAY_ORDER` in `T_WC_T2S_MOVIE_COLLECTION` / `_SERIE_COLLECTION` is just a 1..N counter following that order. **A catalogue numbered by its publisher therefore needs no new sort code**: pour the numbering property into `ORIGINAL_ORDER` via `ORDER:P…` and set `SORT_BY = 1`. Reconciliation is built in: titles that stopped matching are deleted, a collection falling to one element or none is dropped, and rows whose custom list vanished are purged. `TMDB_TARGET_RECORD` (`ID_COLLECTION = n` / `ID_LIST = n`) pushes the members into an existing TMDb collection instead of creating one, additively and without deletion.
+
+Worked example, the Criterion Collection: `WIKIDATA_PROPERTIES = 'ID:P9584 ORDER:P12279 Q1204187'`, `SORT_BY = 1`, `TARGET_TABLE = 2`. `P9584` is the criterion.com film id (membership), `P12279` the DVD/Blu-ray spine number (display order), `Q1204187` the company item, left for `ID_WIKIDATA` and the Wikipedia image. The markers are read and **removed** before the mechanism-2 parse, so a lone `Q` keeps its illustrative role without waking mechanism 2.
+
 Per-process inputs, outputs, filters and operations are documented exhaustively in @README.md (Process Reference + Source → Target Table Map) — consult it rather than re-deriving from code, but verify against code before changing behavior.
 
 ## Database tables

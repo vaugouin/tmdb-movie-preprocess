@@ -1634,6 +1634,104 @@ def f_wikidataexternalidsql(strpropertyid, strsubjectexpr, blnnumeric=False, str
                                   strsubjectexpr, blnnumeric, strprefix, intmaxlength)
 
 
+# ---- TMDB-MOVIE-PREPROCESS-044 : le 4e mecanisme des listes personnalisees ------------
+#
+# Les trois mecanismes historiques de T_WC_CUSTOM_LIST savent dire "ces films-la"
+# (ID_IMDB_LIST), "les films dont la propriete P vaut l'item Q" (WIKIDATA_PROPERTIES) et
+# "les films portant ce mot-cle TMDb" (TMDB_ELEMENTS). Aucun ne sait dire "les films qui
+# PORTENT telle propriete", quelle que soit sa valeur. Or c'est ainsi que se definit un
+# catalogue d'editeur : un film est chez Criterion parce qu'il a un identifiant Criterion
+# (P9584), pas parce qu'une propriete pointe vers l'item Criterion.
+#
+# Le mecanisme 2 ne pouvait pas etre etendu pour le faire : il lit
+# T_WC_WIKIDATA_ITEM_PROPERTY, la table V1 qui ne contient QUE des statements a valeur
+# d'item. Un identifiant externe est une chaine ; il n'y a jamais eu de ligne a y trouver.
+# Celui-ci lit donc V2, comme l'enrichissement du processus 4.
+#
+# LA PROPRIETE D'ORDRE est le second apport, et elle ne filtre rien. Sa valeur numerique
+# est versee dans ORIGINAL_ORDER, la colonne que SORT_BY = 1 trie deja en releguant les
+# NULL en fin de liste. Un catalogue numerote (Criterion et ses spine numbers, P12279) se
+# range donc dans l'ordre de son editeur sans une seule ligne de code de tri nouvelle, et
+# les titres sans numero tombent a la fin au lieu de disparaitre. DISPLAY_ORDER, qui n'est
+# qu'un compteur suivant cet ORDER BY, en decoule.
+#
+# SYNTAXE dans WIKIDATA_PROPERTIES, volontairement EXPLICITE :
+#     ID:P9584 ORDER:P12279 Q1204187
+# Les marqueurs sont obligatoires. Declencher sur "un P sans Q" aurait ete plus court, et
+# c'etait un piege : une ligne existante portant un P orphelin, aujourd'hui inerte, serait
+# devenue du jour au lendemain une collection de plusieurs milliers de titres que personne
+# n'a demandee. Les marqueurs laissent en outre le Q libre pour ce a quoi il sert ici,
+# illustrer la collection (ID_WIKIDATA et image Wikipedia), sans reveiller le mecanisme 2.
+#
+# Pas de filtre DELETED sur le statement, par alignement delibere avec
+# f_wikidatabestvaluesql et f_awardconefilter : deux lectures V2 qui ne filtrent pas
+# pareil finissent par diverger sans que personne ne s'en apercoive.
+#
+# LECTURE DIRECTE DE T2S, la ou le mecanisme 2 passe par la table TMDb source. Ce n'est
+# pas une divergence de style : T_WC_T2S_MOVIE porte deja ID_WIKIDATA, ADULT, la date et
+# le score, et les autres mecanismes doivent de toute facon la joindre pour le score. Le
+# detour par T_WC_TMDB_MOVIE serait une jointure pour rien, sur une population que la
+# collection ne peut pas contenir de toute maniere.
+ARR_CUSTOM_EXTERNAL_ID_ENTITY = {
+    "movie": ("T_WC_T2S_MOVIE", "ID_MOVIE", "IMDB_RATING_WEIGHTED", "DAT_RELEASE"),
+    "serie": ("T_WC_T2S_SERIE", "ID_SERIE", "IMDB_RATING_WEIGHTED", "DAT_FIRST_AIR"),
+}
+
+
+def f_parsecustomexternalidproperties(strwikidataproperties):
+    """Lit les marqueurs ID: et ORDER:, rend (appartenance, ordre, reste de la chaine).
+
+    Le troisieme element est la chaine PRIVEE des tokens consommes, et c'est lui que le
+    mecanisme 2 doit parser ensuite. Sans cela il verrait P9584 comme sa propre propriete
+    de filtre et fabriquerait un couple (P9584, Q1204187) qui ne designe rien : une
+    collection vide, sans erreur SQL, donc sans rien pour alerter.
+    """
+    strremainder = strwikidataproperties or ""
+    strmembershipproperty = ""
+    strorderproperty = ""
+    objmatch = re.search(r"\bID\s*:\s*(P\d+)", strremainder, re.IGNORECASE)
+    if objmatch:
+        strmembershipproperty = objmatch.group(1)
+        strremainder = strremainder.replace(objmatch.group(0), " ")
+    objmatch = re.search(r"\bORDER\s*:\s*(P\d+)", strremainder, re.IGNORECASE)
+    if objmatch:
+        strorderproperty = objmatch.group(1)
+        strremainder = strremainder.replace(objmatch.group(0), " ")
+    return strmembershipproperty, strorderproperty, strremainder
+
+
+def f_customexternalidsourcesql(strmembershipproperty, strorderproperty, strentitykind):
+    """Une source du mecanisme 4, ou la chaine vide si la ligne ne le demande pas.
+
+    Meme contrat que les trois autres sources : quatre colonnes dans le meme ordre
+    (identifiant, ORIGINAL_ORDER, score, SORT_DATE), aucun ORDER BY, une espace finale,
+    puisque f_buildcustomaggregatequery les assemble en UNION ALL et pose le tri.
+    """
+    if strentitykind not in ARR_CUSTOM_EXTERNAL_ID_ENTITY:
+        return ""
+    if not re.fullmatch(r"P\d+", strmembershipproperty or ""):
+        return ""
+    (strt2stable, stridfield, strscorefield,
+     strdatefield) = ARR_CUSTOM_EXTERNAL_ID_ENTITY[strentitykind]
+    strorderexpr = "NULL"
+    if re.fullmatch(r"P\d+", strorderproperty or ""):
+        # Exactement la lecture du processus 4 : rang preferred d'abord, valeur numerique
+        # seulement, et '0' ecarte parce que c'etait la sentinelle "absent" de V1.
+        strorderexpr = f_wikidataexternalidsql(strorderproperty, "t.ID_WIKIDATA", True, "sco")
+    return (
+        f"SELECT DISTINCT t.{stridfield}, {strorderexpr} AS ORIGINAL_ORDER, "
+        f"t.{strscorefield}, t.{strdatefield} AS SORT_DATE "
+        "FROM T_WC_WIKIDATA_STATEMENT sme "
+        f"STRAIGHT_JOIN {strt2stable} t ON t.ID_WIKIDATA = sme.ID_WIKIDATA "
+        "INNER JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE smv ON smv.ID_STATEMENT = sme.ID_STATEMENT "
+        f"WHERE sme.ID_PROPERTY = '{strmembershipproperty}' "
+        "AND (sme.`RANK` IS NULL OR sme.`RANK` <> 'deprecated') "
+        "AND smv.VALUE_EXTERNAL_ID <> '' "
+        "AND t.ADULT = 0 "
+        "AND t.ID_WIKIDATA IS NOT NULL AND t.ID_WIKIDATA <> '' "
+    )
+
+
 # ---- TMDB-MOVIE-PREPROCESS-039 : le cone, ecrit une seule fois -----------------------
 #
 # STR_AWARD_CONE_FILTER_DRIVING et STR_AWARD_CONE_FILTER_PURGE disaient la meme regle
