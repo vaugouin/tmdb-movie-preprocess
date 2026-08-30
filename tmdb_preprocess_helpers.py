@@ -1860,3 +1860,88 @@ def f_awardlinksql(strt2stable, stralias, stridcolumn, strsortcolumn):
         f"AND {stralias}.ID_WIKIDATA IS NOT NULL AND {stralias}.ID_WIKIDATA <> '' "
         f"ORDER BY {stralias}.{strsortcolumn} DESC, {stralias}.{stridcolumn} ASC "
     )
+
+
+# ---- TMDB-MOVIE-PREPROCESS-040 et -041 : les processus 43 (groupes) et 46 (deces) ----
+#
+# ⚠ -040 PARTAIT D'UNE LECTURE FAUSSE, corrigee ici. Le ticket decrivait
+# T_WC_WIKIDATA_PERSON_V1 comme un « pont TMDb vers Wikidata ». C'en est pas un :
+# T_WC_TMDB_PERSON porte deja ID_WIKIDATA, le pont existe sans elle. La jointure est
+# une PORTE : elle exige que Wikidata connaisse l'entite comme une personne. Le
+# ticket demandait donc de mesurer la couverture de P4985 avant de basculer, ce qui
+# n'a aucun objet. L'equivalent V2 est la table d'entite T_WC_WIKIDATA_PERSON, meme
+# jointure, meme role. Ce qu'il faut mesurer, c'est sa couverture en personnes.
+def f_persondrivingsql(strpropertyid, strextraclause=""):
+    """L'ensemble pilote des groupes et des deces : les items qu'au moins DEUX
+    personnes suivies partagent.
+
+    Le seuil de deux n'est pas cosmetique. Sans lui, le processus itererait les
+    centaines de milliers d'items de P463, P108 et P54 pour n'en supprimer que des
+    singletons ; la purge en fin de processus applique le meme seuil, et les deux
+    doivent rester d'accord.
+    """
+    return (
+        "SELECT pv.ID_ITEM "
+        "FROM T_WC_WIKIDATA_STATEMENT sp "
+        "JOIN T_WC_WIKIDATA_ITEM_VALUE pv ON pv.ID_STATEMENT = sp.ID_STATEMENT "
+        "INNER JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = sp.ID_WIKIDATA "
+        "INNER JOIN T_WC_WIKIDATA_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON.ID_WIKIDATA "
+        f"WHERE sp.ID_PROPERTY = '{strpropertyid}' "
+        "AND (sp.`RANK` IS NULL OR sp.`RANK` <> 'deprecated') "
+        + strextraclause
+        + "GROUP BY pv.ID_ITEM "
+        "HAVING COUNT(DISTINCT T_WC_TMDB_PERSON.ID_PERSON) >= 2 "
+        "ORDER BY pv.ID_ITEM ASC "
+    )
+
+
+def f_personlinkfromsql():
+    """Le FROM et le WHERE des liaisons personne, la liste des colonnes restant a
+    l'appelant qui en choisit une dizaine.
+
+    Meme inversion d'ordre que dans f_awardlinksql, et pour la meme raison : en V2 la
+    selectivite est sur la VALEUR, indexee, la propriete seule ne filtrant presque
+    rien. Les deux STRAIGHT_JOIN sont conserves, leur raison n'ayant pas bouge.
+    """
+    return (
+        "FROM T_WC_WIKIDATA_ITEM_VALUE pv "
+        "JOIN T_WC_WIKIDATA_STATEMENT sp ON sp.ID_STATEMENT = pv.ID_STATEMENT "
+        "STRAIGHT_JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = sp.ID_WIKIDATA "
+        "STRAIGHT_JOIN T_WC_WIKIDATA_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON.ID_WIKIDATA "
+        "WHERE sp.ID_PROPERTY = %s "
+        "AND pv.ID_ITEM = %s "
+        "AND (sp.`RANK` IS NULL OR sp.`RANK` <> 'deprecated') "
+        "ORDER BY T_WC_TMDB_PERSON.POPULARITY DESC "
+    )
+
+
+def f_persongrouppurgesql(strtablename, strsourcecolumn, blncustomguard=True, strextraclause=""):
+    """La purge des groupes et des deces : exact inverse du pilote, meme seuil de deux.
+
+    ⚠ La colonne source n'a pas le meme nom d'une table a l'autre, GROUP_SOURCE et
+    DEATH_SOURCE. Elle est passee, jamais deduite : l'avoir deduite avait produit un
+    SQL valide en apparence et faux au premier passage, sur la purge des nominations
+    (-039, corrige le 2026-08-29).
+
+    Les deux processus ne purgent pas tout a fait pareil : 43 protege les groupes
+    'custom', 46 ne le fait pas et porte une exclusion P1196 qui lui est propre. D'ou
+    les deux derniers parametres, plutot qu'une deuxieme fonction presque identique.
+    """
+    strhead = f"DELETE FROM {strtablename}\n"
+    if blncustomguard:
+        strhead += f"WHERE {strsourcecolumn} <> 'custom'\n  AND (\n"
+    else:
+        strhead += "WHERE (\n"
+    return (
+        strhead
+        + "    SELECT COUNT(DISTINCT p.ID_PERSON)\n"
+        "    FROM T_WC_WIKIDATA_ITEM_VALUE wv\n"
+        "    JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT\n"
+        "    INNER JOIN T_WC_TMDB_PERSON p ON p.ID_WIKIDATA = w.ID_WIKIDATA\n"
+        "    INNER JOIN T_WC_WIKIDATA_PERSON wp ON p.ID_WIKIDATA = wp.ID_WIKIDATA\n"
+        f"    WHERE w.ID_PROPERTY = {strtablename}.{strsourcecolumn}\n"
+        f"      AND wv.ID_ITEM = {strtablename}.ID_WIKIDATA\n"
+        "      AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated')\n"
+        + strextraclause
+        + "  ) < 2;"
+    )

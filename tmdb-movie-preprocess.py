@@ -34,6 +34,9 @@ from tmdb_preprocess_helpers import (
     f_awardconeguard,
     f_awarddrivingsql,
     f_awardlinksql,
+    f_persondrivingsql,
+    f_personlinkfromsql,
+    f_persongrouppurgesql,
     f_awardpurgesql,
     f_getwikidatalabel,
     f_wikidataexternalidsql,
@@ -277,7 +280,14 @@ try:
                 )
                 arranalyzetables = [row["TABLE_NAME"] for row in cursoranalyze.fetchall()]
                 arranalyzetables += [
-                    "T_WC_WIKIDATA_ITEM_PROPERTY", "T_WC_WIKIDATA_ITEM_V1",
+                    # Les statistiques nourrissent des plans que le code force par
+                    # STRAIGHT_JOIN : elles doivent porter sur les tables reellement
+                    # lues. Les trois tables V1 ont ete remplacees par leurs
+                    # equivalents V2 le 2026-08-30 (-040, -041) ; ANALYZE sur une
+                    # table que plus personne n'interroge ne coute rien mais ne sert
+                    # a rien, et son absence sur les nouvelles coute un mauvais plan.
+                    "T_WC_WIKIDATA_STATEMENT", "T_WC_WIKIDATA_ITEM_VALUE",
+                    "T_WC_WIKIDATA_PERSON", "T_WC_WIKIDATA_ITEM_V1",
                     "T_WC_WIKIDATA_PERSON_V1", "T_WC_TMDB_MOVIE",
                     "T_WC_TMDB_SERIE", "T_WC_TMDB_PERSON", "T_WC_TMDB_GENRE",
                 ]
@@ -960,17 +970,21 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                             continue
                         strwikidataidlist = "'" + "','".join(arrmoviewikidataids) + "'"
                         strsqlitem = ""
-                        strsqlitem += "SELECT ID_ITEM "
-                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
-                        strsqlitem += "WHERE ID_WIKIDATA IN (" + strwikidataidlist + ") "
-                        strsqlitem += "AND ID_PROPERTY = 'P179' "
-                        strsqlitem += "GROUP BY ID_ITEM "
-                        strsqlitem += "HAVING COUNT(DISTINCT ID_WIKIDATA) = " + str(intmoviecount) + " "
-                        strsqlitem += "AND (SELECT COUNT(DISTINCT ip2.ID_WIKIDATA) "
-                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_PROPERTY ip2 "
-                        strsqlitem += "WHERE ip2.ID_ITEM = T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
-                        strsqlitem += "AND ip2.ID_PROPERTY = 'P179') = " + str(intmoviecount) + " "
-                        strsqlitem += "ORDER BY ID_ITEM ASC "
+                        strsqlitem += "SELECT wv.ID_ITEM "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_VALUE wv "
+                        strsqlitem += "JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT "
+                        strsqlitem += "WHERE w.ID_WIKIDATA IN (" + strwikidataidlist + ") "
+                        strsqlitem += "AND w.ID_PROPERTY = 'P179' "
+                        strsqlitem += "AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') "
+                        strsqlitem += "GROUP BY wv.ID_ITEM "
+                        strsqlitem += "HAVING COUNT(DISTINCT w.ID_WIKIDATA) = " + str(intmoviecount) + " "
+                        strsqlitem += "AND (SELECT COUNT(DISTINCT w2.ID_WIKIDATA) "
+                        strsqlitem += "FROM T_WC_WIKIDATA_ITEM_VALUE wv2 "
+                        strsqlitem += "JOIN T_WC_WIKIDATA_STATEMENT w2 ON w2.ID_STATEMENT = wv2.ID_STATEMENT "
+                        strsqlitem += "WHERE wv2.ID_ITEM = wv.ID_ITEM "
+                        strsqlitem += "AND w2.ID_PROPERTY = 'P179' "
+                        strsqlitem += "AND (w2.`RANK` IS NULL OR w2.`RANK` <> 'deprecated')) = " + str(intmoviecount) + " "
+                        strsqlitem += "ORDER BY wv.ID_ITEM ASC "
                         print(strsqlitem)
                         cursor4.execute(strsqlitem)
                         arritems = cursor4.fetchall()
@@ -1753,8 +1767,8 @@ SET
                                     strsqlmovies_wikidata = ""
                                     strsqlseries_wikidata = ""
                                     if strwdpropertyid and strwditemid:
-                                        strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
-                                        strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                                        strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_VALUE wv JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND wv.ID_ITEM = '" + strwditemid + "' AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
+                                        strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_VALUE wv JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND wv.ID_ITEM = '" + strwditemid + "' AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                                     # Mechanism 3: TMDb keyword filter from TMDB_ELEMENTS
                                     strtmdbelements = row['TMDB_ELEMENTS'] or ''
                                     strsqlmovies_keyword = ""
@@ -2194,8 +2208,8 @@ SET
                                     strsqlmovies_wikidata = ""
                                     strsqlseries_wikidata = ""
                                     if strwdpropertyid and strwditemid:
-                                        strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
-                                        strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                                        strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_VALUE wv JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND wv.ID_ITEM = '" + strwditemid + "' AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
+                                        strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_VALUE wv JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND wv.ID_ITEM = '" + strwditemid + "' AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                                     # Mechanism 3: TMDb keyword filter from TMDB_ELEMENTS
                                     strtmdbelements = row['TMDB_ELEMENTS'] or ''
                                     strsqlmovies_keyword = ""
@@ -2468,19 +2482,12 @@ SET
                             strcurrentprocess = f"{intgroup}: Copying from WIKIDATA {strpropertyid} to T2S_GROUP"
                             # Pre-filter the driving set to only items that resolve to >= 2 linked
                             # TMDb persons. This mirrors the per-item person query joins below
-                            # (T_WC_TMDB_PERSON -> T_WC_WIKIDATA_PERSON_V1 -> T_WC_WIKIDATA_ITEM_PROPERTY)
+                            # (T_WC_TMDB_PERSON -> T_WC_WIKIDATA_PERSON -> les statements V2)
                             # and the "lngpersoncount > 1" group-creation gate, so we no longer iterate
                             # the hundreds of thousands of P463/P108/P54 items that would only ever be
                             # deleted as singletons. Degraded groups (>=2 persons previously, <2 now)
                             # are handled by the count-based stale delete at the end of this process.
-                            strsql += "SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
-                            strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
-                            strsql += "INNER JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
-                            strsql += "INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
-                            strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strpropertyid + "' "
-                            strsql += "GROUP BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
-                            strsql += "HAVING COUNT(DISTINCT T_WC_TMDB_PERSON.ID_PERSON) >= 2 "
-                            strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
+                            strsql += f_persondrivingsql(strpropertyid)
                             #strsql += "LIMIT 10 "
                             #strsql += "LIMIT 1000 "
                             target_field_name = "GROUP_NAME"
@@ -2585,7 +2592,7 @@ SET
                                     strwditemid = next((t for t in arrwdtokens if t.startswith('Q')), '')
                                     strsqlpersons_wikidata = ""
                                     if strwdpropertyid and strwditemid:
-                                        strsqlpersons_wikidata = "SELECT DISTINCT T_WC_TMDB_PERSON.ID_PERSON, NULL AS ORIGINAL_ORDER, T_WC_TMDB_PERSON.POPULARITY, T_WC_TMDB_PERSON.BIRTHDAY AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY STRAIGHT_JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY ='" + strwdpropertyid + "' AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = '" + strwditemid + "' AND T_WC_TMDB_PERSON.ADULT = 0 AND T_WC_TMDB_PERSON.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_PERSON.ID_WIKIDATA <> '' "
+                                        strsqlpersons_wikidata = "SELECT DISTINCT T_WC_TMDB_PERSON.ID_PERSON, NULL AS ORIGINAL_ORDER, T_WC_TMDB_PERSON.POPULARITY, T_WC_TMDB_PERSON.BIRTHDAY AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_VALUE wv JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT STRAIGHT_JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = w.ID_WIKIDATA WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND wv.ID_ITEM = '" + strwditemid + "' AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') AND T_WC_TMDB_PERSON.ADULT = 0 AND T_WC_TMDB_PERSON.ID_WIKIDATA IS NOT NULL AND T_WC_TMDB_PERSON.ID_WIKIDATA <> '' "
 
                                     # Mechanism 3: TMDb person name filter from TMDB_ELEMENTS
                                     strtmdbelements = row['TMDB_ELEMENTS'] or ''
@@ -2607,12 +2614,7 @@ SET
                                     strsqlpersons += "T_WC_TMDB_PERSON.BIOGRAPHY, "
                                     strsqlpersons += "T_WC_TMDB_PERSON.PROFILE_PATH, "
                                     strsqlpersons += "T_WC_TMDB_PERSON.ID_WIKIDATA "
-                                    strsqlpersons += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
-                                    strsqlpersons += "STRAIGHT_JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
-                                    strsqlpersons += "STRAIGHT_JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
-                                    strsqlpersons += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
-                                    strsqlpersons += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = %s "
-                                    strsqlpersons += "ORDER BY T_WC_TMDB_PERSON.POPULARITY DESC "
+                                    strsqlpersons += f_personlinkfromsql()
                                 if strsqlpersons != "":
                                     # Retrieving elements for this group (group/group)
                                     if intgroup == 4:
@@ -2687,17 +2689,7 @@ SET
                         # used to handle before the driving query was pre-filtered. Mirrors the
                         # pre-filter joins so iteration and cleanup stay consistent. Runs over the small
                         # T_WC_T2S_GROUP table, so the correlated subquery executes only a few thousand times.
-                        strsqldelete = """DELETE FROM T_WC_T2S_GROUP
-WHERE GROUP_SOURCE <> 'custom'
-  AND (
-    SELECT COUNT(DISTINCT p.ID_PERSON)
-    FROM T_WC_WIKIDATA_ITEM_PROPERTY w
-    INNER JOIN T_WC_TMDB_PERSON p ON p.ID_WIKIDATA = w.ID_WIKIDATA
-    INNER JOIN T_WC_WIKIDATA_PERSON_V1 wp ON p.ID_WIKIDATA = wp.ID_WIKIDATA
-    WHERE w.ID_PROPERTY = T_WC_T2S_GROUP.GROUP_SOURCE
-      AND w.ID_ITEM = T_WC_T2S_GROUP.ID_WIKIDATA
-  ) < 2;
-                        """
+                        strsqldelete = f_persongrouppurgesql("T_WC_T2S_GROUP", "GROUP_SOURCE")
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
 
@@ -3383,8 +3375,8 @@ SET
                                 strsqlmovies_wikidata = ""
                                 strsqlseries_wikidata = ""
                                 if strwdpropertyid and strwditemid:
-                                    strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
-                                    strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_PROPERTY w STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND w.ID_ITEM = '" + strwditemid + "' AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
+                                    strsqlmovies_wikidata = "SELECT DISTINCT m.ID_MOVIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, m.DAT_RELEASE AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_VALUE wv JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT STRAIGHT_JOIN T_WC_TMDB_MOVIE m ON m.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_MOVIE t ON t.ID_MOVIE = m.ID_MOVIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND wv.ID_ITEM = '" + strwditemid + "' AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') AND m.ADULT = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '' "
+                                    strsqlseries_wikidata = "SELECT DISTINCT s.ID_SERIE, NULL AS ORIGINAL_ORDER, t.IMDB_RATING_WEIGHTED, s.DAT_FIRST_AIR AS SORT_DATE FROM T_WC_WIKIDATA_ITEM_VALUE wv JOIN T_WC_WIKIDATA_STATEMENT w ON w.ID_STATEMENT = wv.ID_STATEMENT STRAIGHT_JOIN T_WC_TMDB_SERIE s ON s.ID_WIKIDATA = w.ID_WIKIDATA INNER JOIN T_WC_T2S_SERIE t ON t.ID_SERIE = s.ID_SERIE WHERE w.ID_PROPERTY ='" + strwdpropertyid + "' AND wv.ID_ITEM = '" + strwditemid + "' AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') AND s.ADULT = 0 AND s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '' "
                                 # Mechanism 3: TMDb keyword filter from TMDB_ELEMENTS
                                 strtmdbelements = row['TMDB_ELEMENTS'] or ''
                                 strsqlmovies_keyword = ""
@@ -3578,21 +3570,16 @@ SET
                             strcurrentprocess = f"{intgroup}: Copying from WIKIDATA {strpropertyid} to T2S_DEATH"
                             # Pre-filter the driving set to only items that resolve to >= 2 linked
                             # TMDb persons. Mirrors the per-item person query joins below
-                            # (T_WC_TMDB_PERSON -> T_WC_WIKIDATA_PERSON_V1 -> T_WC_WIKIDATA_ITEM_PROPERTY)
+                            # (T_WC_TMDB_PERSON -> T_WC_WIKIDATA_PERSON -> les statements V2)
                             # and the "lngpersoncount > 1" creation gate, so we no longer iterate the
                             # P509/P1196 items that would only ever be deleted as singletons. Degraded
                             # deaths (>=2 persons previously, <2 now) are handled by the count-based
                             # stale delete at the end of this process.
-                            strsql += "SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
-                            strsql += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
-                            strsql += "INNER JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
-                            strsql += "INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
-                            strsql += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '" + strpropertyid + "' "
-                            if intgroup == 2:
-                                strsql += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM NOT IN (" + strp1196excludeditems + ") "
-                            strsql += "GROUP BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM "
-                            strsql += "HAVING COUNT(DISTINCT T_WC_TMDB_PERSON.ID_PERSON) >= 2 "
-                            strsql += "ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC "
+                            strdrivingexclusion = ""
+                            if strpropertyid == "P1196" and strp1196excludeditems != "''":
+                                strdrivingexclusion = ("AND pv.ID_ITEM NOT IN ("
+                                                       + strp1196excludeditems + ") ")
+                            strsql += f_persondrivingsql(strpropertyid, strdrivingexclusion)
                             target_field_name = "DEATH_NAME"
                         strrecorddeathsource = strpropertyid
                         if strsql != "":
@@ -3676,12 +3663,7 @@ SET
                                     strsqlpersons += "T_WC_TMDB_PERSON.BIOGRAPHY, "
                                     strsqlpersons += "T_WC_TMDB_PERSON.PROFILE_PATH, "
                                     strsqlpersons += "T_WC_TMDB_PERSON.ID_WIKIDATA "
-                                    strsqlpersons += "FROM T_WC_WIKIDATA_ITEM_PROPERTY "
-                                    strsqlpersons += "STRAIGHT_JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA "
-                                    strsqlpersons += "STRAIGHT_JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA "
-                                    strsqlpersons += "WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = %s "
-                                    strsqlpersons += "AND T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM = %s "
-                                    strsqlpersons += "ORDER BY T_WC_TMDB_PERSON.POPULARITY DESC "
+                                    strsqlpersons += f_personlinkfromsql()
                                 if strsqlpersons != "":
                                     cursor2.execute(strsqlpersons, (strpropertyid, strrecordid))
                                     person_results = cursor2.fetchall()
@@ -3743,20 +3725,12 @@ SET
                         # >=2 to <2 persons" case that the per-item singleton delete used to handle before
                         # the driving query was pre-filtered. Mirrors the pre-filter joins so iteration
                         # and cleanup stay consistent.
-                        strsqldelete = """DELETE FROM T_WC_T2S_DEATH
-WHERE (
-    SELECT COUNT(DISTINCT p.ID_PERSON)
-    FROM T_WC_WIKIDATA_ITEM_PROPERTY w
-    INNER JOIN T_WC_TMDB_PERSON p ON p.ID_WIKIDATA = w.ID_WIKIDATA
-    INNER JOIN T_WC_WIKIDATA_PERSON_V1 wp ON p.ID_WIKIDATA = wp.ID_WIKIDATA
-    WHERE w.ID_PROPERTY = T_WC_T2S_DEATH.DEATH_SOURCE
-      AND w.ID_ITEM = T_WC_T2S_DEATH.ID_WIKIDATA
-      AND NOT (
-          w.ID_PROPERTY = 'P1196'
-          AND w.ID_ITEM IN (""" + strp1196excludeditems + """ )
-      )
-) < 2;
-                        """
+                        strsqldelete = f_persongrouppurgesql(
+                            "T_WC_T2S_DEATH", "DEATH_SOURCE", False,
+                            "      AND NOT (\n"
+                            "          w.ID_PROPERTY = 'P1196'\n"
+                            "          AND wv.ID_ITEM IN (" + strp1196excludeditems + ")\n"
+                            "      )\n")
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
 

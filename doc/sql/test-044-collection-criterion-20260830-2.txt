@@ -1,0 +1,317 @@
++----------------------------------------------+
+| SECTION                                      |
++----------------------------------------------+
+| A1. La ligne Criterion dans T_WC_CUSTOM_LIST |
++----------------------------------------------+
++----------------+--------------------------+----------------------+--------------------------------+---------+--------------+---------+--------------------+--------------+---------------+
+| ID_CUSTOM_LIST | LIST_NAME                | LIST_NAME_FR         | WIKIDATA_PROPERTIES            | SORT_BY | TARGET_TABLE | DELETED | TMDB_TARGET_RECORD | ID_IMDB_LIST | TMDB_ELEMENTS |
++----------------+--------------------------+----------------------+--------------------------------+---------+--------------+---------+--------------------+--------------+---------------+
+|             90 | The Criterion Collection | Collection Criterion | ID:P9584 ORDER:P12279 Q1204187 |       1 |            2 |       0 | []                 | []           | []            |
++----------------+--------------------------+----------------------+--------------------------------+---------+--------------+---------+--------------------+--------------+---------------+
++--------------------------------+
+| SECTION                        |
++--------------------------------+
+| B1. Telemetrie du processus 41 |
++--------------------------------+
++--------------------------------------------------------------+----------------------------------------------------+
+| VAR_NAME                                                     | VAR_VALUE                                          |
++--------------------------------------------------------------+----------------------------------------------------+
+| strtmdbmoviepreprocesscollectioncreatedcount                 | 9747                                               |
+| strtmdbmoviepreprocesscollectioncurrentprocess               | 5: Copying from T_WC_CUSTOM_LIST to T2S_COLLECTION |
+| strtmdbmoviepreprocesscollectioncurrentvalue                 | The Criterion Collection                           |
+| strtmdbmoviepreprocesscollectiondeletedcount                 | 1                                                  |
+| strtmdbmoviepreprocesscollectionenddatetime                  | 2026-08-30 03:31:14                                |
+| strtmdbmoviepreprocesscollectionid                           | 5035                                               |
+| strtmdbmoviepreprocesscollectionprocessedcount               | 21622                                              |
+| strtmdbmoviepreprocesscollectionprocessedseconds             | 581.15                                             |
+| strtmdbmoviepreprocesscollectionstartdatetime                | 2026-08-30 03:21:32                                |
+| strtmdbmoviepreprocesscollectionwikidataid                   | 90                                                 |
+| strtmdbmoviepreprocesscollectionwikidatalinkenddatetime      | 2026-08-30 03:32:00                                |
+| strtmdbmoviepreprocesscollectionwikidatalinkprocessedseconds | 46.39                                              |
+| strtmdbmoviepreprocesscollectionwikidatalinkstartdatetime    | 2026-08-30 03:31:14                                |
+| strtmdbmoviepreprocesscurrentsubprocess                      | Copy Wikipedia main image into T2S                 |
+| strtmdbmoviepreprocessscope                                  | wikidata-all                                       |
+| strtmdbmoviepreprocesstotalruntime                           | 6 hours, 59 minutes, 23 seconds                    |
+| strtmdbmoviepreprocesstotalruntimeprevious                   | RUNNING                                            |
++--------------------------------------------------------------+----------------------------------------------------+
++--------------------------------------------+
+| SECTION                                    |
++--------------------------------------------+
+| C1. La collection dans T_WC_T2S_COLLECTION |
++--------------------------------------------+
++-------------------+--------------------------+----------------------+-------------------+-----------------+-----------+-------------+-------------+-------------+-----------------------------------------------------------------------------------------------------------------------------------------+-------------------+
+| ID_T2S_COLLECTION | COLLECTION_NAME          | COLLECTION_NAME_FR   | COLLECTION_SOURCE | COLLECTION_TYPE | ID_RECORD | MOVIE_COUNT | SERIE_COUNT | ID_WIKIDATA | WIKIPEDIA_IMAGE_PATH                                                                                                                    | IMDB_RATING       |
++-------------------+--------------------------+----------------------+-------------------+-----------------+-----------+-------------+-------------+-------------+-----------------------------------------------------------------------------------------------------------------------------------------+-------------------+
+|              5035 | The Criterion Collection | Collection Criterion | custom            | collection      |        90 |        1677 |          11 | Q1204187    | https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/The_Criterion_Collection_Logo.svg/120px-The_Criterion_Collection_Logo.svg.png | 7.259153249850943 |
++-------------------+--------------------------+----------------------+-------------------+-----------------+-----------+-------------+-------------+-------------+-----------------------------------------------------------------------------------------------------------------------------------------+-------------------+
++-------------------------------------------------+
+| SECTION                                         |
++-------------------------------------------------+
+| C2. Identifiant retenu pour la suite du fichier |
++-------------------------------------------------+
++-------------------------+
+| ID_COLLECTION_CRITERION |
++-------------------------+
+|                    5035 |
++-------------------------+
++-------------------------------------------------+
+| SECTION                                         |
++-------------------------------------------------+
+| D1. Les vingt premiers films, par DISPLAY_ORDER |
++-------------------------------------------------+
++---------------+----------+-------------------------------------+--------------------+--------------+
+| DISPLAY_ORDER | ID_MOVIE | MOVIE_TITLE                         | ID_CRITERION_SPINE | ID_CRITERION |
++---------------+----------+-------------------------------------+--------------------+--------------+
+|             1 |      777 | Grand Illusion                      |                  1 |          351 |
+|             2 |      346 | Seven Samurai                       |                  2 |          165 |
+|             3 |      940 | The Lady Vanishes                   |                  3 |          358 |
+|             4 |     7857 | Amarcord                            |                  4 |          208 |
+|             5 |      147 | The 400 Blows                       |                  5 |          151 |
+|             6 |      648 | Beauty and the Beast                |                  6 |          177 |
+|             7 |    10971 | A Night to Remember                 |                  7 |          521 |
+|             8 |    10835 | The Killer                          |                  8 |          231 |
+|             9 |    11782 | Hard Boiled                         |                  9 |          523 |
+|            10 |    36040 | Walkabout                           |                 10 |          522 |
+|            11 |      490 | The Seventh Seal                    |                 11 |          173 |
+|            12 |    11031 | This Is Spinal Tap                  |                 12 |          317 |
+|            13 |      274 | The Silence of the Lambs            |                 13 |          528 |
+|            14 |    31372 | Samurai I: Musashi Miyamoto         |                 14 |          529 |
+|            15 |    31374 | Samurai II: Duel at Ichijoji Temple |                 15 |          530 |
+|            16 |    31378 | Samurai III: Duel at Ganryu Island  |                 16 |          531 |
+|            17 |     5336 | Salò, or the 120 Days of Sodom      |                 17 |          532 |
+|            18 |    26031 | The Naked Kiss                      |                 18 |          533 |
+|            19 |    25504 | Shock Corridor                      |                 19 |          534 |
+|            20 |    14924 | Sid and Nancy                       |                 20 |          535 |
++---------------+----------+-------------------------------------+--------------------+--------------+
++------------------------------------------------------+
+| SECTION                                              |
++------------------------------------------------------+
+| D2. Integrite de DISPLAY_ORDER (TROUS doit valoir 0) |
++------------------------------------------------------+
++--------+-----------------+-----------+-----------+------------------+-------+
+| LIGNES | FILMS_DISTINCTS | MIN_ORDRE | MAX_ORDRE | ORDRES_DISTINCTS | TROUS |
++--------+-----------------+-----------+-----------+------------------+-------+
+|   1677 |            1677 |         1 |      1677 |             1677 |     0 |
++--------+-----------------+-----------+-----------+------------------+-------+
++----------------------------------------------------+
+| SECTION                                            |
++----------------------------------------------------+
+| D3. Les films sans spine tombent-ils bien a la fin |
++----------------------------------------------------+
++------------+------------+--------------------+--------------------+
+| AVEC_SPINE | SANS_SPINE | DERNIER_AVEC_SPINE | PREMIER_SANS_SPINE |
++------------+------------+--------------------+--------------------+
+|       1229 |        448 |               1229 |               1230 |
++------------+------------+--------------------+--------------------+
++---------------------------------------------------------------+
+| SECTION                                                       |
++---------------------------------------------------------------+
+| D4. Le tri suit-il vraiment le spine (RUPTURES doit valoir 0) |
++---------------------------------------------------------------+
++----------+
+| RUPTURES |
++----------+
+|        0 |
++----------+
++-----------------------------------+
+| SECTION                           |
++-----------------------------------+
+| D5. Des series dans la collection |
++-----------------------------------+
++---------------+----------+----------------------------------+
+| DISPLAY_ORDER | ID_SERIE | SERIE_TITLE                      |
++---------------+----------+----------------------------------+
+|             1 |    61820 | Fishing with John                |
+|             2 |    65170 | Scenes from a Marriage           |
+|             3 |     1804 | Tanner '88                       |
+|             4 |    43189 | Berlin Alexanderplatz            |
+|             5 |    86449 | World on a Wire                  |
+|             6 |    42699 | Dekalog                          |
+|             7 |    39837 | Eight Hours Don’t Make a Day     |
+|             8 |    80039 | The Underground Railroad         |
+|             9 |    76372 | Agnès Varda: From Here to There  |
+|            10 |    77276 | Phantom India                    |
+|            11 |   239616 | Cartesius                        |
++---------------+----------+----------------------------------+
++---------------------------------------------------+
+| SECTION                                           |
++---------------------------------------------------+
+| D6. Spine present en V2, absent de la colonne T2S |
++---------------------------------------------------+
++----------+----------------+-------------+--------------+--------------+--------------------+---------------+-----------------+----------+--------------+
+| ID_MOVIE | MOVIE_TITLE    | ID_WIKIDATA | ID_IMDB      | ID_CRITERION | ID_CRITERION_SPINE | DISPLAY_ORDER | PRESENT_DANS_V1 | SPINE_V2 | CRITERION_V2 |
++----------+----------------+-------------+--------------+--------------+--------------------+---------------+-----------------+----------+--------------+
+|   106194 | Bergman Island | Q97958959   | [tt0469772]  |         NULL |               NULL |           438 |               0 | 477      | 556          |
+|   776551 | Faya Dayi      | Q106632719  | [tt13648216] |         NULL |               NULL |          1062 |               0 | 1141     | 32189        |
++----------+----------------+-------------+--------------+--------------+--------------------+---------------+-----------------+----------+--------------+
++-----------------------------------------------------+
+| SECTION                                             |
++-----------------------------------------------------+
+| E1. Collections par source (a comparer a la veille) |
++-----------------------------------------------------+
++-------------------+-------------+-------+--------+
+| COLLECTION_SOURCE | COLLECTIONS | FILMS | SERIES |
++-------------------+-------------+-------+--------+
+| collection        |        4850 | 16121 |     13 |
+| custom            |          43 |  2116 |     32 |
+| list              |           1 |    93 |     16 |
++-------------------+-------------+-------+--------+
++------------------------------------------------------+
+| SECTION                                              |
++------------------------------------------------------+
+| E2. Toutes les collections custom, une ligne chacune |
++------------------------------------------------------+
++-----------+--------------------------------------------------------------------------+-------------+-------------+---------+--------------------------------+
+| ID_RECORD | COLLECTION_NAME                                                          | MOVIE_COUNT | SERIE_COUNT | SORT_BY | WIKIDATA_PROPERTIES            |
++-----------+--------------------------------------------------------------------------+-------------+-------------+---------+--------------------------------+
+|         1 | Mexican Revolution trilogy by Fernando de Fuentes                        |           3 |           0 |       5 | P179 Q7318696                  |
+|        24 | Middle-Earth: Movies, TV Show In Chronological Timeline Order            |           9 |           1 |       5 | Q79734                         |
+|        36 | Comedies and Proverbs hexalogy by Éric Rohmer                            |           6 |           0 |       5 | P179 Q2991559                  |
+|        37 | Six Moral Tales hexalogy by Éric Rohmer                                  |           6 |           0 |       5 | P179 Q3485614                  |
+|        38 | Tales of the Four Seasons tetralogy by Éric Rohmer                       |           4 |           0 |       5 | P179 Q2995573                  |
+|        46 | Cavalry trilogy by John Ford                                             |           3 |           0 |       5 | P179 Q15823260                 |
+|        49 | Marvel Cinematic Universe (MCU)                                          |          73 |           0 |       5 | Q642878                        |
+|        50 | DC Comics Universe                                                       |          36 |           0 |       5 | Q1152150                       |
+|        51 | Frankenstein                                                             |          19 |           0 |       5 | Q2021531                       |
+|        52 | Hammer Collection                                                        |          35 |           0 |       5 | Q1433745                       |
+|        53 | DC Universe Animated Original Movies                                     |          62 |           0 |       5 | Q2405799                       |
+|        54 | Final Fantasy Collection                                                 |           4 |           0 |       5 | Q12391356                      |
+|        55 | Hellraiser Collection                                                    |          11 |           0 |       5 | Q3553206                       |
+|        56 | Pokémon Collection                                                       |          24 |           0 |       5 | Q864                           |
+|        57 | Resident Evil Collection                                                 |           7 |           0 |       5 |                                |
+|        58 | Space Odyssey Collection                                                 |           2 |           0 |       5 | Q1198588                       |
+|        59 | The Chronicles of Riddick Collection                                     |           6 |           0 |       5 |                                |
+|        60 | Philip Marlowe Collection                                                |          11 |           0 |       5 | Q623732                        |
+|        61 | Mike Hammer Collection                                                   |          15 |           0 |       5 | Q2632785                       |
+|        62 | Maigret Collection                                                       |          25 |           7 |       5 | P161 Q830561                   |
+|        63 | A Quiet Place Collection                                                 |           3 |           0 |       5 |                                |
+|        64 | Alan J. Pakula Paranoia trilogy                                          |           3 |           0 |       5 |                                |
+|        65 | Yasujirō Ozu Noriko Trilogy                                              |           3 |           0 |       5 | Q96146434                      |
+|        66 | Pier Paulo Pasolini's Trilogy of Life                                    |           3 |           0 |       5 | Q785761                        |
+|        67 | Gregg Araki's Teen Apocalypse Trilogy                                    |           3 |           0 |       5 | Q118279378                     |
+|        68 | Edgar Wright's Three Flavours Cornetto trilogy                           |           3 |           0 |       5 | Q169604                        |
+|        69 | A Film Trilogy by Ingmar Bergman                                         |           3 |           0 |       5 | Q98970250                      |
+|        70 | Theo Angelopoulos Trilogy of Silence                                     |           3 |           0 |       5 |                                |
+|        71 | Roberto Rossellini War Trilogy                                           |           3 |           0 |       5 |                                |
+|        72 | Sergio Leone's Once Upon a Time trilogy                                  |           3 |           0 |       5 | Q468018                        |
+|        73 | Wim Wenders Road Movie Trilogy                                           |           3 |           0 |       5 | Q7339356                       |
+|        74 | Rainer Werner Fassbinder's BRD Trilogy                                   |           3 |           0 |       5 | Q4836348                       |
+|        75 | Roman Polanski's Apartment Trilogy                                       |           3 |           0 |       5 |                                |
+|        76 | Michelangelo Antonioni's Early “Trilogy of Decadence”                    |           3 |           0 |       5 |                                |
+|        77 | Sergio Leone's Dollar Trilogy also known as the Man with No Name Trilogy |           3 |           0 |       5 | Q370180                        |
+|        78 | Carlos Saura's Flamenco trilogy                                          |           3 |           0 |       5 |                                |
+|        79 | The Three Mothers Trilogy by Dario Argento                               |           3 |           0 |       5 | Q3829154                       |
+|        80 | Terry Gilliam's Trilogy of Imagination                                   |           3 |           0 |       5 |                                |
+|        81 | João César Monteiro's God Trilogy                                        |           3 |           0 |       5 |                                |
+|        82 | Park Chan Wook's Vengeance Trilogy                                       |           3 |           0 |       5 | Q483605                        |
+|        83 | Leos Carax Alex trilogy                                                  |           3 |           0 |       5 |                                |
+|        86 | Star Trek Collection                                                     |          15 |          13 |       5 | Q1092                          |
+|        90 | The Criterion Collection                                                 |        1677 |          11 |       1 | ID:P9584 ORDER:P12279 Q1204187 |
++-----------+--------------------------------------------------------------------------+-------------+-------------+---------+--------------------------------+
++--------------------------------------------------------------------------+
+| SECTION                                                                  |
++--------------------------------------------------------------------------+
+| E3. Listes actives qui ne produisent PLUS de collection (doit etre vide) |
++--------------------------------------------------------------------------+
++-----------------------------------------+
+| SECTION                                 |
++-----------------------------------------+
+| F1. Trois definitions, quatre decomptes |
++-----------------------------------------+
++----------------------------------------------------------+-------+
+| DEFINITION                                               | FILMS |
++----------------------------------------------------------+-------+
+| F1a. Statement P9584 non vide (mecanisme 4 tel quel)     |  1677 |
+| F1b. Idem, avec la garde numerique du processus 4        |  1677 |
+| F1c. Colonne T2S ID_CRITERION (regle actuelle du prompt) |  1676 |
+| F1d. Membres reels de la collection                      |  1677 |
++----------------------------------------------------------+-------+
++----------------------------------------------------------+
+| SECTION                                                  |
++----------------------------------------------------------+
+| F2. Dans la collection, absents de la regle ID_CRITERION |
++----------------------------------------------------------+
++----------+----------------+-------------+--------------+--------------------+---------------+--------------+
+| ID_MOVIE | MOVIE_TITLE    | ID_WIKIDATA | ID_CRITERION | ID_CRITERION_SPINE | DISPLAY_ORDER | VALEUR_P9584 |
++----------+----------------+-------------+--------------+--------------------+---------------+--------------+
+|   106194 | Bergman Island | Q97958959   |         NULL |               NULL |           438 | 556          |
+|   776551 | Faya Dayi      | Q106632719  |         NULL |               NULL |          1062 | 32189        |
++----------+----------------+-------------+--------------+--------------------+---------------+--------------+
++---------------------------------------------------------------------------+
+| SECTION                                                                   |
++---------------------------------------------------------------------------+
+| F3. Dans la regle ID_CRITERION, absents de la collection (doit etre vide) |
++---------------------------------------------------------------------------+
++----------+------------------------+-------------+--------------+--------------------+-------+-----------------+-------------+
+| ID_MOVIE | MOVIE_TITLE            | ID_WIKIDATA | ID_CRITERION | ID_CRITERION_SPINE | ADULT | PRESENT_DANS_V1 | P9584_EN_V2 |
++----------+------------------------+-------------+--------------+--------------------+-------+-----------------+-------------+
+|   686487 | King Kong vs. Godzilla | Q141130367  |        30209 |                  0 |     0 |               0 |           0 |
++----------+------------------------+-------------+--------------+--------------------+-------+-----------------+-------------+
++-----------------------------------------------------------------------+
+| SECTION                                                               |
++-----------------------------------------------------------------------+
+| G1. Les vingt premiers par l ancienne regle (chemin actuel du prompt) |
++-----------------------------------------------------------------------+
++----------+-------------------------------------+--------------------+
+| ID_MOVIE | MOVIE_TITLE                         | ID_CRITERION_SPINE |
++----------+-------------------------------------+--------------------+
+|      777 | Grand Illusion                      |                  1 |
+|      346 | Seven Samurai                       |                  2 |
+|      940 | The Lady Vanishes                   |                  3 |
+|     7857 | Amarcord                            |                  4 |
+|      147 | The 400 Blows                       |                  5 |
+|      648 | Beauty and the Beast                |                  6 |
+|    10971 | A Night to Remember                 |                  7 |
+|    10835 | The Killer                          |                  8 |
+|    11782 | Hard Boiled                         |                  9 |
+|    36040 | Walkabout                           |                 10 |
+|      490 | The Seventh Seal                    |                 11 |
+|    11031 | This Is Spinal Tap                  |                 12 |
+|      274 | The Silence of the Lambs            |                 13 |
+|    31372 | Samurai I: Musashi Miyamoto         |                 14 |
+|    31374 | Samurai II: Duel at Ichijoji Temple |                 15 |
+|    31378 | Samurai III: Duel at Ganryu Island  |                 16 |
+|     5336 | Salò, or the 120 Days of Sodom      |                 17 |
+|    26031 | The Naked Kiss                      |                 18 |
+|    25504 | Shock Corridor                      |                 19 |
+|    14924 | Sid and Nancy                       |                 20 |
++----------+-------------------------------------+--------------------+
++-------------------------------------------------+
+| SECTION                                         |
++-------------------------------------------------+
+| G2. Les vingt premiers par le chemin collection |
++-------------------------------------------------+
++----------+-------------------------------------+--------------------+---------------+
+| ID_MOVIE | MOVIE_TITLE                         | ID_CRITERION_SPINE | DISPLAY_ORDER |
++----------+-------------------------------------+--------------------+---------------+
+|      777 | Grand Illusion                      |                  1 |             1 |
+|      346 | Seven Samurai                       |                  2 |             2 |
+|      940 | The Lady Vanishes                   |                  3 |             3 |
+|     7857 | Amarcord                            |                  4 |             4 |
+|      147 | The 400 Blows                       |                  5 |             5 |
+|      648 | Beauty and the Beast                |                  6 |             6 |
+|    10971 | A Night to Remember                 |                  7 |             7 |
+|    10835 | The Killer                          |                  8 |             8 |
+|    11782 | Hard Boiled                         |                  9 |             9 |
+|    36040 | Walkabout                           |                 10 |            10 |
+|      490 | The Seventh Seal                    |                 11 |            11 |
+|    11031 | This Is Spinal Tap                  |                 12 |            12 |
+|      274 | The Silence of the Lambs            |                 13 |            13 |
+|    31372 | Samurai I: Musashi Miyamoto         |                 14 |            14 |
+|    31374 | Samurai II: Duel at Ichijoji Temple |                 15 |            15 |
+|    31378 | Samurai III: Duel at Ganryu Island  |                 16 |            16 |
+|     5336 | Salò, or the 120 Days of Sodom      |                 17 |            17 |
+|    26031 | The Naked Kiss                      |                 18 |            18 |
+|    25504 | Shock Corridor                      |                 19 |            19 |
+|    14924 | Sid and Nancy                       |                 20 |            20 |
++----------+-------------------------------------+--------------------+---------------+
++----------------------------------------------------------------+
+| SECTION                                                        |
++----------------------------------------------------------------+
+| G3. Les deux tetes de liste se recouvrent-elles (attendu : 20) |
++----------------------------------------------------------------+
++----------------+
+| COMMUNS_SUR_20 |
++----------------+
+|             20 |
++----------------+
