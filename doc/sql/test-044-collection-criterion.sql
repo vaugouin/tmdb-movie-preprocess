@@ -138,7 +138,9 @@ WHERE COLLECTION_SOURCE = 'custom'
 --
 -- D3 est le controle qui se lit sans reflechir : PREMIER_SANS_SPINE doit etre
 -- SUPERIEUR a DERNIER_AVEC_SPINE. Si c'est l'inverse, le tri s'est fait a l'envers
--- et SORT_BY ne vaut pas 1.
+-- et SORT_BY ne vaut pas 1. Il lit le numero DANS V2, comme le tri lui-meme, et la
+-- note posee sur D3 explique pourquoi cette precision a coute une fausse alerte.
+-- D6 traite l'autre question, l'ecart entre V2 et la colonne T2S.
 -- ============================================================================
 
 SELECT 'D1. Les vingt premiers films, par DISPLAY_ORDER' AS SECTION;
@@ -165,17 +167,41 @@ SELECT COUNT(*)                              AS LIGNES,
 FROM T_WC_T2S_MOVIE_COLLECTION
 WHERE ID_T2S_COLLECTION = @idcollection;
 
+-- D3 A ETE REECRITE LE 2026-08-30, ET C'EST UNE LECON. La premiere version
+-- classait les films selon T_WC_T2S_MOVIE.ID_CRITERION_SPINE, alors que l'ORDRE
+-- vient du numero lu dans les statements V2. Ces deux sources ne couvrent pas la
+-- meme population : la colonne T2S n'est ecrite que sur les films joignables a
+-- T_WC_WIKIDATA_MOVIE_V1, dependance que le processus 4 conserve encore. Un film
+-- connu de V2 mais absent de V1 etait donc trie a sa vraie place ET compte comme
+-- « sans spine ». Le controle annoncait une inversion du tri qui n'existait pas
+-- (PREMIER_SANS_SPINE 438 contre DERNIER_AVEC_SPINE 1229, pour deux films
+-- seulement), pendant que D4 et D1 disaient, eux, la verite.
+--
+-- La regle qu'il faut en retenir : UN CONTROLE DOIT LIRE LA MEME SOURCE QUE CE
+-- QU'IL CONTROLE. D3 lit desormais V2, comme le mecanisme. L'ecart entre V2 et la
+-- colonne T2S est une vraie question, mais c'est celle de D6, pas celle-ci.
 SELECT 'D3. Les films sans spine tombent-ils bien a la fin' AS SECTION;
 
-SELECT SUM(m.ID_CRITERION_SPINE IS NOT NULL AND m.ID_CRITERION_SPINE <> 0) AS AVEC_SPINE,
-       SUM(m.ID_CRITERION_SPINE IS NULL OR m.ID_CRITERION_SPINE = 0)       AS SANS_SPINE,
-       MAX(CASE WHEN m.ID_CRITERION_SPINE IS NOT NULL AND m.ID_CRITERION_SPINE <> 0
-                THEN mc.DISPLAY_ORDER END)                                 AS DERNIER_AVEC_SPINE,
-       MIN(CASE WHEN m.ID_CRITERION_SPINE IS NULL OR m.ID_CRITERION_SPINE = 0
-                THEN mc.DISPLAY_ORDER END)                                 AS PREMIER_SANS_SPINE
-FROM T_WC_T2S_MOVIE_COLLECTION mc
-INNER JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = mc.ID_MOVIE
-WHERE mc.ID_T2S_COLLECTION = @idcollection;
+SELECT SUM(SPINE_V2 IS NOT NULL)                                  AS AVEC_SPINE,
+       SUM(SPINE_V2 IS NULL)                                      AS SANS_SPINE,
+       MAX(CASE WHEN SPINE_V2 IS NOT NULL THEN DISPLAY_ORDER END) AS DERNIER_AVEC_SPINE,
+       MIN(CASE WHEN SPINE_V2 IS NULL THEN DISPLAY_ORDER END)     AS PREMIER_SANS_SPINE
+FROM (
+    SELECT mc.DISPLAY_ORDER,
+           ( SELECT CAST(sv.VALUE_EXTERNAL_ID AS UNSIGNED)
+             FROM T_WC_WIKIDATA_STATEMENT ss
+             JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE sv ON sv.ID_STATEMENT = ss.ID_STATEMENT
+             WHERE ss.ID_WIKIDATA = m.ID_WIKIDATA
+               AND ss.ID_PROPERTY = 'P12279'
+               AND (ss.`RANK` IS NULL OR ss.`RANK` <> 'deprecated')
+               AND sv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+               AND sv.VALUE_EXTERNAL_ID <> '0'
+             ORDER BY (ss.`RANK` = 'preferred') DESC, ss.ID_STATEMENT ASC
+             LIMIT 1 ) AS SPINE_V2
+    FROM T_WC_T2S_MOVIE_COLLECTION mc
+    INNER JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = mc.ID_MOVIE
+    WHERE mc.ID_T2S_COLLECTION = @idcollection
+) classement;
 
 SELECT 'D4. Le tri suit-il vraiment le spine (RUPTURES doit valoir 0)' AS SECTION;
 
@@ -200,6 +226,56 @@ INNER JOIN T_WC_T2S_SERIE s ON s.ID_SERIE = sc.ID_SERIE
 WHERE sc.ID_T2S_COLLECTION = @idcollection
 ORDER BY sc.DISPLAY_ORDER
 LIMIT 20;
+
+-- ============================================================================
+-- D6. L'ECART ENTRE V2 ET LA COLONNE T2S : LA JOINTURE V1 EST-ELLE LA CAUSE
+-- ============================================================================
+--
+-- Ajoutee le 2026-08-30, apres que la premiere execution a trouve trois films
+-- d'ecart entre la collection et la regle actuelle du prompt. L'hypothese a
+-- tester tient en une phrase : la colonne T2S n'est pas ecrite parce que
+-- l'UPDATE d'enrichissement du processus 4 jointe encore T_WC_WIKIDATA_MOVIE_V1,
+-- dependance connue et documentee sur -043, qui doit tomber avec -042.
+--
+-- Si PRESENT_DANS_V1 vaut 0 sur ces lignes, l'hypothese est confirmee et les
+-- ecarts ne sont pas une regression du 4e mecanisme : ce sont des films que V2
+-- connait et que la voie V1 n'atteint pas. La bascule des prompts les GAGNE.
+--
+-- Si PRESENT_DANS_V1 vaut 1, la cause est ailleurs (ID_IMDB vide, ou la valeur
+-- ecartee par une garde) et il faut la chercher avant de basculer.
+-- ============================================================================
+
+SELECT 'D6. Spine present en V2, absent de la colonne T2S' AS SECTION;
+
+SELECT m.ID_MOVIE,
+       m.MOVIE_TITLE,
+       m.ID_WIKIDATA,
+       CONCAT('[', COALESCE(m.ID_IMDB, 'NULL'), ']')                       AS ID_IMDB,
+       m.ID_CRITERION,
+       m.ID_CRITERION_SPINE,
+       mc.DISPLAY_ORDER,
+       ( SELECT COUNT(*) FROM T_WC_WIKIDATA_MOVIE_V1 w
+         WHERE w.ID_WIKIDATA = m.ID_WIKIDATA )                             AS PRESENT_DANS_V1,
+       ( SELECT MIN(sv.VALUE_EXTERNAL_ID)
+         FROM T_WC_WIKIDATA_STATEMENT ss
+         JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE sv ON sv.ID_STATEMENT = ss.ID_STATEMENT
+         WHERE ss.ID_WIKIDATA = m.ID_WIKIDATA AND ss.ID_PROPERTY = 'P12279' ) AS SPINE_V2,
+       ( SELECT MIN(sv.VALUE_EXTERNAL_ID)
+         FROM T_WC_WIKIDATA_STATEMENT ss
+         JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE sv ON sv.ID_STATEMENT = ss.ID_STATEMENT
+         WHERE ss.ID_WIKIDATA = m.ID_WIKIDATA AND ss.ID_PROPERTY = 'P9584' )  AS CRITERION_V2
+FROM T_WC_T2S_MOVIE_COLLECTION mc
+INNER JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = mc.ID_MOVIE
+WHERE mc.ID_T2S_COLLECTION = @idcollection
+  AND (m.ID_CRITERION_SPINE IS NULL OR m.ID_CRITERION_SPINE = 0)
+  AND EXISTS ( SELECT 1
+               FROM T_WC_WIKIDATA_STATEMENT ss
+               JOIN T_WC_WIKIDATA_EXTERNAL_ID_VALUE sv ON sv.ID_STATEMENT = ss.ID_STATEMENT
+               WHERE ss.ID_WIKIDATA = m.ID_WIKIDATA
+                 AND ss.ID_PROPERTY = 'P12279'
+                 AND sv.VALUE_EXTERNAL_ID REGEXP '^[0-9]+$'
+                 AND sv.VALUE_EXTERNAL_ID <> '0' )
+ORDER BY mc.DISPLAY_ORDER;
 
 -- ============================================================================
 -- E. NON-REGRESSION SUR LES AUTRES LISTES PERSONNALISEES
@@ -339,7 +415,12 @@ SELECT m.ID_MOVIE,
        m.ID_WIKIDATA,
        m.ID_CRITERION,
        m.ID_CRITERION_SPINE,
-       m.ADULT
+       m.ADULT,
+       ( SELECT COUNT(*) FROM T_WC_WIKIDATA_MOVIE_V1 w
+         WHERE w.ID_WIKIDATA = m.ID_WIKIDATA )                              AS PRESENT_DANS_V1,
+       ( SELECT COUNT(*)
+         FROM T_WC_WIKIDATA_STATEMENT ss
+         WHERE ss.ID_WIKIDATA = m.ID_WIKIDATA AND ss.ID_PROPERTY = 'P9584' ) AS P9584_EN_V2
 FROM T_WC_T2S_MOVIE m
 LEFT JOIN T_WC_T2S_MOVIE_COLLECTION mc
        ON mc.ID_MOVIE = m.ID_MOVIE
@@ -405,8 +486,9 @@ INNER JOIN ( SELECT mc.ID_MOVIE
 --   C1  une ligne, COLLECTION_NAME_FR non vide, ID_WIKIDATA = Q1204187
 --   D1  spines 1 a 20 dans l'ordre, La Grande Illusion en tete
 --   D2  TROUS = 0 et LIGNES = FILMS_DISTINCTS
---   D3  PREMIER_SANS_SPINE > DERNIER_AVEC_SPINE
+--   D3  PREMIER_SANS_SPINE > DERNIER_AVEC_SPINE (spine lu en V2, comme le tri)
 --   D4  RUPTURES = 0
+--   D6  PRESENT_DANS_V1 = 0 partout, sinon chercher ailleurs
 --   E1  +1 collection custom et +1 677 films par rapport a la veille
 --   E3  aucune ligne
 --   F1  quatre chiffres, et F2 nomme ce qui les separe
