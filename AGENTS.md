@@ -18,7 +18,7 @@ Deeper specs live in their own files:
 
 This is the core **preprocessing** stage of the larger movie/TV database system (owned by GitHub user `vaugouin`, all siblings under `C:\Users\vaugo\Code\<repo>` and `github.com/vaugouin/<repo>`, converging on one shared MySQL/MariaDB instance with `T_WC_*` tables). It reads the raw source tables produced by the upstream crawlers — TMDb (`T_WC_TMDB_*`), Wikidata (`T_WC_WIKIDATA_*`), Wikipedia (live API + `T_WC_WIKIPEDIA_*`) and IMDb (`T_WC_IMDB_*`) — and consolidates them into the denormalized `T_WC_T2S_*` read-model. That read-model is consumed downstream by the `fastapi-text2sql` API and the `embedding-update` semantic index.
 
-This repo is parallel to the sibling preprocessing repos `tmdb-person-preprocess` and `keywords-processing`. The canonical sibling-repo roster lives in `tmdb-front/doc/related-repositories/related-repositories.txt`.
+This repo is parallel to the sibling preprocessing repos `tmdb-person-preprocess` and `keywords-processing`. The canonical sibling-repo roster lives in `%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt`.
 
 ## Where things live (file → role)
 

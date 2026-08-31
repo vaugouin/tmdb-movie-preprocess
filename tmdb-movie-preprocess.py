@@ -6551,7 +6551,7 @@ RENAME TABLE
 
                         # CAST_CHARACTER_KEY is pinned to utf8mb4_bin in T_WC_TMDB_CHARACTER /
                         # T_WC_T2S_CHARACTER (byte-exact unique key; see tmdb-front
-                        # doc/db-collation/collation-migration-runbook.md). The temp source keys
+                        # %USERPROFILE%/Nestor/projets/t2s-backlog/topics/collation-migration-runbook.md). The temp source keys
                         # below MUST carry COLLATE utf8mb4_bin so the GROUP BY / unique index dedup
                         # byte-exactly (consistent with the pinned column) and the joins onto
                         # T_WC_TMDB_CHARACTER.CAST_CHARACTER_KEY don't raise #1267 (illegal mix of
