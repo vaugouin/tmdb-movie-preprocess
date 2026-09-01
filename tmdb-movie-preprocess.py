@@ -182,8 +182,8 @@ try:
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
-            if strnow.startswith("2026-07-18"):
-                arrprocessscope = {4: 'T2S_MOVIE'}
+            if strnow.startswith("2026-09-01"):
+                #arrprocessscope = {4: 'T2S_MOVIE'}
                 arrprocessscope = {5: 'T2S_SERIE'}
             cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | neighbours)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
@@ -4209,11 +4209,32 @@ WHERE t2s.ID_IMDB IS NOT NULL
                         # '0', sentinelle "absent" de l'epoque V1. Tout controle s'ecrit donc
                         # `col IS NOT NULL AND col <> 0`, jamais `IS NOT NULL` seul, sans quoi il
                         # compte les zeros et fabrique un faux constat.
+                        # ---- DECOUPAGE, ajoute le 2026-09-01 apres un echec en production ----
+                        # Cet UPDATE etait un seul enonce sur les 333437 series, la ou son jumeau
+                        # film tourne DANS la boucle de decoupage avec un BETWEEN. Asymetrie sans
+                        # raison, longtemps sans consequence, devenue fatale quand -045 lui a ajoute
+                        # deux sous-requetes correlees de plus : premiere execution en production,
+                        # « MySQL Error (1205): Lock wait timeout exceeded ». Le run avait passe
+                        # toutes ses tranches et echouait sur ce seul enonce.
+                        #
+                        # Il tient desormais une tranche a la fois, avec un commit par tranche, ce
+                        # que fait deja la copie SERIE_LANG trois blocs plus bas pour exactement la
+                        # meme raison : « chunked by ID_SERIE range so each transaction stays small ».
+                        # On reutilise lngchunksize et lngserierangemax deja calcules pour la copie.
+                        #
+                        # Deux effets, et le second compte autant que le premier. Aucun verrou n'est
+                        # tenu sur la table entiere, donc plus de collision avec le conteneur
+                        # wikidata que le lanceur demarre en parallele. Et un echec tardif ne perd
+                        # plus le travail des tranches precedentes, deja validees.
                         strsqlplex = f_wikidataexternalidsql(STR_WD_PROPERTY_PLEX, "t2s.ID_WIKIDATA", False, "spx", 50)
                         strsqlcriterion = f_wikidataexternalidsql(STR_WD_PROPERTY_CRITERION, "t2s.ID_WIKIDATA", True, "scr")
                         strsqlspine = f_wikidataexternalidsql(STR_WD_PROPERTY_CRITERION_SPINE, "t2s.ID_WIKIDATA", True, "scs")
                         strsqlinstanceof = f_wikidatainstanceofsql("t2s.ID_WIKIDATA", "sio")
-                        strsqlseries = f"""
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Wikidata enrichment on T_WC_T2S_SERIE, chunked","Current sub process in the TMDb database series preprocess",0)
+                        for lngserierangestart in range(1, lngserierangemax + 1, lngchunksize):
+                            lngserierangeend = min(lngserierangestart + lngchunksize - 1, lngserierangemax)
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentserieid",str(lngserierangestart),"Current serie ID in the TMDb database preprocess (Wikidata enrichment)",0)
+                            strsqlseries = f"""
 UPDATE T_WC_T2S_SERIE t2s
 INNER JOIN T_WC_WIKIDATA_SERIE_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
@@ -4222,10 +4243,11 @@ SET t2s.WIKIDATA_TITLE = w.TITLE,
     t2s.ID_CRITERION = {strsqlcriterion},
     t2s.ID_CRITERION_SPINE = {strsqlspine},
     t2s.INSTANCE_OF = {strsqlinstanceof}
-WHERE t2s.ID_IMDB IS NOT NULL
+WHERE t2s.ID_SERIE BETWEEN {lngserierangestart} AND {lngserierangeend}
+    AND t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
-                        cursor2.execute(strsqlseries)
-                        cp.connectioncp.commit()
+                            cursor2.execute(strsqlseries)
+                            cp.connectioncp.commit()
 
                         # ---- TMDB-MOVIE-PREPROCESS-031: localized TEXT into T_WC_T2S_SERIE_LANG ---------
                         # Twin of the movie T_WC_T2S_MOVIE_LANG copy. Text-only (OVERVIEW / TAGLINE); posters
