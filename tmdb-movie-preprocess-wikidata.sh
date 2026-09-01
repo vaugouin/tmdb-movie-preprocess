@@ -16,8 +16,9 @@
 # Schedule this on its own cron cadence (e.g. once a day), independently of the
 # main tmdb-movie-preprocess.sh run.
 
-# Check if the decoupled container is already running
-if [ $(docker ps -q -f name=tmdb-movie-preprocess-wikidata) ]; then
+# Check if the decoupled container is already running (filtre ANCRE, voir la note du
+# script principal : la correspondance par sous-chaine confondait les deux conteneurs)
+if [ -n "$(docker ps -q -f name=^tmdb-movie-preprocess-wikidata$)" ]; then
     echo "tmdb-movie-preprocess-wikidata Docker container is already running."
 else
     cd /home/debian/docker/tmdb-movie-preprocess
