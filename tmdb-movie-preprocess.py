@@ -4189,9 +4189,29 @@ WHERE t2s.ID_IMDB IS NOT NULL
                         cp.connectioncp.commit()
 
                         # TMDB-MOVIE-PREPROCESS-043 : jumeau du bloc film, memes regles et memes
-                        # raisons (voir le commentaire du processus 4). La serie n'a pas de
-                        # Criterion : deux colonnes seulement passent en V2.
+                        # raisons (voir le commentaire du processus 4).
+                        #
+                        # ---- TMDB-MOVIE-PREPROCESS-045 : la serie A un Criterion, en fait ----
+                        # Le commentaire qui tenait ici affirmait le contraire, "la serie n'a pas de
+                        # Criterion : deux colonnes seulement passent en V2". C'etait faux et cela a
+                        # coute deux evaluations. La collection Criterion compte ONZE series (Dekalog,
+                        # Berlin Alexanderplatz, Scenes from a Marriage, World on a Wire...), et le
+                        # spine 42 est une serie, Fishing with John. Une recherche par numero de spine
+                        # ne pouvait donc pas les atteindre : la colonne n'existait que cote film.
+                        #
+                        # Rien de neuf n'est invente ici. T_WC_WIKIDATA_SERIE_V1 portait DEJA les deux
+                        # colonnes, la symetrie amont existait, seul le read-model T2S ne la reprenait
+                        # pas. Les deux constantes de propriete et le helper sont ceux du processus 4,
+                        # eprouves depuis -043.
+                        #
+                        # PIEGE hérité de -043, pour qui verifiera la couverture : ces colonnes sont
+                        # des ENTIERS et la garde numerique de f_wikidatabestvaluesql ecarte la valeur
+                        # '0', sentinelle "absent" de l'epoque V1. Tout controle s'ecrit donc
+                        # `col IS NOT NULL AND col <> 0`, jamais `IS NOT NULL` seul, sans quoi il
+                        # compte les zeros et fabrique un faux constat.
                         strsqlplex = f_wikidataexternalidsql(STR_WD_PROPERTY_PLEX, "t2s.ID_WIKIDATA", False, "spx", 50)
+                        strsqlcriterion = f_wikidataexternalidsql(STR_WD_PROPERTY_CRITERION, "t2s.ID_WIKIDATA", True, "scr")
+                        strsqlspine = f_wikidataexternalidsql(STR_WD_PROPERTY_CRITERION_SPINE, "t2s.ID_WIKIDATA", True, "scs")
                         strsqlinstanceof = f_wikidatainstanceofsql("t2s.ID_WIKIDATA", "sio")
                         strsqlseries = f"""
 UPDATE T_WC_T2S_SERIE t2s
@@ -4199,6 +4219,8 @@ INNER JOIN T_WC_WIKIDATA_SERIE_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 SET t2s.WIKIDATA_TITLE = w.TITLE,
     t2s.PLEX_MEDIA_KEY = {strsqlplex},
+    t2s.ID_CRITERION = {strsqlcriterion},
+    t2s.ID_CRITERION_SPINE = {strsqlspine},
     t2s.INSTANCE_OF = {strsqlinstanceof}
 WHERE t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
