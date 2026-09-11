@@ -32,6 +32,8 @@ from tmdb_preprocess_helpers import (
     f_getwikidataimagepath,
     f_parsecustomexternalidproperties,
     f_awardconeguard,
+    f_buildlocationclasstable,
+    f_buildlocationtables,
     f_awarddrivingsql,
     f_awardlinksql,
     f_persondrivingsql,
@@ -129,7 +131,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -7238,6 +7240,53 @@ ORDER BY COMPTE DESC
                     cp.f_setservervariable("strtmdbmoviepreprocessassertionrefreshskipped", str(lngskipped), "Living-eval assertions skipped by a guardrail in the last run", 0)
                     print(f"T2S_EVALUATION_ASSERTION_REFRESH complete: {lngrefreshed} refreshed, {lngskipped} skipped")
                     print(f"Elapsed time: {time.time() - start_time:.2f} seconds")
+                elif intindex == 72:
+                    #----------------------------------------------------
+                    # T2S_LOCATION : le read-model des lieux
+                    # (TMDB-MOVIE-PREPROCESS-014, cible API 1.1.19).
+                    #
+                    # Les lieux etaient la SEULE famille d'entites sans read-model :
+                    # recompenses, collections, mouvements, groupes et listes ont tous
+                    # leur table T2S, les lieux non. Toute question de lieu traversait
+                    # donc les tables Wikidata par necessite, pas par choix.
+                    #
+                    # RECONSTRUCTION TOTALE, decidee par la volumetrie : 11 922 lieux et
+                    # 95 766 associations mesures le 2026-09-11. A cette taille un
+                    # curseur et une reprise coutent plus qu'ils ne rapportent. Le patron
+                    # BUILD puis RENAME est celui du processus 40, et la bascule des trois
+                    # tables se fait d'un seul RENAME, donc atomiquement.
+                    #
+                    # PLACE DANS L'ORDRE : apres T2S_MOVIE et T2S_SERIE, dont il lit les
+                    # identifiants, et AVANT le processus 71, qui remplit les colonnes
+                    # d'image Wikipedia de toutes les entites et doit donc trouver les
+                    # lieux deja construits.
+                    print("T2S_LOCATION processing")
+                    tellocation = EntityTelemetry("location", 72, "location", kind="copy")
+                    tellocation.begin()
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Building the location class cones","Current sub process in the TMDb database movie preprocess",0)
+                    arrconecounts = f_buildlocationclasstable()
+                    for strconetype, lngconecount in arrconecounts.items():
+                        print(f"72: cone {strconetype}: {lngconecount} classes")
+                        cp.f_setservervariable("strtmdbmoviepreprocesslocationcone" + strconetype, str(lngconecount), f"Number of P279 classes in the {strconetype} location cone", 0)
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Rebuilding T2S_LOCATION and its associations","Current sub process in the TMDb database movie preprocess",0)
+                    arrlocationcounts = f_buildlocationtables()
+                    print(f"72: {arrlocationcounts.get('lieux', 0)} locations, "
+                          f"{arrlocationcounts.get('movie', 0)} movie links, "
+                          f"{arrlocationcounts.get('serie', 0)} serie links, "
+                          f"{arrlocationcounts.get('sans_type', 0)} without a type")
+                    for strkey, strdesc in (("lieux", "Locations rebuilt by"),
+                                            ("movie", "Movie-location links rebuilt by"),
+                                            ("serie", "Serie-location links rebuilt by"),
+                                            ("sans_type", "Locations left without a LOCATION_TYPE by")):
+                        cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strkey + "count", str(arrlocationcounts.get(strkey, 0)), strdesc + " the location rebuild (process 72)", 0)
+                    # set_processed() et non une affectation directe : kind="copy"
+                    # laisse _track_processed a faux, donc finish() n'ecrirait pas le
+                    # compte, et la variable serveur resterait a la valeur du passage
+                    # precedent. Un compteur qui ne bouge pas se lit comme un processus
+                    # qui n'a rien fait, ce qui serait faux.
+                    tellocation.set_processed(arrlocationcounts.get("lieux", 0))
+                    tellocation.finish()
+
                 elif intindex == 71:
                     #----------------------------------------------------
                     # Wikipedia main image into the T2S serving layer
@@ -7268,7 +7317,7 @@ ORDER BY COMPTE DESC
                     print("T2S_WIKIPEDIA_MAIN_IMAGE processing")
                     start_time = time.time()
                     cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copy Wikipedia main image into T2S","Current sub process in the TMDb database preprocess",0)
-                    arrwikipediaimageentities = ["MOVIE","SERIE","PERSON","SEASON","EPISODE","CHARACTER","ITEM","AWARD","NOMINATION","DEATH","GROUP","MOVEMENT","COLLECTION","LIST","TOPIC","TECHNICAL"]
+                    arrwikipediaimageentities = ["MOVIE","SERIE","PERSON","SEASON","EPISODE","CHARACTER","ITEM","AWARD","NOMINATION","DEATH","GROUP","MOVEMENT","COLLECTION","LIST","TOPIC","TECHNICAL","LOCATION"]
                     arrwikipediaimagelangs = [("en","WIKIPEDIA_MAIN_IMAGE_URL"),("fr","WIKIPEDIA_MAIN_IMAGE_URL_FR")]
                     lngwikipediaimagerowstotal = 0
                     lngwikipediaimageskipped = 0

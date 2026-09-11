@@ -1945,3 +1945,305 @@ def f_persongrouppurgesql(strtablename, strsourcecolumn, blncustomguard=True, st
         + strextraclause
         + "  ) < 2;"
     )
+
+
+# ---------------------------------------------------------------------------
+# TMDB-MOVIE-PREPROCESS-014 : le read-model des lieux
+# ---------------------------------------------------------------------------
+
+STR_LOCATION_CLASS_TABLE = "T_WC_T2S_LOCATION_CLASS"
+
+# Les cones de classes qui donnent LOCATION_TYPE, DANS L'ORDRE DE PRIORITE.
+#
+# ⚠ LES RACINES SONT RELEVEES, PAS DEVINEES. Chaque QID ci-dessous vient de la section 1
+# de doc/sql/test-014-location-classes.sql, lancee le 2026-09-11, qui a liste les classes
+# que les lieux portent REELLEMENT avec leur libelle et leur frequence. Ecrire un QID de
+# memoire est la faute du 2026-08-31, ou un cas temoin pointait un identifiant reconstruit
+# de tete et rendait zero ligne en se lisant comme un succes.
+#
+# ⚠ L'ORDRE EST LE COEUR DU SUJET, parce que l'appartenance multiple est la norme et non
+# l'exception : Paris porte QUINZE classes, Prague quinze, Singapour dix dont "big city",
+# "country", "port city" et "border city" ensemble. Le premier cone qui correspond gagne.
+#
+# Les trois choix d'ordre qui se discutent, et pourquoi ils sont ainsi :
+#   - fiction EN PREMIER : une ville fictive est de la fiction avant d'etre une ville.
+#     Bikini Bottom, cite 780 fois, ne doit pas se ranger avec Los Angeles.
+#   - country AVANT city : Singapour devient un pays. Une question sur les pays est plus
+#     souvent posee qu'une question sur les villes-Etats, et le pays est la categorie la
+#     plus grossiere, donc la plus decisive.
+#   - city AVANT region : et celui-la protege les cas les plus cites. Berlin est un
+#     "federated state of Germany", Hambourg aussi, Paris une "territorial collectivity
+#     of France with special status". Ranger la region avant la ville les ferait tous
+#     basculer en region, ce qui serait faux pour l'usage.
+#
+# Un type NULL n'est pas un echec : 0,5 % des lieux n'ont aucun P31 (85 sur 16 299), et
+# ceux dont aucune classe ne tombe dans un cone restent sans type plutot que mal classes.
+# Le compte des non classes est publie en variable serveur, pour qu'il se voie.
+LOCATION_TYPE_CONES = (
+    ("fiction",   ("Q1964689", "Q2775969")),              # fictional city, fictional planet
+    ("country",   ("Q6256",)),                            # country
+    ("city",      ("Q486972",)),                          # human settlement (couvre city, big city, town, village, port city, border city, kibbutz)
+    ("island",    ("Q23442",)),                           # island
+    ("region",    ("Q82794",)),                           # region
+    ("structure", ("Q41176", "Q23413", "Q33506",          # building, castle, museum
+                   "Q24354", "Q55488", "Q79007",          # theatre building, railway station, street
+                   "Q174782")),                           # square
+)
+
+
+def f_buildlocationclasstable():
+    """Construit la table de classement des classes de lieux, un cone par type.
+
+    Meme mecanisme que f_buildawardconetable() : la fermeture transitive P279 est
+    materialisee une fois par passage plutot que parcourue une fois par ligne.
+
+    Le CAST de l'ancre n'est pas decoratif. Sans lui MariaDB type la colonne recursive
+    sur la longueur du litteral et rejette ses propres Q-ids avec l'erreur 1406.
+
+    La priorite est resolue A LA CONSTRUCTION, pas a la lecture : une classe presente
+    dans deux cones ne garde que le type du premier, si bien que la table rendue associe
+    a chaque classe UN seul type. La requete de classement devient une jointure simple,
+    ce qui evite d'apprendre l'ordre au modele de langage comme aux lecteurs futurs.
+
+    Rend le nombre de classes chargees, par type.
+    """
+    connection = cp.connectioncp
+    cursor = connection.cursor()
+    arrcounts = {}
+    try:
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS `" + STR_LOCATION_CLASS_TABLE + "` ("
+            "`ID_CLASS` VARCHAR(50) NOT NULL,"
+            "`LOCATION_TYPE` VARCHAR(20) NOT NULL,"
+            "`DAT_CREAT` DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            "PRIMARY KEY (`ID_CLASS`),"
+            "KEY `LOCATION_TYPE` (`LOCATION_TYPE`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        )
+        cursor.execute("TRUNCATE TABLE `" + STR_LOCATION_CLASS_TABLE + "`")
+        for strtype, arrroots in LOCATION_TYPE_CONES:
+            strroots = " UNION ALL ".join(
+                "SELECT '" + strroot + "' AS qid" for strroot in arrroots
+            )
+            # INSERT IGNORE et non INSERT : la cle primaire sur ID_CLASS fait que la
+            # premiere insertion gagne, ce qui EST la priorite. Les cones se recouvrent
+            # largement et ce recouvrement n'est pas une anomalie a corriger.
+            cursor.execute(
+                "INSERT IGNORE INTO `" + STR_LOCATION_CLASS_TABLE + "` (ID_CLASS, LOCATION_TYPE) "
+                "WITH RECURSIVE cone_location (qid) AS ( "
+                "SELECT CAST(r.qid AS CHAR(50)) COLLATE utf8mb4_unicode_ci AS qid "
+                "FROM (" + strroots + ") AS r "
+                "UNION "
+                "SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc "
+                "JOIN cone_location c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0 "
+                ") SELECT qid, %s FROM cone_location",
+                (strtype,),
+            )
+            connection.commit()
+            cursor.execute(
+                "SELECT COUNT(*) AS COMPTE FROM `" + STR_LOCATION_CLASS_TABLE + "` "
+                "WHERE LOCATION_TYPE = %s", (strtype,)
+            )
+            arrcounts[strtype] = int(cursor.fetchone()["COMPTE"])
+        return arrcounts
+    finally:
+        cursor.close()
+
+
+# L'ensemble pilote : tout item cite en valeur de P840 ou P915 par un film ou une serie
+# QUE T2S CONNAIT. La definition n'est pas inventee ici, c'est celle du processus 209
+# d'embedding-update, portee sur les statements V2 plutot que sur la table plate V1.
+#
+# La restriction aux oeuvres T2S retire 4 377 lieux sur 16 299, et la mesure du
+# 2026-09-11 dit pourquoi : 2 665 sont cites par des films et des series que Wikidata
+# connait et que TMDb ignore, 1 636 par des episodes, et seulement 102 par des romans,
+# jeux ou bandes dessinees. Ce n'est donc PAS une affaire de nature d'oeuvre, c'est le
+# defaut de rapprochement que selenium-tmdb ferme un CSV a la fois.
+STR_LOCATION_DRIVING = (
+    "  SELECT DISTINCT iv.ID_ITEM AS ID_WIKIDATA\n"
+    "  FROM T_WC_WIKIDATA_STATEMENT st\n"
+    "  INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+    "  WHERE st.ID_PROPERTY IN ('P840', 'P915')\n"
+    "    AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+    "    AND ( EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = st.ID_WIKIDATA)\n"
+    "       OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = st.ID_WIKIDATA) )\n"
+)
+
+
+def f_locationassociationsql(strmajor):
+    """Le peuplement d'une table d'association, film ou serie.
+
+    strmajor vaut 'MOVIE' ou 'SERIE'. Les deux requetes sont rigoureusement paralleles,
+    et c'est la raison de les generer plutot que de les ecrire deux fois : le defaut
+    classique de ces paires est qu'une des deux derive lors d'une correction.
+
+    LOCATION_ROLE traduit la propriete en mot, 'filming' pour P915 et 'narrative' pour
+    P840. Le modele de langage ecrit du SQL contre cette colonne ; lui faire retenir des
+    codes Wikidata est l'erreur que FASTAPI-TEXT2SQL-238 a corrigee.
+
+    DISPLAY_ORDER n'est pas rempli ici : l'API trie par IMDB_RATING_WEIGHTED de l'oeuvre,
+    qui est une donnee vivante, et figer un rang le jour du calcul le rendrait faux des
+    le lendemain.
+    """
+    strid = "ID_" + strmajor
+    strt2s = "T_WC_T2S_" + strmajor
+    return (
+        f"INSERT INTO T_WC_T2S_{strmajor}_LOCATION_BUILD\n"
+        f"    ({strid}, ID_LOCATION, LOCATION_ROLE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
+        f"SELECT DISTINCT w.{strid},\n"
+        "       loc.ID_LOCATION,\n"
+        "       CASE st.ID_PROPERTY WHEN 'P915' THEN 'filming' ELSE 'narrative' END,\n"
+        "       0, CURDATE(), NOW()\n"
+        "FROM T_WC_WIKIDATA_STATEMENT st\n"
+        "INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+        f"INNER JOIN {strt2s} w ON w.ID_WIKIDATA = st.ID_WIKIDATA\n"
+        "INNER JOIN T_WC_T2S_LOCATION_BUILD loc ON loc.ID_WIKIDATA = iv.ID_ITEM\n"
+        "WHERE st.ID_PROPERTY IN ('P840', 'P915')\n"
+        "  AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+    )
+
+
+def f_buildlocationtables():
+    """Reconstruit les trois tables des lieux, en entier, par du SQL seul.
+
+    RECONSTRUCTION TOTALE ET NON INCREMENTALE, et c'est la volumetrie qui l'a decide :
+    11 922 lieux et 95 766 associations mesures le 2026-09-11. A cette taille, un
+    curseur, un filigrane et une reprise coutent plus en complexite qu'ils ne font gagner
+    en temps. Le patron BUILD puis RENAME est celui du processus 40 : la table servie
+    n'est jamais vide, meme une seconde, parce que le remplacement est atomique.
+
+    L'ORDRE DES ETAPES EST CONTRAINT. Les associations ont besoin de ID_LOCATION, donc
+    de la table d'entite construite ; les compteurs et les agregats ont besoin des
+    associations. D'ou entite, associations, agregats, puis les trois RENAME ensemble.
+
+    Rend un dictionnaire de comptes, pour la telemetrie et pour la recette.
+    """
+    connection = cp.connectioncp
+    cursor = connection.cursor()
+    arrresult = {}
+    try:
+        # --- 1. L'entite -----------------------------------------------------
+        # Le libelle et la description viennent de V2 seul, jamais de T_WC_T2S_ITEM :
+        # la population de cette derniere est pilotee par V1 deliberement, et elle part
+        # en TMDB-MOVIE-PREPROCESS-047. S'y adosser ajouterait un lecteur V1 au moment
+        # ou l'on cherche a en retirer.
+        #
+        # OVERVIEW porte la description Wikidata, et ce n'est pas decoratif : c'est elle
+        # qui desambiguise l'embedding. "Paris, capital and largest city of France" et
+        # "Paris, city in Texas" se distinguent par le vecteur, la ou "Paris" et "Paris"
+        # produisent deux documents identiques que rien ne peut departager. Le type seul
+        # n'y suffirait pas, les deux sont des villes.
+        for strsql in ("DROP TABLE IF EXISTS T_WC_T2S_LOCATION_BUILD",
+                       "CREATE TABLE T_WC_T2S_LOCATION_BUILD LIKE T_WC_T2S_LOCATION"):
+            cursor.execute(strsql)
+        connection.commit()
+        cursor.execute(
+            "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
+            "    (ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
+            "     LOCATION_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
+            "SELECT lieux.ID_WIKIDATA,\n"
+            "       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.en')),\n"
+            "                NULLIF(wi.LABEL_EN, '')),\n"
+            "       JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.fr')),\n"
+            "       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.DESCRIPTIONS_JSON, '$.en')),\n"
+            "                NULLIF(wi.DESCRIPTION_EN, '')),\n"
+            "       'wikidata', 0, CURDATE(), NOW()\n"
+            "FROM (\n" + STR_LOCATION_DRIVING + ") lieux\n"
+            "LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = lieux.ID_WIKIDATA"
+        )
+        arrresult["lieux"] = cursor.rowcount
+        connection.commit()
+
+        # --- 2. Le type, par jointure sur les cones --------------------------
+        # DEUX NIVEAUX DE PRIORITE, et il faut les deux.
+        #   Le premier est resolu a la construction des cones : une CLASSE presente dans
+        #   deux cones ne garde que le premier type, par l'INSERT IGNORE sur la cle.
+        #   Le second est ici : un LIEU porte souvent plusieurs classes de types
+        #   differents, et Paris en porte quinze. Le ORDER BY FIELD() rejoue alors le
+        #   meme ordre que LOCATION_TYPE_CONES, si bien qu'un tri alphabetique accidentel
+        #   ne peut pas s'y substituer.
+        # Sans le second niveau, le type rendu dependrait de l'ordre physique des lignes,
+        # donc du hasard, et changerait d'un passage a l'autre sans que rien ne bouge.
+        cursor.execute(
+            "UPDATE T_WC_T2S_LOCATION_BUILD loc\n"
+            "SET loc.LOCATION_TYPE = (\n"
+            "    SELECT lc.LOCATION_TYPE\n"
+            "    FROM T_WC_WIKIDATA_STATEMENT st\n"
+            "    INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+            "    INNER JOIN `" + STR_LOCATION_CLASS_TABLE + "` lc ON lc.ID_CLASS = iv.ID_ITEM\n"
+            "    WHERE st.ID_WIKIDATA = loc.ID_WIKIDATA AND st.ID_PROPERTY = 'P31'\n"
+            "      AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+            "    ORDER BY FIELD(lc.LOCATION_TYPE, " +
+            ", ".join("'" + t + "'" for t, _ in LOCATION_TYPE_CONES) + ")\n"
+            "    LIMIT 1)"
+        )
+        connection.commit()
+        cursor.execute("SELECT COUNT(*) AS C FROM T_WC_T2S_LOCATION_BUILD WHERE LOCATION_TYPE IS NULL")
+        arrresult["sans_type"] = int(cursor.fetchone()["C"])
+
+        # --- 3. Les deux associations ----------------------------------------
+        for strmajor in ("MOVIE", "SERIE"):
+            strtable = "T_WC_T2S_" + strmajor + "_LOCATION"
+            cursor.execute("DROP TABLE IF EXISTS " + strtable + "_BUILD")
+            cursor.execute("CREATE TABLE " + strtable + "_BUILD LIKE " + strtable)
+            connection.commit()
+            cursor.execute(f_locationassociationsql(strmajor))
+            arrresult[strmajor.lower()] = cursor.rowcount
+            connection.commit()
+
+        # --- 4. Compteurs et agregats ----------------------------------------
+        # Les formules sont celles des collections et des mouvements : la note du lieu
+        # est la moyenne des notes des oeuvres qui s'y rattachent, sa popularite la
+        # moyenne de leur popularite. Un lieu sans oeuvre notee garde NULL plutot que
+        # zero, un zero se trierait comme une mauvaise note alors qu'il signifie
+        # l'absence de mesure. C'est le piege du sentinelle zero, paye trois fois dans
+        # cette migration.
+        cursor.execute(
+            "UPDATE T_WC_T2S_LOCATION_BUILD loc SET\n"
+            "  loc.MOVIE_COUNT = (SELECT COUNT(DISTINCT ml.ID_MOVIE)\n"
+            "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
+            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION),\n"
+            "  loc.SERIE_COUNT = (SELECT COUNT(DISTINCT sl.ID_SERIE)\n"
+            "                     FROM T_WC_T2S_SERIE_LOCATION_BUILD sl\n"
+            "                     WHERE sl.ID_LOCATION = loc.ID_LOCATION)"
+        )
+        connection.commit()
+        cursor.execute(
+            "UPDATE T_WC_T2S_LOCATION_BUILD loc SET\n"
+            "  loc.IMDB_RATING = (SELECT AVG(m.IMDB_RATING)\n"
+            "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
+            "                     JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ml.ID_MOVIE\n"
+            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.IMDB_RATING > 0),\n"
+            "  loc.IMDB_RATING_WEIGHTED = (SELECT AVG(m.IMDB_RATING_WEIGHTED)\n"
+            "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
+            "                     JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ml.ID_MOVIE\n"
+            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.IMDB_RATING_WEIGHTED > 0),\n"
+            "  loc.POPULARITY = (SELECT AVG(m.POPULARITY)\n"
+            "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
+            "                     JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ml.ID_MOVIE\n"
+            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.POPULARITY > 0)"
+        )
+        connection.commit()
+
+        # --- 5. Les trois bascules -------------------------------------------
+        # RENAME TABLE d'un seul tenant : MariaDB le traite comme une operation atomique,
+        # donc aucune requete ne peut voir une table nouvelle et une autre ancienne.
+        for strtable in ("T_WC_T2S_LOCATION", "T_WC_T2S_MOVIE_LOCATION", "T_WC_T2S_SERIE_LOCATION"):
+            cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
+        connection.commit()
+        cursor.execute(
+            "RENAME TABLE\n"
+            "  T_WC_T2S_LOCATION TO T_WC_T2S_LOCATION_OLD,\n"
+            "  T_WC_T2S_LOCATION_BUILD TO T_WC_T2S_LOCATION,\n"
+            "  T_WC_T2S_MOVIE_LOCATION TO T_WC_T2S_MOVIE_LOCATION_OLD,\n"
+            "  T_WC_T2S_MOVIE_LOCATION_BUILD TO T_WC_T2S_MOVIE_LOCATION,\n"
+            "  T_WC_T2S_SERIE_LOCATION TO T_WC_T2S_SERIE_LOCATION_OLD,\n"
+            "  T_WC_T2S_SERIE_LOCATION_BUILD TO T_WC_T2S_SERIE_LOCATION"
+        )
+        connection.commit()
+        for strtable in ("T_WC_T2S_LOCATION", "T_WC_T2S_MOVIE_LOCATION", "T_WC_T2S_SERIE_LOCATION"):
+            cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
+        connection.commit()
+        return arrresult
+    finally:
+        cursor.close()
