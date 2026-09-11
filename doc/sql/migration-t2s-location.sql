@@ -176,13 +176,24 @@ CREATE TABLE IF NOT EXISTS `T_WC_T2S_SERIE_LOCATION` (
 -- 3. VERIFICATION
 -- ============================================================================
 
+-- ⚠ NE PAS INTERROGER information_schema ICI, ET LA RAISON A COUTE UN RUN.
+-- La premiere version de cette section faisait
+--   SELECT ... FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()
+-- ce qui a fait echouer TOUTE la section 4 avec « #1109 Table inconnue
+-- 'T_WC_WIKIDATA_STATEMENT' dans information_schema », le 2026-09-12.
+--
+-- Le mecanisme : phpMyAdmin execute le fichier instruction par instruction et retient
+-- la derniere base referencee comme base courante. Une requete sur information_schema
+-- y bascule donc le contexte, et les instructions suivantes, dont les noms de tables ne
+-- sont pas qualifies, vont les chercher la. DATABASE() rendant alors information_schema,
+-- la requete se sabotait elle-meme.
+--
+-- Le defaut ne se voit PAS avec le client mariadb en ligne de commande, qui garde la
+-- base de la connexion : une verification qui marche d'un cote et casse de l'autre.
+-- SHOW TABLE STATUS rend les memes informations sans changer de base.
 SELECT '3. Tables creees' AS SECTION;
 
-SELECT TABLE_NAME, TABLE_ROWS, ENGINE, TABLE_COLLATION
-FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = DATABASE()
-  AND TABLE_NAME IN ('T_WC_T2S_LOCATION', 'T_WC_T2S_MOVIE_LOCATION', 'T_WC_T2S_SERIE_LOCATION')
-ORDER BY TABLE_NAME;
+SHOW TABLE STATUS LIKE '%\_LOCATION';
 
 -- ============================================================================
 -- 4. CE QUE LE PROCESSUS 72 Y METTRA, pour dimensionner avant de le lancer
