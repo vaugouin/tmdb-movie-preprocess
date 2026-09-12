@@ -168,6 +168,17 @@ try:
             # Run with TMDB_PREPROCESS_SCOPE=neighbours. Order matters: T2S_MOVIE/SERIE (4/5) must
             # already exist, which they do in a normal DB (this scope only rebuilds the neighbour twins).
             arrprocessscopeneighbours = {36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION'}
+            # Locations only (Process 72): rebuild T2S_LOCATION and its two association
+            # tables from the V2 statements, on demand. Utile pour la recette de
+            # TMDB-MOVIE-PREPROCESS-014 sans rejouer les 45 processus du scope principal.
+            # Run with TMDB_PREPROCESS_SCOPE=locations.
+            #
+            # ⚠ CE SCOPE NE REMPLIT PAS LES COLONNES D'IMAGE. Elles sont ecrites par le
+            # processus 71, qui n'est pas ici. Apres un premier passage, enchainer sur
+            # TMDB_PREPROCESS_SCOPE=wikipedia-main-image pour que les lieux recoivent la
+            # leur, sans quoi WIKIPEDIA_MAIN_IMAGE_URL reste NULL et se lit comme une
+            # absence d'image alors que c'est une absence de passage.
+            arrprocessscopelocations = {72: 'T2S_LOCATION'}
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
                 arrprocessscope = arrprocessscopewikidatatopics
@@ -181,13 +192,22 @@ try:
                 arrprocessscope = arrprocessscopewikipediamainimage
             elif strprocessscope in ("neighbours", "neighbors", "similar-recommendations"):
                 arrprocessscope = arrprocessscopeneighbours
+            elif strprocessscope in ("locations", "location"):
+                arrprocessscope = arrprocessscopelocations
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
-            if strnow.startswith("2026-09-01"):
-                #arrprocessscope = {4: 'T2S_MOVIE'}
-                arrprocessscope = {5: 'T2S_SERIE'}
-            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | neighbours)", 0)
+            # ⚠ RETIRE LE 2026-09-12 : un forcage date qui ecrasait le scope APRES son choix.
+            #     if strnow.startswith("2026-09-01"):
+            #         arrprocessscope = {5: 'T2S_SERIE'}
+            # Le 1er septembre, toute execution ne lancait que le processus 5, quel que
+            # soit TMDB_PREPROCESS_SCOPE, et la variable serveur strtmdbmoviepreprocessscope
+            # annoncait pourtant le scope demande : le journal disait « main, 45 processus »
+            # et un seul tournait. Le code etait mort depuis, la date etant passee, mais
+            # il restait un piege pour le prochain lecteur et un precedent a ne pas suivre.
+            # Un forcage ponctuel se fait par la variable d'environnement, jamais par une
+            # date en dur qui survit a son jour.
+            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
