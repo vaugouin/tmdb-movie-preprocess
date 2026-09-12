@@ -232,3 +232,68 @@ GROUP BY cone.RACINE, CLASSE, cone.TYPE_PROPOSE
 ORDER BY GAGNE_SANS_TYPE DESC;
 
 DROP TEMPORARY TABLE IF EXISTS TMP_LOCATION_CANDIDATE_CONE;
+
+-- ---------------------------------------------------------------------------
+-- 5. LES DEUX RACINES QUI RESTENT A TRANCHER, a lancer APRES le passage de la
+--    deuxieme iteration des cones (2026-09-12).
+--
+--    Q15284 est le parent P279 commun de Q2074737, Q747074 et Q856076, les classes
+--    administratives peuplees qui sortent aujourd'hui en 'region'. MADRID ne porte
+--    qu'une seule classe, Q2074737, et c'est pour cela qu'elle est mal rangee. Son
+--    libelle est absent de la base, donc je ne la nomme pas : je la mesure.
+--
+--    Q811979 « architectural structure » avait ete ecartee parce qu'elle prenait 6 747
+--    lieux aux deja classes. Le deplacement de structure avant region devrait faire
+--    fondre ce chiffre, une bonne part de ces 6 747 etant les rues et les chateaux que
+--    region volait. Si DEJA_CLASSES tombe sous quelques centaines, la racine redevient
+--    un simple ajout et peut entrer.
+-- ---------------------------------------------------------------------------
+SELECT '5. Les deux racines restantes' AS SECTION;
+
+DROP TEMPORARY TABLE IF EXISTS TMP_LOCATION_CANDIDATE_CONE2;
+CREATE TEMPORARY TABLE TMP_LOCATION_CANDIDATE_CONE2 (
+  ID_CLASS     VARCHAR(50) NOT NULL,
+  RACINE       VARCHAR(50) NOT NULL,
+  TYPE_PROPOSE VARCHAR(20) NOT NULL,
+  PRIMARY KEY (RACINE, ID_CLASS),
+  KEY IDX_CLASS (ID_CLASS)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE2 (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q15284' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q15284', 'city' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE2 (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q484170' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q484170', 'city' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE2 (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q811979' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q811979', 'structure' FROM c;
+
+SELECT cone.RACINE, cone.TYPE_PROPOSE,
+       COUNT(DISTINCT cone.ID_CLASS)                                                    AS CLASSES,
+       COUNT(DISTINCT CASE WHEN loc.LOCATION_TYPE IS NULL THEN loc.ID_LOCATION END)     AS GAGNE_SANS_TYPE,
+       COUNT(DISTINCT CASE WHEN loc.LOCATION_TYPE IS NOT NULL THEN loc.ID_LOCATION END) AS DEJA_CLASSES,
+       GROUP_CONCAT(DISTINCT loc.LOCATION_TYPE ORDER BY loc.LOCATION_TYPE SEPARATOR ' | ') AS TYPES_PRIS
+FROM TMP_LOCATION_CANDIDATE_CONE2 cone
+LEFT JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_ITEM = cone.ID_CLASS
+LEFT JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_STATEMENT = iv.ID_STATEMENT
+       AND st.ID_PROPERTY = 'P31'
+       AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
+LEFT JOIN T_WC_T2S_LOCATION loc ON loc.ID_WIKIDATA = st.ID_WIKIDATA
+GROUP BY cone.RACINE, cone.TYPE_PROPOSE
+ORDER BY GAGNE_SANS_TYPE DESC;
+
+-- Madrid, le temoin : son unique classe entre-t-elle dans l'un des trois cones ?
+SELECT 'Q2807 Madrid' AS TEMOIN, cone.RACINE, cone.TYPE_PROPOSE
+FROM TMP_LOCATION_CANDIDATE_CONE2 cone
+WHERE cone.ID_CLASS = 'Q2074737';
+
+DROP TEMPORARY TABLE IF EXISTS TMP_LOCATION_CANDIDATE_CONE2;

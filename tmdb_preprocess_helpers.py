@@ -1980,15 +1980,75 @@ STR_LOCATION_CLASS_TABLE = "T_WC_T2S_LOCATION_CLASS"
 # ceux dont aucune classe ne tombe dans un cone restent sans type plutot que mal classes.
 # Le compte des non classes est publie en variable serveur, pour qu'il se voie.
 LOCATION_TYPE_CONES = (
-    ("fiction",   ("Q1964689", "Q2775969")),              # fictional city, fictional planet
+    # ---------------------------------------------------------------------
+    # DEUXIEME ITERATION, 2026-09-12, sur la mesure de
+    # doc/sql/test-014-location-type-drivers.sql. La premiere avait bon l'ORDRE, les
+    # huit temoins de priorite etant tous justes, et faux les RACINES.
+    #
+    # ⚠ LA CORRECTION PRINCIPALE EST UN DEPLACEMENT, PAS UN AJOUT, et je m'etais
+    # trompe de diagnostic. J'avais accuse la TAILLE du cone region, 19 482 classes.
+    # Le probleme etait son RANG. La priorite se resout a la construction par un
+    # INSERT IGNORE sur la cle : la premiere insertion gagne. region etant inseree
+    # avant structure, toute classe presente dans les deux cones etait estampillee
+    # region, et les deux cones se recouvrent massivement. Mesure : 274 rues, 162
+    # chateaux, 108 places, 64 chaines de montagnes, 63 parcs, 44 lacs, 43 rivieres
+    # et 29 zoos etaient classes « region ». Aucun n'est une region.
+    #
+    # structure et nature passent donc AVANT region, qui redevient ce qu'elle doit
+    # etre : le fourre-tout des vraies entites territoriales, en avant-dernier.
+    # ---------------------------------------------------------------------
+    ("fiction",   ("Q1964689",    # fictional city
+                   "Q2775969",    # fictional planet
+                   # Quatre racines relevees dans les lieux SANS type, gains mesures
+                   # au regard de ce qu'elles prennent aux deja classes :
+                   "Q1145276",    # fictional country      51 gagnes /  7 pris
+                   "Q106921111",  # fictional town         41 gagnes /  0 pris
+                   "Q14637321",   # fictional spacecraft   40 gagnes /  1 pris
+                   "Q6619693")),  # fictional island       25 gagnes /  2 pris
     ("country",   ("Q6256",)),                            # country
-    ("city",      ("Q486972",)),                          # human settlement (couvre city, big city, town, village, port city, border city, kibbutz)
+    ("city",      ("Q486972",)),                          # human settlement
     ("island",    ("Q23442",)),                           # island
-    ("region",    ("Q82794",)),                           # region
-    ("structure", ("Q41176", "Q23413", "Q33506",          # building, castle, museum
-                   "Q24354", "Q55488", "Q79007",          # theatre building, railway station, street
-                   "Q174782")),                           # square
+    ("structure", ("Q41176",      # building
+                   "Q23413",      # castle
+                   "Q33506",      # museum
+                   "Q24354",      # theatre building
+                   "Q55488",      # railway station
+                   "Q79007",      # street
+                   "Q174782",     # square
+                   "Q375336",     # film studio            77 gagnes / 16 pris
+                   "Q40357",      # prison                 43 gagnes / 21 pris
+                   "Q22698",      # park
+                   "Q22746",      # urban park
+                   "Q43501")),    # zoo
+    # Le relief, famille qui manquait entierement : une montagne n'est ni une
+    # structure ni une region, et elle etait rangee dans la seconde.
+    ("nature",    ("Q8502",       # mountain               56 gagnes / 12 pris
+                   "Q46831",      # mountain range
+                   "Q40080",      # beach                  29 gagnes / 14 pris
+                   "Q23397",      # lake
+                   "Q4022")),     # river
+    ("region",    ("Q82794",)),                            # region
 )
+
+# ⚠ DEUX RACINES DELIBEREMENT ECARTEES, ET LA RAISON EST CHIFFREE.
+#
+# Q811979 « architectural structure » recupererait 233 lieux sans type, mais en
+# prendrait 6 747 aux deja classes, soit 57 % du corpus, pour un cone de 25 047
+# classes. Ma propre regle de recette dit que la seconde colonne doit rester petite :
+# une racine qui reclasse massivement n'est pas un ajout, c'est un changement de
+# conception. A remesurer APRES le deplacement ci-dessus, parce qu'une partie de ces
+# 6 747 sont justement les rues et les chateaux que region volait, et qu'ils seront
+# deja chez structure : le chiffre devrait donc fondre, et la racine redevenir un
+# simple ajout.
+#
+# Q15284 et Q484170, les classes administratives peuplees, restent a mesurer. Elles
+# sont la cause directe du seul defaut de conception encore ouvert : MADRID ne porte
+# qu'UNE classe, Q2074737, et elle n'est dans aucun cone city. Madrid sort donc en
+# region, ce qui est faux. Q2074737, Q747074 et Q856076 partagent un parent P279,
+# Q15284, qui est probablement la racine a poser, mais son libelle est absent de la
+# base et je ne le nommerai pas de memoire : c'est la faute du 2026-08-31. A mesurer
+# comme les autres avant de l'ajouter.
+
 
 
 def f_buildlocationclasstable():
