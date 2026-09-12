@@ -2163,6 +2163,26 @@ def f_locationassociationsql(strmajor):
     )
 
 
+def _f_locationstep(cursor, strstep, strsql):
+    """Execute une etape de la reconstruction des lieux en la NOMMANT d'abord.
+
+    ⚠ ECRIT LE 2026-09-12 APRES UN ECHEC MUET. Le passage s'est arrete sur
+    « MySQL Error: (1205, Lock wait timeout exceeded) » juste apres la construction des
+    cones, et rien dans le journal ne disait a quelle instruction : il fallait deviner
+    entre deux DROP, deux CREATE, trois INSERT, trois UPDATE correles et un RENAME de six
+    tables. Une reconstruction en onze instructions qui echoue sans dire laquelle oblige
+    a refaire le diagnostic de zero.
+
+    Le nom part AVANT l'execution et non apres, sinon la derniere ligne du journal est
+    celle qui a REUSSI, ce qui envoie chercher au mauvais endroit.
+
+    Rend le nombre de lignes touchees, utile aux etapes qui comptent.
+    """
+    print(f"72:   {strstep} ...", flush=True)
+    cursor.execute(strsql)
+    return cursor.rowcount
+
+
 def f_buildlocationtables():
     """Reconstruit les trois tables des lieux, en entier, par du SQL seul.
 
@@ -2182,6 +2202,15 @@ def f_buildlocationtables():
     cursor = connection.cursor()
     arrresult = {}
     try:
+        # ⚠ ATTENTE DE VERROU BORNEE A DEUX MINUTES, sur la session seulement.
+        # Par defaut MariaDB attend 50 secondes, ce qui est court pour un RENAME de six
+        # tables que l'API lit en continu, et le 2026-09-12 le passage est mort la.
+        # Deux minutes laissent passer une lecture longue sans bloquer le traitement de
+        # nuit derriere une transaction oubliee : au-dela, l'echec est le BON
+        # comportement, il signale qu'une session tient un verrou qu'elle ne devrait plus
+        # tenir. Ne pas monter ce chiffre pour faire disparaitre le symptome.
+        cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
+
         # --- 1. L'entite -----------------------------------------------------
         # Le libelle et la description viennent de V2 seul, jamais de T_WC_T2S_ITEM :
         # la population de cette derniere est pilotee par V1 deliberement, et elle part
@@ -2193,11 +2222,12 @@ def f_buildlocationtables():
         # "Paris, city in Texas" se distinguent par le vecteur, la ou "Paris" et "Paris"
         # produisent deux documents identiques que rien ne peut departager. Le type seul
         # n'y suffirait pas, les deux sont des villes.
-        for strsql in ("DROP TABLE IF EXISTS T_WC_T2S_LOCATION_BUILD",
-                       "CREATE TABLE T_WC_T2S_LOCATION_BUILD LIKE T_WC_T2S_LOCATION"):
-            cursor.execute(strsql)
+        _f_locationstep(cursor, "1a. DROP T_WC_T2S_LOCATION_BUILD",
+                        "DROP TABLE IF EXISTS T_WC_T2S_LOCATION_BUILD")
+        _f_locationstep(cursor, "1b. CREATE T_WC_T2S_LOCATION_BUILD",
+                        "CREATE TABLE T_WC_T2S_LOCATION_BUILD LIKE T_WC_T2S_LOCATION")
         connection.commit()
-        cursor.execute(
+        arrresult["lieux"] = _f_locationstep(cursor, "1c. INSERT des lieux", (
             "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
             "    (ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
             "     LOCATION_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
@@ -2209,9 +2239,7 @@ def f_buildlocationtables():
             "                NULLIF(wi.DESCRIPTION_EN, '')),\n"
             "       'wikidata', 0, CURDATE(), NOW()\n"
             "FROM (\n" + STR_LOCATION_DRIVING + ") lieux\n"
-            "LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = lieux.ID_WIKIDATA"
-        )
-        arrresult["lieux"] = cursor.rowcount
+            "LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = lieux.ID_WIKIDATA"))
         connection.commit()
 
         # --- 2. Le type, par jointure sur les cones --------------------------
@@ -2224,7 +2252,7 @@ def f_buildlocationtables():
         #   ne peut pas s'y substituer.
         # Sans le second niveau, le type rendu dependrait de l'ordre physique des lignes,
         # donc du hasard, et changerait d'un passage a l'autre sans que rien ne bouge.
-        cursor.execute(
+        _f_locationstep(cursor, "2. UPDATE LOCATION_TYPE", (
             "UPDATE T_WC_T2S_LOCATION_BUILD loc\n"
             "SET loc.LOCATION_TYPE = (\n"
             "    SELECT lc.LOCATION_TYPE\n"
@@ -2235,8 +2263,7 @@ def f_buildlocationtables():
             "      AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
             "    ORDER BY FIELD(lc.LOCATION_TYPE, " +
             ", ".join("'" + t + "'" for t, _ in LOCATION_TYPE_CONES) + ")\n"
-            "    LIMIT 1)"
-        )
+            "    LIMIT 1)"))
         connection.commit()
         cursor.execute("SELECT COUNT(*) AS C FROM T_WC_T2S_LOCATION_BUILD WHERE LOCATION_TYPE IS NULL")
         arrresult["sans_type"] = int(cursor.fetchone()["C"])
@@ -2244,11 +2271,13 @@ def f_buildlocationtables():
         # --- 3. Les deux associations ----------------------------------------
         for strmajor in ("MOVIE", "SERIE"):
             strtable = "T_WC_T2S_" + strmajor + "_LOCATION"
-            cursor.execute("DROP TABLE IF EXISTS " + strtable + "_BUILD")
-            cursor.execute("CREATE TABLE " + strtable + "_BUILD LIKE " + strtable)
+            _f_locationstep(cursor, "3a. DROP " + strtable + "_BUILD",
+                            "DROP TABLE IF EXISTS " + strtable + "_BUILD")
+            _f_locationstep(cursor, "3b. CREATE " + strtable + "_BUILD",
+                            "CREATE TABLE " + strtable + "_BUILD LIKE " + strtable)
             connection.commit()
-            cursor.execute(f_locationassociationsql(strmajor))
-            arrresult[strmajor.lower()] = cursor.rowcount
+            arrresult[strmajor.lower()] = _f_locationstep(
+                cursor, "3c. INSERT " + strtable + "_BUILD", f_locationassociationsql(strmajor))
             connection.commit()
 
         # --- 4. Compteurs et agregats ----------------------------------------
@@ -2258,17 +2287,16 @@ def f_buildlocationtables():
         # zero, un zero se trierait comme une mauvaise note alors qu'il signifie
         # l'absence de mesure. C'est le piege du sentinelle zero, paye trois fois dans
         # cette migration.
-        cursor.execute(
+        _f_locationstep(cursor, "4a. UPDATE des compteurs", (
             "UPDATE T_WC_T2S_LOCATION_BUILD loc SET\n"
             "  loc.MOVIE_COUNT = (SELECT COUNT(DISTINCT ml.ID_MOVIE)\n"
             "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
             "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION),\n"
             "  loc.SERIE_COUNT = (SELECT COUNT(DISTINCT sl.ID_SERIE)\n"
             "                     FROM T_WC_T2S_SERIE_LOCATION_BUILD sl\n"
-            "                     WHERE sl.ID_LOCATION = loc.ID_LOCATION)"
-        )
+            "                     WHERE sl.ID_LOCATION = loc.ID_LOCATION)"))
         connection.commit()
-        cursor.execute(
+        _f_locationstep(cursor, "4b. UPDATE des notes et de la popularite", (
             "UPDATE T_WC_T2S_LOCATION_BUILD loc SET\n"
             "  loc.IMDB_RATING = (SELECT AVG(m.IMDB_RATING)\n"
             "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
@@ -2281,25 +2309,29 @@ def f_buildlocationtables():
             "  loc.POPULARITY = (SELECT AVG(m.POPULARITY)\n"
             "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
             "                     JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ml.ID_MOVIE\n"
-            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.POPULARITY > 0)"
-        )
+            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.POPULARITY > 0)"))
         connection.commit()
 
         # --- 5. Les trois bascules -------------------------------------------
         # RENAME TABLE d'un seul tenant : MariaDB le traite comme une operation atomique,
         # donc aucune requete ne peut voir une table nouvelle et une autre ancienne.
+        #
+        # ⚠ C'EST L'ETAPE LA PLUS EXPOSEE AU VERROU, parce qu'elle demande un verrou de
+        # metadonnees exclusif sur trois tables que l'API lit en permanence. Une session
+        # qui a laisse une transaction ouverte sur l'une d'elles, un onglet phpMyAdmin
+        # par exemple, suffit a la faire echouer en 1205. Si c'est ici que le passage
+        # meurt, chercher la transaction fautive plutot que rejouer.
         for strtable in ("T_WC_T2S_LOCATION", "T_WC_T2S_MOVIE_LOCATION", "T_WC_T2S_SERIE_LOCATION"):
             cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
         connection.commit()
-        cursor.execute(
+        _f_locationstep(cursor, "5. RENAME des trois tables", (
             "RENAME TABLE\n"
             "  T_WC_T2S_LOCATION TO T_WC_T2S_LOCATION_OLD,\n"
             "  T_WC_T2S_LOCATION_BUILD TO T_WC_T2S_LOCATION,\n"
             "  T_WC_T2S_MOVIE_LOCATION TO T_WC_T2S_MOVIE_LOCATION_OLD,\n"
             "  T_WC_T2S_MOVIE_LOCATION_BUILD TO T_WC_T2S_MOVIE_LOCATION,\n"
             "  T_WC_T2S_SERIE_LOCATION TO T_WC_T2S_SERIE_LOCATION_OLD,\n"
-            "  T_WC_T2S_SERIE_LOCATION_BUILD TO T_WC_T2S_SERIE_LOCATION"
-        )
+            "  T_WC_T2S_SERIE_LOCATION_BUILD TO T_WC_T2S_SERIE_LOCATION"))
         connection.commit()
         for strtable in ("T_WC_T2S_LOCATION", "T_WC_T2S_MOVIE_LOCATION", "T_WC_T2S_SERIE_LOCATION"):
             cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
