@@ -7294,11 +7294,18 @@ ORDER BY COMPTE DESC
                           f"{arrlocationcounts.get('movie', 0)} movie links, "
                           f"{arrlocationcounts.get('serie', 0)} serie links, "
                           f"{arrlocationcounts.get('sans_type', 0)} without a type")
-                    for strkey, strdesc in (("lieux", "Locations rebuilt by"),
-                                            ("movie", "Movie-location links rebuilt by"),
-                                            ("serie", "Serie-location links rebuilt by"),
-                                            ("sans_type", "Locations left without a LOCATION_TYPE by")):
-                        cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strkey + "count", str(arrlocationcounts.get(strkey, 0)), strdesc + " the location rebuild (process 72)", 0)
+                    # ⚠ strlocationdesc et NON strdesc : la variable de boucle du pipeline
+                    # s'appelle strdesc (ligne 326) et sert APRES le bloc, au classement des
+                    # durees et a la description de la variable serveur du temps ecoule. La
+                    # premiere version de ce bloc la masquait, si bien que le passage du
+                    # 2026-09-12 a titre le processus 72 « Locations left without a
+                    # LOCATION_TYPE by » au lieu de « T2S_LOCATION ». Aucun calcul fausse,
+                    # mais un rapport qui ment sur ce qu'il mesure.
+                    for strkey, strlocationdesc in (("lieux", "Locations rebuilt by"),
+                                                    ("movie", "Movie-location links rebuilt by"),
+                                                    ("serie", "Serie-location links rebuilt by"),
+                                                    ("sans_type", "Locations left without a LOCATION_TYPE by")):
+                        cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strkey + "count", str(arrlocationcounts.get(strkey, 0)), strlocationdesc + " the location rebuild (process 72)", 0)
                     # set_processed() et non une affectation directe : kind="copy"
                     # laisse _track_processed a faux, donc finish() n'ecrirait pas le
                     # compte, et la variable serveur resterait a la valeur du passage
