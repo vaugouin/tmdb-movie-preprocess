@@ -2211,6 +2211,45 @@ def f_buildlocationtables():
         # tenir. Ne pas monter ce chiffre pour faire disparaitre le symptome.
         cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
 
+        # ⚠ LECTURE NON VERROUILLANTE QUAND LE SERVEUR LE PERMET, et la condition est
+        # verifiee A L'EXECUTION plutot qu'ecrite en dur.
+        #
+        # Le probleme : l'etape 1c est un INSERT ... SELECT sur T_WC_WIKIDATA_STATEMENT,
+        # et ce type d'instruction ne lit PAS en simple lecture. Il pose des verrous
+        # PARTAGES sur les lignes source, pour que le journal binaire rejoue le meme
+        # resultat. Le 2026-09-12, pendant que wikidata-crawler inserait dans cette table
+        # depuis 4 425 secondes, l'etape a attendu puis rendu 1205 : la table _BUILD
+        # etait creee a 17:22:08 et vide, ce qui localise l'echec sans ambiguite.
+        #
+        # La sortie : en READ COMMITTED la lecture redevient un instantane et ne verrouille
+        # plus rien. Mais ce n'est licite que s'il n'y a pas de journal a rejouer.
+        # Mesure du 2026-09-12 sur ce serveur : log_bin = 0, journal binaire inactif,
+        # donc rien a preserver et binlog_format = MIXED est sans effet.
+        #
+        # POURQUOI UNE VERIFICATION ET NON UNE LIGNE EN DUR. Le correctif depend d'un
+        # reglage serveur qui peut changer sans que ce code le sache : activer la
+        # journalisation binaire, pour de la replication ou une restauration a l'instant,
+        # invaliderait le raisonnement. La verification garde le code juste dans les deux
+        # mondes, et elle dit dans le journal ce qu'elle a decide, ce qu'une ligne en dur
+        # ne ferait pas.
+        try:
+            cursor.execute("SELECT @@GLOBAL.log_bin AS LOGBIN, @@GLOBAL.binlog_format AS FORMAT")
+            arrbinlog = cursor.fetchone()
+            blnbinlog = int(arrbinlog["LOGBIN"] or 0) == 1
+            strbinlogformat = (arrbinlog["FORMAT"] or "").upper()
+            if (not blnbinlog) or strbinlogformat == "ROW":
+                cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+                strraison = "journal binaire inactif" if not blnbinlog else "binlog_format = ROW"
+                print(f"72: lecture en READ COMMITTED ({strraison}), l'INSERT ... SELECT ne verrouillera pas la source.")
+            else:
+                print(f"72: lecture laissee en REPEATABLE READ (binlog_format = {strbinlogformat}, journalisation active) :")
+                print("72:   l'INSERT ... SELECT verrouillera la source, donc NE PAS lancer pendant un chargement de wikidata-crawler.")
+        except Exception as isolationerror:
+            # Ne jamais faire echouer la reconstruction sur l'optimisation qui devait la
+            # proteger : sans le reglage, le comportement est celui d'avant, verrouillant
+            # mais correct.
+            print(f"72: isolation laissee par defaut ({type(isolationerror).__name__}: {isolationerror}).")
+
         # --- 1. L'entite -----------------------------------------------------
         # Le libelle et la description viennent de V2 seul, jamais de T_WC_T2S_ITEM :
         # la population de cette derniere est pilotee par V1 deliberement, et elle part
