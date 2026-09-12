@@ -7289,7 +7289,36 @@ ORDER BY COMPTE DESC
                         print(f"72: cone {strconetype}: {lngconecount} classes")
                         cp.f_setservervariable("strtmdbmoviepreprocesslocationcone" + strconetype, str(lngconecount), f"Number of P279 classes in the {strconetype} location cone", 0)
                     cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Rebuilding T2S_LOCATION and its associations","Current sub process in the TMDb database movie preprocess",0)
-                    arrlocationcounts = f_buildlocationtables()
+                    # ⚠ RATTRAPAGE PROPRE A CE PROCESSUS, ajoute le 2026-09-12, et il
+                    # corrige un risque que l'ajout du 72 au scope principal avait cree
+                    # sans que je le voie.
+                    #
+                    # L'etape 1c est un INSERT ... SELECT sur T_WC_WIKIDATA_STATEMENT.
+                    # Sous l'isolation par defaut, ce type d'instruction ne lit PAS en
+                    # simple lecture : il pose des verrous partages sur les lignes source.
+                    # Quand wikidata-crawler charge cette meme table, la collision est
+                    # certaine, et c'est arrive le 2026-09-12 : erreur 1205 avec la table
+                    # _BUILD creee et vide.
+                    #
+                    # Sans ce try, l'erreur remonte au try unique du haut du script et
+                    # TUE TOUT LE PASSAGE. Or 72 est place avant 70 et 71 dans le scope
+                    # principal, donc une nuit ou le crawler charge ferait perdre le
+                    # rafraichissement des assertions ET la copie des images Wikipedia,
+                    # pour un read-model de lieux qui, lui, ne perd rien du tout : le
+                    # patron BUILD puis RENAME laisse la table servie intacte.
+                    #
+                    # Un echec ici doit donc coûter un read-model d'un jour de retard, pas
+                    # deux processus voisins. Le detail part en variable serveur pour que
+                    # le silence ne passe pas pour un succes.
+                    arrlocationcounts = {}
+                    try:
+                        arrlocationcounts = f_buildlocationtables()
+                        cp.f_setservervariable("strtmdbmoviepreprocesslocationerror", "", "Last error of the location rebuild (process 72), empty when it succeeded", 0)
+                    except Exception as locationerror:
+                        strlocationerror = f"{type(locationerror).__name__}: {locationerror}"
+                        print(f"72: FAILED, the served tables are unchanged: {strlocationerror}")
+                        print("72: the rest of the pipeline continues. Re-run with TMDB_PREPROCESS_SCOPE=locations once wikidata-crawler is idle.")
+                        cp.f_setservervariable("strtmdbmoviepreprocesslocationerror", strlocationerror, "Last error of the location rebuild (process 72), empty when it succeeded", 0)
                     print(f"72: {arrlocationcounts.get('lieux', 0)} locations, "
                           f"{arrlocationcounts.get('movie', 0)} movie links, "
                           f"{arrlocationcounts.get('serie', 0)} serie links, "
