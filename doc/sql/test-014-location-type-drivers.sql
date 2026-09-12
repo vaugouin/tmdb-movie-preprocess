@@ -114,36 +114,121 @@ ORDER BY c.ID_CLASS, PARENT_P279;
 -- ---------------------------------------------------------------------------
 -- 4. Les racines candidates, chiffrees avant d'etre ajoutees.
 --
---    Combien de lieux SANS TYPE chacune recupererait, et combien elle en volerait a un
---    type deja attribue. La seconde colonne est celle qui doit rester petite : une
---    racine qui reclasse massivement des lieux deja classes n'est pas un ajout, c'est
---    un changement de conception.
+-- ⚠ REECRITE LE 2026-09-12 APRES AVOIR DU TUER LA PREMIERE VERSION, restee 91 minutes
+-- en « Executing » sans rendre la main. Deux fautes, et la premiere est un motif que ce
+-- projet a deja paye.
+--
+--   a) LA JOINTURE NE POUVAIT PAS UTILISER D'INDEX. J'avais ecrit
+--        LEFT JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_ITEM IN (cand.ID_CLASS, sc.ID_CHILD)
+--      Un IN dont les deux membres sont des COLONNES, et non des constantes, interdit la
+--      recherche par index : le moteur balaie la table entiere, qui compte des dizaines
+--      de millions de lignes, une fois par couple (candidat, sous-classe). C'est
+--      exactement la faute du garde des IMDb ambigus de selenium-tmdb le 2026-09-02, sous
+--      une autre forme : une condition non indexable executee un tres grand nombre de
+--      fois. Le symptome est le meme, un conteneur qui ne rend jamais la main.
+--
+--   b) LA MESURE AURAIT ETE FAUSSE MEME EN ABOUTISSANT. Je ne prenais que les enfants
+--      DIRECTS de chaque racine, un seul niveau de P279, alors qu'un cone est une
+--      fermeture transitive. Le compte aurait sous-estime chaque candidate, et
+--      d'autant plus qu'elle est haute dans la hierarchie.
+--
+-- La version ci-dessous materialise les cones candidats par le meme CTE recursif que
+-- f_buildawardconetable() et f_buildlocationclasstable(), puis joint sur des colonnes
+-- indexees. Le cone est parcouru une fois, pas une fois par ligne.
 -- ---------------------------------------------------------------------------
-SELECT '4. Ce que chaque racine candidate rapporterait' AS SECTION;
 
-SELECT cand.ID_CLASS                                                          AS RACINE,
-       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.en')),
-                NULLIF(wi.LABEL_EN, ''))                                      AS CLASSE,
-       cand.TYPE_PROPOSE,
-       COUNT(DISTINCT CASE WHEN loc.LOCATION_TYPE IS NULL THEN loc.ID_LOCATION END) AS GAGNE_SANS_TYPE,
+DROP TEMPORARY TABLE IF EXISTS TMP_LOCATION_CANDIDATE_CONE;
+CREATE TEMPORARY TABLE TMP_LOCATION_CANDIDATE_CONE (
+  ID_CLASS      VARCHAR(50) NOT NULL,
+  RACINE        VARCHAR(50) NOT NULL,
+  TYPE_PROPOSE  VARCHAR(20) NOT NULL,
+  PRIMARY KEY (RACINE, ID_CLASS),
+  KEY IDX_CLASS (ID_CLASS)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Une insertion par racine. Le CAST de l'ancre n'est pas decoratif : sans lui MariaDB
+-- type la colonne recursive sur la longueur du litteral et rejette ses propres Q-ids
+-- avec l'erreur 1406.
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q375336' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q375336', 'structure' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q40357' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q40357', 'structure' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q811979' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q811979', 'structure' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q1145276' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q1145276', 'fiction' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q106921111' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q106921111', 'fiction' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q6619693' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q6619693', 'fiction' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q14637321' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q14637321', 'fiction' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q8502' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q8502', 'nature' FROM c;
+
+INSERT INTO TMP_LOCATION_CANDIDATE_CONE (ID_CLASS, RACINE, TYPE_PROPOSE)
+WITH RECURSIVE c (qid) AS (
+  SELECT CAST('Q40080' AS CHAR(50)) COLLATE utf8mb4_unicode_ci
+  UNION SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc JOIN c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0
+) SELECT qid, 'Q40080', 'nature' FROM c;
+
+SELECT '4a. Taille des cones candidats' AS SECTION;
+
+SELECT RACINE, TYPE_PROPOSE, COUNT(*) AS CLASSES
+FROM TMP_LOCATION_CANDIDATE_CONE
+GROUP BY RACINE, TYPE_PROPOSE
+ORDER BY CLASSES DESC;
+
+-- GAGNE_SANS_TYPE est ce que la racine ajoute, DEJA_CLASSES ce qu'elle prend a un autre
+-- type. C'est la SECONDE colonne qui doit rester petite : une racine qui reclasse
+-- massivement des lieux deja classes n'est pas un ajout, c'est un changement de
+-- conception, et elle demande alors d'etre placee dans l'ordre plutot qu'ajoutee.
+SELECT '4b. Ce que chaque racine candidate rapporterait' AS SECTION;
+
+SELECT cone.RACINE,
+       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.en')), NULLIF(wi.LABEL_EN, '')) AS CLASSE,
+       cone.TYPE_PROPOSE,
+       COUNT(DISTINCT CASE WHEN loc.LOCATION_TYPE IS NULL THEN loc.ID_LOCATION END)     AS GAGNE_SANS_TYPE,
        COUNT(DISTINCT CASE WHEN loc.LOCATION_TYPE IS NOT NULL THEN loc.ID_LOCATION END) AS DEJA_CLASSES
-FROM (
-  SELECT 'Q375336'    AS ID_CLASS, 'structure' AS TYPE_PROPOSE UNION ALL  -- film studio
-  SELECT 'Q40357',    'structure' UNION ALL                               -- prison
-  SELECT 'Q811979',   'structure' UNION ALL                               -- architectural structure
-  SELECT 'Q1145276',  'fiction'   UNION ALL                               -- fictional country
-  SELECT 'Q106921111','fiction'   UNION ALL                               -- fictional town
-  SELECT 'Q6619693',  'fiction'   UNION ALL                               -- fictional island
-  SELECT 'Q14637321', 'fiction'   UNION ALL                               -- fictional spacecraft
-  SELECT 'Q8502',     'nature'    UNION ALL                               -- mountain
-  SELECT 'Q40080',    'nature'                                            -- beach
-) cand
-LEFT JOIN T_WC_WIKIDATA_SUBCLASS sc ON sc.ID_PARENT = cand.ID_CLASS AND sc.DELETED = 0
-LEFT JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_ITEM IN (cand.ID_CLASS, sc.ID_CHILD)
-LEFT JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_STATEMENT = iv.ID_STATEMENT
+FROM TMP_LOCATION_CANDIDATE_CONE cone
+INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_ITEM = cone.ID_CLASS
+INNER JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_STATEMENT = iv.ID_STATEMENT
        AND st.ID_PROPERTY = 'P31'
        AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
-LEFT JOIN T_WC_T2S_LOCATION loc ON loc.ID_WIKIDATA = st.ID_WIKIDATA
-LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = cand.ID_CLASS
-GROUP BY cand.ID_CLASS, CLASSE, cand.TYPE_PROPOSE
+INNER JOIN T_WC_T2S_LOCATION loc ON loc.ID_WIKIDATA = st.ID_WIKIDATA
+LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = cone.RACINE
+GROUP BY cone.RACINE, CLASSE, cone.TYPE_PROPOSE
 ORDER BY GAGNE_SANS_TYPE DESC;
+
+DROP TEMPORARY TABLE IF EXISTS TMP_LOCATION_CANDIDATE_CONE;
