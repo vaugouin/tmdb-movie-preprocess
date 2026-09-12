@@ -131,6 +131,12 @@ missing half of the graph.
 `...awardconeskipstreak` and `...awardconeskipreason` are written every run. Read the
 streak: one skipped day is invisible, three in a row means the crawler dependency is
 broken and the two tables have been frozen since.
+## Recettes SQL : deux pieges qui ne se voient pas sur le poste de l'auteur
+
+**⚠ Ne jamais placer une requete sur `information_schema` AVANT des instructions qui nomment des tables sans les qualifier.** phpMyAdmin retient la derniere base referencee comme base courante : une requete sur `information_schema` y bascule le contexte, et tout ce qui suit va chercher `T_WC_...` la-bas, avec « #1109 Table inconnue dans information_schema ». Mettre ces requetes **en dernier**, ou qualifier les noms. Le defaut ne se voit PAS avec le client `mariadb` en ligne de commande, qui garde la base de la connexion : une recette qui marche d'un cote et casse de l'autre. Paye deux fois, `migration-t2s-location.sql` le 2026-09-11 puis `test-014-locks.sql` le 2026-09-12, la seconde parce que la consigne n'existait que dans les commentaires du premier fichier. **Un avertissement dans un fichier ne protege que son lecteur**, d'ou celui-ci.
+
+**⚠ `information_schema.INNODB_TRX` et `PROCESSLIST` demandent le privilege global `PROCESS`, que le compte applicatif n'a pas.** Ne pas le lui donner pour faire passer une recette : `PROCESS` laisse voir le texte de toutes les requetes de tous les utilisateurs, donnees comprises. Lancer ces sections depuis phpMyAdmin en `root`, et les isoler du reste du fichier pour que leur echec n'emporte pas les sections qui, elles, tournent avec le compte applicatif.
+
 ## SQL Object Naming Conventions
 
 The shared database follows these conventions (consistent across sibling repos) — keep new objects aligned:
