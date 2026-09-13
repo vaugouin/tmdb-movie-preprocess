@@ -20,9 +20,10 @@ for intindex, strdesc in arrprocessscope.items():
 - `wikidata-companies` — **only** Process 63 (link companies to Wikidata) — **pilot**.
 - `wikidata-all` (alias `wikidata`) — **all** Wikidata linkers run **sequentially in one container** (Process 60 → 63 → future network/genre/character). This is the scope to **schedule**: one process means one Wikimedia request stream, so the linkers never contend for the rate limit. The `wikidata-topics` / `wikidata-companies` scopes remain for targeted single-linker / debug runs.
 - `locations` (alias `location`) — **only** Process 72 (rebuild `T_WC_T2S_LOCATION` and its two association tables from the Wikidata V2 statements `P840` / `P915`, plus the `T_WC_T2S_LOCATION_CLASS` cone table that `LOCATION_TYPE` is derived from). Wrapper: `tmdb-movie-preprocess-locations.sh`. **Does not fill the image columns** — those belong to Process 71, so chain `wikipedia-main-image` after the first pass or `WIKIPEDIA_MAIN_IMAGE_URL` stays NULL, which reads as "no image" when it is in fact "no pass".
+- `wikidata-colour` (alias `wikidata-color`), **only** Process 64 (colour flags from Wikidata `P462` for films without a French Format line, TMDB-MOVIE-PREPROCESS-049). For the first backfill and reruns on demand; in `main` it runs between 1 and 2.
 - `neighbours` (aliases `neighbors`, `similar-recommendations`) — **only** Processes 36-39 (rebuild the T2S `similar` / `recommendation` neighbour tables from the raw `T_WC_TMDB_*` twins). Handy as a **unit test** right after creating the four T2S tables, without the whole pipeline. Wrapper: `tmdb-movie-preprocess-neighbours.sh`.
 
-The `main` scope runs processes: **1, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 36, 37, 38, 39, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40, 72, 70, 71**. Process 72 (locations) sits **before** 71: the image copier fills every T2S entity table and must therefore find the locations already built. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
+The `main` scope runs processes: **1, 64, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 36, 37, 38, 39, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40, 72, 70, 71**. Process 72 (locations) sits **before** 71: the image copier fills every T2S entity table and must therefore find the locations already built. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
 
 Progress is tracked server-side via `cp.f_setservervariable()`. Multiple cursor objects (`cursor`, `cursor2` … `cursor5`) allow parallel DB operations within a single process.
 
@@ -190,6 +191,24 @@ ORDER BY ID_MOVIE ASC
 - Rebuilds the `medium_format` + `aspect_ratio` junction rows in `T_WC_T2S_MOVIE_TECHNICAL` for the processed movies (per-movie, scoped re-sync — see §12.5), then refreshes `MOVIE_COUNT` on `T_WC_T2S_TECHNICAL`.
 
 > **Note:** selection is keyed on `DAT_WIKIPEDIA_FORMAT_LINE`, and the **`wikipedia-crawler` repo is the guarantor** of that marker: it writes `WIKIPEDIA_FORMAT_LINE` and `DAT_WIKIPEDIA_FORMAT_LINE = NOW()` (`Europe/Paris`) in the same upsert (`wikipedia_crawler.py`, `arrcouples` write of `T_WC_TMDB_MOVIE`), so the date always advances whenever the format line changes — and in the same timezone this process stamps its watermark. To force a full re-parse, clear the watermark (set `strtmdbmoviepreprocesswikipediaformatlinelastrun` to empty / delete the row).
+
+---
+
+### Process 64 - WIKIDATA_COLOR
+
+Fills `IS_COLOR` / `IS_BLACK_AND_WHITE` on `T_WC_TMDB_MOVIE` from the Wikidata colour property `P462` for the films that have **no** French Wikipedia Format line, and signs them `COLOR_SOURCE = 'wikidata'`. The Format line keeps precedence: Process 1 signs its own writes `COLOR_SOURCE = 'format_line'` and this process never touches a film that carries a non-empty line or that signature. TMDB-MOVIE-PREPROCESS-049, option A: an item holding both Wikidata values gives both flags, the provenance column tells them apart.
+
+**Reads:** `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE` (`P462`, values `Q22006653` colour and `Q838368` black-and-white; rank `deprecated` excluded, `preferred` honoured when the item has one), `T_WC_TMDB_MOVIE` (`ID_WIKIDATA`, `WIKIPEDIA_FORMAT_LINE`, `COLOR_SOURCE`)
+**Writes:** `T_WC_TMDB_MOVIE` (`IS_COLOR`, `IS_BLACK_AND_WHITE`, `COLOR_SOURCE`, `TIM_COLOR_SOURCE`, `TIM_UPDATED`), `T_WC_T2S_MOVIE_TECHNICAL` (rows `color_movie` / `black_and_white_movie` only), `T_WC_T2S_TECHNICAL.MOVIE_COUNT`
+
+**Operations (set-based, idempotent, wrapped in its own `try` so a failure costs this process alone):**
+- Builds a temporary table with one row per Wikidata item carrying `P462`: `HAS_COLOR`, `HAS_BLACK_AND_WHITE` (about 197 000 rows, keyed on `ID_WIKIDATA`).
+- One `UPDATE ... JOIN` on `ID_WIKIDATA`, restricted to films with an empty Format line, a `COLOR_SOURCE` that is `NULL` or `wikidata`, and flags that actually change. `TIM_UPDATED` is bumped so Process 4 copies the row to `T_WC_T2S_MOVIE` in the same run.
+- Clears the flags and the signature of `wikidata`-signed films whose item no longer carries `P462`.
+- Rewrites the `color_movie` / `black_and_white_movie` junction rows of the touched films (scoped `DELETE`, two `INSERT ... SELECT`), then refreshes `MOVIE_COUNT`. Silent, 3D and aspect-ratio rows are never touched.
+- Publishes counts by provenance (`strtmdbmoviepreprocesscoloursource<formatline|wikidata|none>count`), `...wikidatacolouritemscount`, `...wikidatacolourupdatedcount`, `...wikidatacolourclearedcount`, `...wikidatacolourjunctionrowscount`, `...wikidatacolourlastrun`, and blanks `...wikidatacolourerror` on success.
+
+> **Migration (one-shot):** `doc/sql/migration-049-color-source.sql` adds `COLOR_SOURCE` and `TIM_COLOR_SOURCE` to `T_WC_TMDB_MOVIE` and `T_WC_T2S_MOVIE` and signs the existing line-derived flags `format_line`. Apply it by hand before the first run. First run on demand with `./tmdb-movie-preprocess-wikidata-colour.sh` (scope `wikidata-colour`, alias `wikidata-color`, Process 64 only); afterwards it runs inside `main` between 1 and 2. Recipe: `doc/sql/test-049-colour-source.sql`.
 
 ---
 
@@ -1058,6 +1077,7 @@ Refreshes "living" evaluation assertions so time-varying samples/evals (e.g. *tr
 | Source tables | Target T2S tables |
 |---------------|-------------------|
 | T_WC_TMDB_MOVIE | T_WC_T2S_MOVIE, T_WC_TMDB_MOVIE_LANG_META |
+| T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P462) | T_WC_TMDB_MOVIE (colour flags, COLOR_SOURCE), T_WC_T2S_MOVIE_TECHNICAL (color_movie / black_and_white_movie) |
 | T_WC_TMDB_SERIE | T_WC_T2S_SERIE |
 | T_WC_TMDB_PERSON | T_WC_T2S_PERSON |
 | T_WC_TMDB_COMPANY | T_WC_T2S_COMPANY |

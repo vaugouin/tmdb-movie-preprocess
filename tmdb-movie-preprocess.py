@@ -131,7 +131,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -179,6 +179,9 @@ try:
             # leur, sans quoi WIKIPEDIA_MAIN_IMAGE_URL reste NULL et se lit comme une
             # absence d'image alors que c'est une absence de passage.
             arrprocessscopelocations = {72: 'T2S_LOCATION'}
+            # Process 64 alone, for the first backfill and for reruns on demand
+            # (TMDB-MOVIE-PREPROCESS-049). In main it sits between 1 and 2.
+            arrprocessscopewikidatacolour = {64: 'WIKIDATA_COLOR'}
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
                 arrprocessscope = arrprocessscopewikidatatopics
@@ -194,6 +197,8 @@ try:
                 arrprocessscope = arrprocessscopeneighbours
             elif strprocessscope in ("locations", "location"):
                 arrprocessscope = arrprocessscopelocations
+            elif strprocessscope in ("wikidata-colour", "wikidata-color"):
+                arrprocessscope = arrprocessscopewikidatacolour
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
@@ -207,7 +212,7 @@ try:
             # il restait un piege pour le prochain lecteur et un precedent a ne pas suivre.
             # Un forcage ponctuel se fait par la variable d'environnement, jamais par une
             # date en dur qui survit a son jour.
-            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations)", 0)
+            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations | wikidata-colour)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
@@ -239,6 +244,7 @@ try:
                 0: ("customlistunescape", "custom list HTML unescape"),
                 1: ("wikipediaformatline", "Wikipedia format-line cleanup"),
                 2: ("movietechnical", "movie technical"),
+                64: ("wikidatacolour", "colour flags from Wikidata P462"),
                 4: ("movie", "movie"),
                 5: ("serie", "serie"),
                 6: ("person", "person"),
@@ -475,6 +481,9 @@ try:
 
                         # Validate format lines
                         data['IS_VALID_FORMAT'] = data['WIKIPEDIA_FORMAT_LINE'].apply(validate_format_line)
+                        # TMDB-MOVIE-PREPROCESS-049 : the parse signs what it writes, so the
+                        # Wikidata colour pass (process 64) never overrides a line-derived flag.
+                        data['COLOR_SOURCE'] = 'format_line'
 
                         # Display sample of processed data
                         print("\nSample of processed data:")
@@ -3841,6 +3850,7 @@ INSERT INTO T_WC_T2S_MOVIE (
     VIDEO, DAT_CREAT, TIM_UPDATED, RELEASE_YEAR, RELEASE_MONTH,
     RELEASE_DAY, ID_WIKIDATA, HOMEPAGE_URL, STATUS, BUDGET,
     REVENUE, RUNTIME, TAGLINE, IS_COLOR, IS_BLACK_AND_WHITE,
+    COLOR_SOURCE, TIM_COLOR_SOURCE,
     IS_SILENT, IS_3D, COLOR_TECHNOLOGY, FILM_TECHNOLOGY,
     FILM_FORMAT, SOUND_SYSTEM, SOUND_TECHNOLOGY,
     IS_MOVIE, IS_DOCUMENTARY, IS_SHORT_FILM, DELETED
@@ -3852,6 +3862,7 @@ SELECT
     VIDEO, DAT_CREAT, TIM_UPDATED, RELEASE_YEAR, RELEASE_MONTH,
     RELEASE_DAY, ID_WIKIDATA, HOMEPAGE_URL, STATUS, BUDGET,
     REVENUE, RUNTIME, TAGLINE, IS_COLOR, IS_BLACK_AND_WHITE,
+    COLOR_SOURCE, TIM_COLOR_SOURCE,
     IS_SILENT, IS_3D, COLOR_TECHNOLOGY, FILM_TECHNOLOGY,
     FILM_FORMAT, SOUND_SYSTEM, SOUND_TECHNOLOGY,
     IS_MOVIE, IS_DOCUMENTARY, IS_SHORT_FILM, DELETED
@@ -3888,6 +3899,8 @@ AND ID_MOVIE >= {lngmovierangestart} AND ID_MOVIE <= {lngmovierangeend}
     TAGLINE = VALUES(TAGLINE),
     IS_COLOR = VALUES(IS_COLOR),
     IS_BLACK_AND_WHITE = VALUES(IS_BLACK_AND_WHITE),
+    COLOR_SOURCE = VALUES(COLOR_SOURCE),
+    TIM_COLOR_SOURCE = VALUES(TIM_COLOR_SOURCE),
     IS_SILENT = VALUES(IS_SILENT),
     IS_3D = VALUES(IS_3D),
     COLOR_TECHNOLOGY = VALUES(COLOR_TECHNOLOGY),
@@ -7342,6 +7355,193 @@ ORDER BY COMPTE DESC
                     # qui n'a rien fait, ce qui serait faux.
                     tellocation.set_processed(arrlocationcounts.get("lieux", 0))
                     tellocation.finish()
+
+                elif intindex == 64:
+                    #----------------------------------------------------
+                    # WIKIDATA_COLOR : les flags couleur depuis Wikidata P462 quand la
+                    # ligne Format francaise manque (TMDB-MOVIE-PREPROCESS-049, option A
+                    # retenue par Philippe le 2026-09-13).
+                    #
+                    # La ligne Format garde la main : le processus 1 signe ce qu'il ecrit
+                    # (COLOR_SOURCE = 'format_line') et ce processus ne touche jamais un
+                    # film qui porte une ligne non vide ou cette signature. Un item
+                    # Wikidata aux deux valeurs donne les deux flags, la colonne de
+                    # provenance permet de les distinguer. Tout est ensembliste et
+                    # idempotent : deux passages de suite n'ecrivent rien.
+                    #
+                    # Ordre dans le scope main : apres 1 (une ligne arrivee la veille
+                    # gagne le jour meme) et avant 4 (la copie T2S lit TIM_UPDATED, que
+                    # l'UPDATE ci-dessous avance).
+                    #
+                    # Le corps est dans un try : la boucle n'a pas de try autour du sien,
+                    # et un echec ici ne doit pas emporter les processus qui suivent.
+                    #----------------------------------------------------
+                    print("WIKIDATA_COLOR processing (TMDB-MOVIE-PREPROCESS-049)")
+                    strwikidatacolourrunstart = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    strwikidatacolourerrorvar = "strtmdbmoviepreprocesswikidatacolourerror"
+                    strwikidatacolourerrordesc = "Last error of the WIKIDATA_COLOR process; blank when the last run succeeded"
+                    lngwikidatacolouritems = 0
+                    lngwikidatacolourupdated = 0
+                    lngwikidatacolourcleared = 0
+                    lngwikidatacolourjunctionrows = 0
+                    try:
+                        # 1. Une ligne par item Wikidata portant P462 : laquelle des deux
+                        #    valeurs il tient. Rang 'deprecated' ecarte ; si l'item a un rang
+                        #    'preferred' sur P462, seules ces valeurs comptent (semantique
+                        #    Wikidata du best value). Pas de filtre DELETED, regle maison des
+                        #    lectures V2 (voir f_wikidatabestvaluesql dans les helpers).
+                        cursor2.execute("DROP TEMPORARY TABLE IF EXISTS T_WC_TMP_WIKIDATA_COLOUR")
+                        cursor2.execute(
+                            "CREATE TEMPORARY TABLE T_WC_TMP_WIKIDATA_COLOUR ("
+                            "  ID_WIKIDATA VARCHAR(50) NOT NULL PRIMARY KEY,"
+                            "  HAS_COLOR TINYINT(1) NOT NULL,"
+                            "  HAS_BLACK_AND_WHITE TINYINT(1) NOT NULL"
+                            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+                        )
+                        strsqlwikidatacolourfill = (
+                            "INSERT INTO T_WC_TMP_WIKIDATA_COLOUR (ID_WIKIDATA, HAS_COLOR, HAS_BLACK_AND_WHITE) "
+                            "SELECT w.ID_WIKIDATA, "
+                            "       MAX(wv.ID_ITEM = 'Q22006653') AS HAS_COLOR, "
+                            "       MAX(wv.ID_ITEM = 'Q838368') AS HAS_BLACK_AND_WHITE "
+                            "FROM T_WC_WIKIDATA_STATEMENT w "
+                            "JOIN T_WC_WIKIDATA_ITEM_VALUE wv ON wv.ID_STATEMENT = w.ID_STATEMENT "
+                            "WHERE w.ID_PROPERTY = 'P462' "
+                            "  AND wv.ID_ITEM IN ('Q22006653', 'Q838368') "
+                            "  AND (w.`RANK` IS NULL OR w.`RANK` <> 'deprecated') "
+                            "  AND (w.`RANK` = 'preferred' OR NOT EXISTS ("
+                            "        SELECT 1 FROM T_WC_WIKIDATA_STATEMENT wp "
+                            "        WHERE wp.ID_WIKIDATA = w.ID_WIKIDATA AND wp.ID_PROPERTY = 'P462' "
+                            "          AND wp.`RANK` = 'preferred')) "
+                            "GROUP BY w.ID_WIKIDATA"
+                        )
+                        cursor2.execute(strsqlwikidatacolourfill)
+                        lngwikidatacolouritems = cursor2.rowcount
+                        cp.connectioncp.commit()
+                        print(f"  {lngwikidatacolouritems} Wikidata items carry P462 with a colour or black-and-white value")
+
+                        # 2. L'UPDATE ensembliste : films sans ligne Format, non signes par la
+                        #    ligne, et dont les flags changent (ou jamais signes). TIM_UPDATED
+                        #    avance pour que le processus 4 recopie la ligne vers
+                        #    T_WC_T2S_MOVIE dans le meme run.
+                        strsqlwikidatacolourupdate = (
+                            "UPDATE T_WC_TMDB_MOVIE m "
+                            "JOIN T_WC_TMP_WIKIDATA_COLOUR c ON c.ID_WIKIDATA = m.ID_WIKIDATA "
+                            "SET m.IS_COLOR = c.HAS_COLOR, "
+                            "    m.IS_BLACK_AND_WHITE = c.HAS_BLACK_AND_WHITE, "
+                            "    m.COLOR_SOURCE = 'wikidata', "
+                            "    m.TIM_COLOR_SOURCE = %s, "
+                            "    m.TIM_UPDATED = %s "
+                            "WHERE (m.WIKIPEDIA_FORMAT_LINE IS NULL OR m.WIKIPEDIA_FORMAT_LINE = '') "
+                            "  AND (m.COLOR_SOURCE IS NULL OR m.COLOR_SOURCE = 'wikidata') "
+                            "  AND (m.COLOR_SOURCE IS NULL "
+                            "       OR COALESCE(m.IS_COLOR, -1) <> c.HAS_COLOR "
+                            "       OR COALESCE(m.IS_BLACK_AND_WHITE, -1) <> c.HAS_BLACK_AND_WHITE)"
+                        )
+                        cursor2.execute(strsqlwikidatacolourupdate, (strwikidatacolourrunstart, strwikidatacolourrunstart))
+                        lngwikidatacolourupdated = cursor2.rowcount
+                        cp.connectioncp.commit()
+                        print(f"  {lngwikidatacolourupdated} movie(s) received colour flags from Wikidata")
+
+                        # 3. Le cas inverse, rare : un film signe 'wikidata' dont l'item n'a
+                        #    plus de P462 (statement retire entre deux dumps). Flags et
+                        #    signature effaces, sinon un fait disparu de la source survivrait.
+                        strsqlwikidatacolourclear = (
+                            "UPDATE T_WC_TMDB_MOVIE m "
+                            "LEFT JOIN T_WC_TMP_WIKIDATA_COLOUR c ON c.ID_WIKIDATA = m.ID_WIKIDATA "
+                            "SET m.IS_COLOR = NULL, "
+                            "    m.IS_BLACK_AND_WHITE = NULL, "
+                            "    m.COLOR_SOURCE = NULL, "
+                            "    m.TIM_COLOR_SOURCE = %s, "
+                            "    m.TIM_UPDATED = %s "
+                            "WHERE m.COLOR_SOURCE = 'wikidata' "
+                            "  AND (m.WIKIPEDIA_FORMAT_LINE IS NULL OR m.WIKIPEDIA_FORMAT_LINE = '') "
+                            "  AND c.ID_WIKIDATA IS NULL"
+                        )
+                        cursor2.execute(strsqlwikidatacolourclear, (strwikidatacolourrunstart, strwikidatacolourrunstart))
+                        lngwikidatacolourcleared = cursor2.rowcount
+                        cp.connectioncp.commit()
+                        if lngwikidatacolourcleared > 0:
+                            print(f"  ⚠️ {lngwikidatacolourcleared} movie(s) lost their Wikidata colour flags (P462 gone from the item)")
+
+                        # 4. La jonction, lignes color_movie / black_and_white_movie seulement,
+                        #    pour les films touches par ce passage (TIM_COLOR_SOURCE = debut du
+                        #    run, ce qui inclut les films effaces au 3). Ensembliste : un DELETE
+                        #    cible, deux INSERT ... SELECT. Les lignes silent / 3d / aspect_ratio
+                        #    ne sont pas touchees, ce processus ne sait rien d'elles.
+                        arrwikidatacolourclassid, _arrwikidatacolourratioid = load_technical_ids(cursor)
+                        lngwikidatacolourcolorid = int(arrwikidatacolourclassid['color_movie'])
+                        lngwikidatacolourbwid = int(arrwikidatacolourclassid['black_and_white_movie'])
+                        strsqlwikidatacolourjunctiondelete = (
+                            "DELETE mt FROM T_WC_T2S_MOVIE_TECHNICAL mt "
+                            "JOIN T_WC_TMDB_MOVIE m ON m.ID_MOVIE = mt.ID_MOVIE "
+                            "WHERE m.TIM_COLOR_SOURCE = %s "
+                            "  AND (m.COLOR_SOURCE = 'wikidata' OR m.COLOR_SOURCE IS NULL) "
+                            "  AND mt.ID_TECHNICAL IN (%s, %s)"
+                        )
+                        cursor2.execute(
+                            strsqlwikidatacolourjunctiondelete,
+                            (strwikidatacolourrunstart, lngwikidatacolourcolorid, lngwikidatacolourbwid),
+                        )
+                        for lngwikidatacolourtechid, strwikidatacolourflag, intwikidatacolourorder in (
+                            (lngwikidatacolourcolorid, "IS_COLOR", 1),
+                            (lngwikidatacolourbwid, "IS_BLACK_AND_WHITE", 2),
+                        ):
+                            strsqlwikidatacolourjunctioninsert = (
+                                "INSERT INTO T_WC_T2S_MOVIE_TECHNICAL "
+                                "(ID_MOVIE, ID_TECHNICAL, DISPLAY_ORDER, DELETED, DAT_CREAT, TIM_UPDATED, "
+                                " ID_CREATOR, ID_OWNER, ID_USER_UPDATED) "
+                                "SELECT m.ID_MOVIE, %s, %s, 0, CURDATE(), %s, %s, %s, %s "
+                                "FROM T_WC_TMDB_MOVIE m "
+                                "WHERE m.TIM_COLOR_SOURCE = %s "
+                                "  AND m.COLOR_SOURCE = 'wikidata' "
+                                "  AND m." + strwikidatacolourflag + " = 1"
+                            )
+                            cursor2.execute(
+                                strsqlwikidatacolourjunctioninsert,
+                                (lngwikidatacolourtechid, intwikidatacolourorder, strwikidatacolourrunstart,
+                                 cp.lnguseridsession, cp.lnguseridsession, cp.lnguseridsession,
+                                 strwikidatacolourrunstart),
+                            )
+                            lngwikidatacolourjunctionrows += cursor2.rowcount
+                        cp.connectioncp.commit()
+                        refresh_technical_movie_count(cp.connectioncp)
+                        print(f"  {lngwikidatacolourjunctionrows} junction row(s) written for color_movie / black_and_white_movie")
+
+                        cursor2.execute("DROP TEMPORARY TABLE IF EXISTS T_WC_TMP_WIKIDATA_COLOUR")
+                        cp.connectioncp.commit()
+
+                        # 5. Comptes et temoins pour le monitoring. L'erreur est blanchie sur
+                        #    succes : le silence ne doit jamais se lire comme un succes.
+                        cursor2.execute(
+                            "SELECT COALESCE(COLOR_SOURCE, 'none') AS COLOR_SOURCE, COUNT(*) AS N "
+                            "FROM T_WC_TMDB_MOVIE GROUP BY COALESCE(COLOR_SOURCE, 'none')"
+                        )
+                        for arrwikidatacolourrow in cursor2.fetchall():
+                            strwikidatacoloursource = str(arrwikidatacolourrow['COLOR_SOURCE']).replace('_', '')
+                            cp.f_setservervariable(
+                                "strtmdbmoviepreprocesscoloursource" + strwikidatacoloursource + "count",
+                                str(arrwikidatacolourrow['N']),
+                                "Movies whose colour flags come from " + str(arrwikidatacolourrow['COLOR_SOURCE']) + " (TMDB-MOVIE-PREPROCESS-049)",
+                                0,
+                            )
+                        cp.f_setservervariable("strtmdbmoviepreprocesswikidatacolouritemscount", str(lngwikidatacolouritems), "Wikidata items carrying P462 colour or black-and-white in the last WIKIDATA_COLOR run", 0)
+                        cp.f_setservervariable("strtmdbmoviepreprocesswikidatacolourupdatedcount", str(lngwikidatacolourupdated), "Movies whose colour flags were set from Wikidata P462 in the last run", 0)
+                        cp.f_setservervariable("strtmdbmoviepreprocesswikidatacolourclearedcount", str(lngwikidatacolourcleared), "Movies whose Wikidata colour flags were cleared in the last run (P462 gone)", 0)
+                        cp.f_setservervariable("strtmdbmoviepreprocesswikidatacolourjunctionrowscount", str(lngwikidatacolourjunctionrows), "Junction rows color_movie / black_and_white_movie written by the last WIKIDATA_COLOR run", 0)
+                        cp.f_setservervariable("strtmdbmoviepreprocesswikidatacolourlastrun", strwikidatacolourrunstart, "Start datetime of the last successful WIKIDATA_COLOR run", 0)
+                        cp.f_setservervariable(strwikidatacolourerrorvar, "", strwikidatacolourerrordesc, 0)
+                        if telcopy is not None:
+                            # set_processed() et non une affectation directe (voir 72).
+                            telcopy.set_processed(lngwikidatacolourupdated + lngwikidatacolourcleared)
+                        print(f"WIKIDATA_COLOR complete: {lngwikidatacolourupdated} updated, {lngwikidatacolourcleared} cleared, {lngwikidatacolouritems} items read")
+                    except Exception as errwikidatacolour:
+                        try:
+                            cp.connectioncp.rollback()
+                        except Exception:
+                            pass
+                        strwikidatacolourerror = f"{type(errwikidatacolour).__name__}: {errwikidatacolour}"
+                        print(f"❌ WIKIDATA_COLOR failed, continuing with the next process: {strwikidatacolourerror}")
+                        cp.f_setservervariable(strwikidatacolourerrorvar, strwikidatacolourerror[:250], strwikidatacolourerrordesc, 0)
 
                 elif intindex == 71:
                     #----------------------------------------------------

@@ -1201,6 +1201,12 @@ def batch_update_data(connection, df, batch_size=1000):
                 arrmoviecouples["NUM_AUDIO_TRACKS"] = 0
             
             arrmoviecouples["IS_VALID_FORMAT"] = row['IS_VALID_FORMAT']
+            # TMDB-MOVIE-PREPROCESS-049 : provenance of the colour flags. The parse
+            # signs 'format_line'; process 64 signs 'wikidata' on its own and never
+            # touches a movie carrying this signature or a non-empty Format line.
+            if 'COLOR_SOURCE' in processed_df.columns:
+                arrmoviecouples["COLOR_SOURCE"] = row['COLOR_SOURCE']
+                arrmoviecouples["TIM_COLOR_SOURCE"] = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
             #print("\nArrmoviecouples:")
             #print(arrmoviecouples)
             #time.sleep(5)
