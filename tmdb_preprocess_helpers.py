@@ -2272,20 +2272,88 @@ def f_buildlocationtables():
         _f_locationstep(cursor, "1b. CREATE T_WC_T2S_LOCATION_BUILD",
                         "CREATE TABLE T_WC_T2S_LOCATION_BUILD LIKE T_WC_T2S_LOCATION")
         connection.commit()
-        arrresult["lieux"] = _f_locationstep(cursor, "1c. INSERT des lieux", (
-            "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
-            "    (ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
-            "     LOCATION_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
-            "SELECT lieux.ID_WIKIDATA,\n"
+        # --- 1c. Les lieux, en trois insertions, POUR QUE ID_LOCATION NE BOUGE PAS ----
+        # ⚠ CORRIGE LE 2026-09-13. La premiere version inserait sans ID_LOCATION dans une
+        # table creee LIKE la table servie : l'AUTO_INCREMENT renumerotait les lieux a
+        # chaque nuit. Un identifiant qui change chaque nuit n'en est pas un : un lien
+        # /locations/{id}, une assertion d'evaluation, un document Chroma cle dessus
+        # pointaient ailleurs le lendemain, sans erreur. ID_LOCATION se comporte
+        # desormais comme ID_GROUP ou ID_AWARD : attribue une fois, jamais reattribue.
+        #
+        #   (0)   le perimetre est materialise une fois : la requete pilote est la partie
+        #         couteuse, et elle sert trois fois ;
+        #   (i)   un lieu deja connu garde son ID_LOCATION et sa DAT_CREAT ;
+        #   (ii)  un lieu sorti du perimetre reste, DELETED = 1, pour que son numero ne
+        #         soit jamais reattribue et qu'un consommateur lise « supprime » plutot
+        #         que rien, la convention DELETED des tables T2S ; ses associations et
+        #         ses compteurs tombent a zero d'eux-memes, le perimetre ne le cite plus ;
+        #   (iii) un lieu nouveau recoit un numero au-dela de tout numero deja attribue,
+        #         le compteur etant aligne explicitement sur MAX(ID_LOCATION) de la table
+        #         servie, parce que CREATE TABLE ... LIKE ne reporte pas le compteur, et
+        #         parce qu'aucune ligne n'etant plus jamais retiree, ce MAX est le vrai
+        #         plus haut numero jamais attribue.
+        # Trois insertions et non une seule melant ID explicites et NULL : dans un meme
+        # INSERT ... SELECT, l'AUTO_INCREMENT peut attribuer a une ligne NULL un numero
+        # qu'une ligne explicite apporte plus loin, et c'est une cle dupliquee.
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieux")
+        cursor.execute("CREATE TEMPORARY TABLE tmp_lieux (ID_WIKIDATA VARCHAR(20) NOT NULL PRIMARY KEY) "
+                       "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")
+        arrresult["perimetre"] = _f_locationstep(cursor, "1c-0. INSERT du perimetre (tmp_lieux)", (
+            "INSERT INTO tmp_lieux (ID_WIKIDATA)\n"
+            "SELECT lieux.ID_WIKIDATA\n"
+            "FROM (\n" + STR_LOCATION_DRIVING + ") lieux\n"
+            "WHERE lieux.ID_WIKIDATA IS NOT NULL AND lieux.ID_WIKIDATA <> ''"))
+        connection.commit()
+        strlabels = (
             "       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.en')),\n"
             "                NULLIF(wi.LABEL_EN, '')),\n"
             "       JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.fr')),\n"
             "       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.DESCRIPTIONS_JSON, '$.en')),\n"
             "                NULLIF(wi.DESCRIPTION_EN, '')),\n"
-            "       'wikidata', 0, CURDATE(), NOW()\n"
-            "FROM (\n" + STR_LOCATION_DRIVING + ") lieux\n"
+        )
+        arrresult["lieux_conserves"] = _f_locationstep(cursor, "1c-i. INSERT des lieux connus (ID_LOCATION conserve)", (
+            "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
+            "    (ID_LOCATION, ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
+            "     LOCATION_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
+            "SELECT old.ID_LOCATION, lieux.ID_WIKIDATA,\n" + strlabels +
+            "       'wikidata', 0, COALESCE(old.DAT_CREAT, CURDATE()), NOW()\n"
+            "FROM tmp_lieux lieux\n"
+            "INNER JOIN T_WC_T2S_LOCATION old ON old.ID_WIKIDATA = lieux.ID_WIKIDATA\n"
             "LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = lieux.ID_WIKIDATA"))
         connection.commit()
+        arrresult["lieux_supprimes"] = _f_locationstep(cursor, "1c-ii. INSERT des lieux sortis du perimetre (DELETED = 1)", (
+            "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
+            "    (ID_LOCATION, ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
+            "     LOCATION_SOURCE, LOCATION_TYPE, DELETED, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT,\n"
+            "     ID_OWNER, TIM_UPDATED, ID_USER_UPDATED, POSTER_PATH, WIKIPEDIA_IMAGE_PATH,\n"
+            "     TIM_WIKIDATA_COMPLETED, WIKIPEDIA_MAIN_IMAGE_URL, WIKIPEDIA_MAIN_IMAGE_URL_FR)\n"
+            "SELECT old.ID_LOCATION, old.ID_WIKIDATA, old.LOCATION_NAME, old.LOCATION_NAME_FR, old.OVERVIEW,\n"
+            "       old.LOCATION_SOURCE, old.LOCATION_TYPE, 1, old.DISPLAY_ORDER, old.ID_CREATOR, old.DAT_CREAT,\n"
+            "       old.ID_OWNER, CASE WHEN old.DELETED = 1 THEN old.TIM_UPDATED ELSE NOW() END, old.ID_USER_UPDATED,\n"
+            "       old.POSTER_PATH, old.WIKIPEDIA_IMAGE_PATH,\n"
+            "       old.TIM_WIKIDATA_COMPLETED, old.WIKIPEDIA_MAIN_IMAGE_URL, old.WIKIPEDIA_MAIN_IMAGE_URL_FR\n"
+            "FROM T_WC_T2S_LOCATION old\n"
+            "WHERE NOT EXISTS (SELECT 1 FROM tmp_lieux lieux WHERE lieux.ID_WIKIDATA = old.ID_WIKIDATA)"))
+        connection.commit()
+        cursor.execute("SELECT COALESCE(MAX(ID_LOCATION), 0) AS M FROM T_WC_T2S_LOCATION")
+        lngnextlocationid = int(cursor.fetchone()["M"]) + 1
+        _f_locationstep(cursor, f"1c-iii-0. ALTER AUTO_INCREMENT = {lngnextlocationid}",
+                        f"ALTER TABLE T_WC_T2S_LOCATION_BUILD AUTO_INCREMENT = {lngnextlocationid}")
+        arrresult["lieux_nouveaux"] = _f_locationstep(cursor, "1c-iii. INSERT des lieux nouveaux (ID_LOCATION attribue)", (
+            "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
+            "    (ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
+            "     LOCATION_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
+            "SELECT lieux.ID_WIKIDATA,\n" + strlabels +
+            "       'wikidata', 0, CURDATE(), NOW()\n"
+            "FROM tmp_lieux lieux\n"
+            "LEFT JOIN T_WC_T2S_LOCATION old ON old.ID_WIKIDATA = lieux.ID_WIKIDATA\n"
+            "LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = lieux.ID_WIKIDATA\n"
+            "WHERE old.ID_LOCATION IS NULL"))
+        connection.commit()
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieux")
+        arrresult["lieux"] = arrresult["lieux_conserves"] + arrresult["lieux_nouveaux"]
+        print(f"72:   1c. {arrresult['lieux_conserves']} lieux conserves, {arrresult['lieux_nouveaux']} nouveaux "
+              f"(a partir de {lngnextlocationid}), {arrresult['lieux_supprimes']} sortis du perimetre gardes en DELETED = 1")
 
         # --- 2. Le type, par jointure sur les cones --------------------------
         # DEUX NIVEAUX DE PRIORITE, et il faut les deux.

@@ -7332,10 +7332,20 @@ ORDER BY COMPTE DESC
                         print(f"72: FAILED, the served tables are unchanged: {strlocationerror}")
                         print("72: the rest of the pipeline continues. Re-run with TMDB_PREPROCESS_SCOPE=locations once wikidata-crawler is idle.")
                         cp.f_setservervariable("strtmdbmoviepreprocesslocationerror", strlocationerror, "Last error of the location rebuild (process 72), empty when it succeeded", 0)
-                    print(f"72: {arrlocationcounts.get('lieux', 0)} locations, "
+                    print(f"72: {arrlocationcounts.get('lieux', 0)} locations "
+                          f"({arrlocationcounts.get('lieux_conserves', 0)} kept their ID_LOCATION, "
+                          f"{arrlocationcounts.get('lieux_nouveaux', 0)} new, "
+                          f"{arrlocationcounts.get('lieux_supprimes', 0)} left the perimeter and stay as DELETED = 1), "
                           f"{arrlocationcounts.get('movie', 0)} movie links, "
                           f"{arrlocationcounts.get('serie', 0)} serie links, "
                           f"{arrlocationcounts.get('sans_type', 0)} without a type")
+                    # Les trois comptes de l'etape 1c en variables serveur : c'est la trace qui
+                    # prouve, nuit apres nuit, que l'identifiant est conserve (correctif du 2026-09-13).
+                    for strlocationcountkey, strlocationcountsuffix, strlocationcountdesc in (
+                            ("lieux_conserves", "kept", "Locations that kept their ID_LOCATION"),
+                            ("lieux_nouveaux", "new", "New locations, ID_LOCATION assigned above the previous maximum"),
+                            ("lieux_supprimes", "deleted", "Locations that left the perimeter, kept as DELETED = 1")):
+                        cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strlocationcountsuffix, str(arrlocationcounts.get(strlocationcountkey, 0)), strlocationcountdesc + " (process 72)", 0)
                     # ⚠ strlocationdesc et NON strdesc : la variable de boucle du pipeline
                     # s'appelle strdesc (ligne 326) et sert APRES le bloc, au classement des
                     # durees et a la description de la variable serveur du temps ecoule. La
