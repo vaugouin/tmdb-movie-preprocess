@@ -4269,18 +4269,57 @@ WHERE t2s.ID_IMDB IS NOT NULL
                         for lngserierangestart in range(1, lngserierangemax + 1, lngchunksize):
                             lngserierangeend = min(lngserierangestart + lngchunksize - 1, lngserierangemax)
                             cp.f_setservervariable("strtmdbmoviepreprocesscurrentserieid",str(lngserierangestart),"Current serie ID in the TMDb database preprocess (Wikidata enrichment)",0)
+                            # ---- TMDB-MOVIE-PREPROCESS-046, volet Criterion des series, 2026-09-15 ----
+                            # L'enonce ci-dessous enrichissait CINQ colonnes derriere une seule jointure
+                            # V1. Or une seule d'entre elles a besoin de cette jointure : WIKIDATA_TITLE,
+                            # qui lit w.TITLE. Les quatre autres se calculent sur les statements V2 a
+                            # partir de t2s.ID_WIKIDATA et ne nomment jamais w. La jointure ne leur
+                            # apportait rien, elle leur retirait une population : toute serie absente de
+                            # T_WC_WIKIDATA_SERIE_V1 restait vide, meme quand V2 portait la valeur.
+                            #
+                            # Le cas temoin est celui du ticket. Dekalog (42699, Q59783) est membre de la
+                            # collection Criterion, appartenance calculee en V2 par le processus 41, et
+                            # porte P12279 = 837 dans ces memes statements V2, que la page serie du front
+                            # affiche. Sa colonne ID_CRITERION_SPINE etait pourtant vide, faute de ligne V1.
+                            #
+                            # POURQUOI CECI N'ATTEND PAS -042, contrairement a ce que dit le ticket. -046
+                            # y etait ecrit comme "faire tomber la jointure", ce qui suppose que
+                            # WIKIDATA_TITLE trouve sa source ailleurs, donc -042, donc WIKIDATA-CRAWLER-017.
+                            # On ne la fait pas tomber : on la laisse exactement la ou elle sert, sur le
+                            # libelle, et on en sort les colonnes qui n'en avaient pas besoin. Le blocage
+                            # amont porte sur le libelle, pas sur les identifiants externes.
+                            #
+                            # PERIMETRE DELIBEREMENT ETROIT : les deux colonnes Criterion seulement.
+                            # PLEX_MEDIA_KEY et INSTANCE_OF sont dans le meme cas et appellent le meme
+                            # traitement, mais elargir leur population touche l'integration Plex et la
+                            # classification, deux sujets qui meritent leur propre recette. Le jumeau
+                            # film (processus 4) porte le meme defaut, laisse en l'etat pour la meme raison.
                             strsqlseries = f"""
 UPDATE T_WC_T2S_SERIE t2s
 INNER JOIN T_WC_WIKIDATA_SERIE_V1 w
     ON t2s.ID_WIKIDATA = w.ID_WIKIDATA
 SET t2s.WIKIDATA_TITLE = w.TITLE,
     t2s.PLEX_MEDIA_KEY = {strsqlplex},
-    t2s.ID_CRITERION = {strsqlcriterion},
-    t2s.ID_CRITERION_SPINE = {strsqlspine},
     t2s.INSTANCE_OF = {strsqlinstanceof}
 WHERE t2s.ID_SERIE BETWEEN {lngserierangestart} AND {lngserierangeend}
     AND t2s.ID_IMDB IS NOT NULL
     AND t2s.ID_IMDB <> '' """
+                            cursor2.execute(strsqlseries)
+                            cp.connectioncp.commit()
+                            # Les deux colonnes Criterion, sur la population V2. Meme tranche et meme
+                            # filtre ID_IMDB que son jumeau ci-dessus, plus la seule condition que les
+                            # sous-requetes demandent vraiment : un ID_WIKIDATA a interroger. Une serie
+                            # sans statement V2 recoit NULL, qui est la valeur juste pour "absent", et
+                            # non la conservation d'une valeur que plus rien ne soutient.
+                            strsqlseries = f"""
+UPDATE T_WC_T2S_SERIE t2s
+SET t2s.ID_CRITERION = {strsqlcriterion},
+    t2s.ID_CRITERION_SPINE = {strsqlspine}
+WHERE t2s.ID_SERIE BETWEEN {lngserierangestart} AND {lngserierangeend}
+    AND t2s.ID_IMDB IS NOT NULL
+    AND t2s.ID_IMDB <> ''
+    AND t2s.ID_WIKIDATA IS NOT NULL
+    AND t2s.ID_WIKIDATA <> '' """
                             cursor2.execute(strsqlseries)
                             cp.connectioncp.commit()
 
