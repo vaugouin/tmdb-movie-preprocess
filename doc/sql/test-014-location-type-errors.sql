@@ -3,7 +3,10 @@
 -- ============================================================================
 --
 -- LECTURE SEULE. Ecrit le 2026-09-15, avant toute modification des cones, pour servir
--- de mesure AVANT au retravail du defaut 2.
+-- de mesure AVANT au retravail du defaut 2. Le motif de la section F a ete REPARE le
+-- 2026-09-16 (version 2, voir la section) : le releve du 2026-09-15 comptait 579 erreurs
+-- dont une bonne part n'en etait pas, et ce chiffre-la est PERIME. Relancer le fichier
+-- sur la table inchangee : c'est le nouveau releve qui est la mesure AVANT.
 --
 --   mysql --force -t vaugouindb < doc/sql/test-014-location-type-errors.sql \
 --       > doc/sql/test-014-location-type-errors-AAAAMMJJ.txt 2>&1
@@ -31,7 +34,9 @@
 --      sources issues de Wikidata par des chemins differents, le cone P31 d'un cote et
 --      la description de l'autre, se contredisent de facon incompatible. Chaque ligne
 --      comptee est une erreur reelle ; les erreurs non comptees sont inconnues. Le
---      chiffre se lit « au moins N », jamais « N ».
+--      chiffre se lit « au moins N », jamais « N ». Le couple city / region, seul
+--      desaccord dont les deux membres peuvent etre vrais a la fois, est compte A PART
+--      en F3-bis et ne s'ajoute jamais au precedent.
 --   3. IL GELE UN ECHANTILLON A JUGER A LA MAIN (section H). C'est la seule voie vers un
 --      TAUX d'erreur. L'echantillon est deterministe, donc le meme avant et apres le
 --      retravail, ce que la stabilite d'ID_LOCATION acquise le 2026-09-13 rend possible
@@ -311,9 +316,47 @@ LIMIT 40;
 --    sont pas jugeables et sont comptes a part : c'est la couverture de la mesure, et
 --    sans elle la borne se lirait comme un taux.
 --
---    L'ORDRE DU CASE REJOUE L'ORDRE DES CONES, et pour la meme raison : « fictional
---    town » contient « town », donc fiction doit etre teste avant city, sans quoi toute
---    la fiction serait comptee comme ville.
+-- ===========================================================================
+-- VERSION 2, 2026-09-16. LA VERSION 1 COMPTAIT 579 ERREURS DONT UNE BONNE PART
+-- N'EN ETAIT PAS, ET LA FAUTE ETAIT DANS L'ORDRE.
+-- ===========================================================================
+--
+-- La version 1 testait les familles de mots DANS L'ORDRE DES CONES, en se disant que
+-- « fictional town » contient « town » et que fiction devait donc passer avant city.
+-- Le raisonnement etait juste sur son exemple et faux sur le principe : une description
+-- n'est pas une classe, c'est une PHRASE, et une phrase se lit de gauche a droite.
+-- Quatre familles de faux positifs l'ont montre sur le releve du 2026-09-15 :
+--
+--   « country house near Woodstock »        country avant house    -> Blenheim en pays
+--   « railway terminal in New York City »   city  avant terminal   -> Grand Central en ville
+--   « capital city [...] Salt Lake County » lake  avant city       -> Salt Lake City en relief
+--   « city on the Neckar river »            river avant city       -> Stuttgart en relief
+--   « department store in Paris »           department avant store -> Galeries Lafayette en region
+--   « state park in California »            state avant park       -> Leo Carrillo en region
+--   « theatre of WWI in France »            theatre                -> le front de l'Ouest en batiment
+--
+-- LE MOTIF COMMUN : une description Wikidata annonce son GENRE en tete, puis nomme ce
+-- qui CONTIENT l'objet (« station in Tende », « city of the state of Utah »). Un test
+-- par priorite de cone lit le contenant aussi volontiers que le genre, et rien ne les
+-- distingue. Un test PAR POSITION lit le genre, parce que le genre est en tete.
+--
+-- D'OU LA VERSION 2 : on releve la POSITION du premier mot de chaque famille avec
+-- REGEXP_INSTR, et le type retenu est celui dont le mot apparait LE PLUS TOT. L'ordre
+-- des cones ne sert plus qu'a departager une egalite, cas qui ne se produit que si un
+-- meme mot figure dans deux familles.
+--
+-- ⚠ ET LE CAS QUI AVAIT MOTIVE LA VERSION 1 SE REGLE TOUT SEUL : dans « fictional town »,
+-- « fictional » est en position 1 et « town » en position 11, donc fiction gagne par
+-- position. La regle generale couvre le cas particulier, ce qui est le signe qu'elle est
+-- la bonne.
+--
+-- TROIS LOOKAHEADS NEGATIFS restent necessaires, pour les locutions ou le mot de tete
+-- n'est pas le genre : « country house », « department store », « state park ». Ce sont
+-- des exceptions nommees, pas une regle, et elles se lisent comme telles.
+--
+-- ⚠ COMPARABILITE : le chiffre rendu ici N'EST PAS comparable aux 579 du 2026-09-15, qui
+-- mesuraient un motif casse. Relancer ce fichier sur la table INCHANGEE avant de toucher
+-- aux cones : c'est ce releve-la qui est la mesure AVANT.
 -- ---------------------------------------------------------------------------
 SELECT 'F. Desaccords entre le type et la description Wikidata' AS SECTION;
 
@@ -321,37 +364,74 @@ DROP TEMPORARY TABLE IF EXISTS TMP_LOC_INDICE;
 CREATE TEMPORARY TABLE TMP_LOC_INDICE (
   ID_LOCATION   INT         NOT NULL,
   STOCKE        VARCHAR(20) NULL,
+  POS_FICTION   INT         NOT NULL DEFAULT 0,
+  POS_COUNTRY   INT         NOT NULL DEFAULT 0,
+  POS_CITY      INT         NOT NULL DEFAULT 0,
+  POS_ISLAND    INT         NOT NULL DEFAULT 0,
+  POS_STRUCTURE INT         NOT NULL DEFAULT 0,
+  POS_NATURE    INT         NOT NULL DEFAULT 0,
+  POS_REGION    INT         NOT NULL DEFAULT 0,
+  POS_MIN       INT         NOT NULL DEFAULT 999999,
   INDICE        VARCHAR(20) NULL,
   INCOMPATIBLE  TINYINT     NOT NULL DEFAULT 0,
+  DISCUTABLE    TINYINT     NOT NULL DEFAULT 0,
   PRIMARY KEY (ID_LOCATION),
   KEY IDX_PAIRE (STOCKE, INDICE),
-  KEY IDX_INCOMPATIBLE (INCOMPATIBLE)
+  KEY IDX_INCOMPATIBLE (INCOMPATIBLE),
+  KEY IDX_DISCUTABLE (DISCUTABLE)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO TMP_LOC_INDICE (ID_LOCATION, STOCKE, INDICE)
+-- REGEXP_INSTR rend la position du premier mot trouve, et 0 quand la famille est absente.
+-- La collation utf8mb4_unicode_ci rend la comparaison insensible a la casse, ce qui est
+-- voulu : « City » en tete de description et « city » au fil du texte sont le meme mot.
+INSERT INTO TMP_LOC_INDICE
+    (ID_LOCATION, STOCKE, POS_FICTION, POS_COUNTRY, POS_CITY, POS_ISLAND,
+     POS_STRUCTURE, POS_NATURE, POS_REGION)
 SELECT loc.ID_LOCATION,
        loc.LOCATION_TYPE,
-       CASE
-         WHEN loc.OVERVIEW IS NULL OR loc.OVERVIEW = '' THEN NULL
-         WHEN loc.OVERVIEW REGEXP '\\b(fictional|fictitious|imaginary)\\b'      THEN 'fiction'
-         WHEN loc.OVERVIEW REGEXP '\\b(sovereign state|country)\\b'             THEN 'country'
-         WHEN loc.OVERVIEW REGEXP '\\b(island|archipelago|islet)\\b'            THEN 'island'
-         WHEN loc.OVERVIEW REGEXP
-              '\\b(station|airport|building|museum|castle|palace|theatre|theater|cinema|stadium|arena|prison|jail|bridge|street|avenue|boulevard|church|cathedral|temple|hotel|restaurant|school|university|hospital|tower|studio|factory|lighthouse|monument|railway line|metro line|tram line)\\b'
-                                                                               THEN 'structure'
-         WHEN loc.OVERVIEW REGEXP
-              '\\b(river|mountain|mountains|lake|beach|forest|desert|valley|glacier|volcano|waterfall|canyon|bay|cave|peak|sea|ocean)\\b'
-                                                                               THEN 'nature'
-         WHEN loc.OVERVIEW REGEXP
-              '\\b(city|town|village|municipality|commune|borough|hamlet|capital|settlement|metropolis)\\b'
-                                                                               THEN 'city'
-         WHEN loc.OVERVIEW REGEXP
-              '\\b(region|province|county|district|department|prefecture|canton|state|territory|oblast)\\b'
-                                                                               THEN 'region'
-         ELSE NULL
-       END
+       REGEXP_INSTR(COALESCE(loc.OVERVIEW, ''),
+           '\\b(fictional|fictitious|imaginary|mythological|mythical|legendary)\\b'),
+       -- ⚠ « country house » est une maison, pas un pays. Exception nommee.
+       REGEXP_INSTR(COALESCE(loc.OVERVIEW, ''),
+           '\\bcountry\\b(?!\\s+(house|home|estate|seat|club|park|lane|road))|\\b(sovereign state|nation state|republic|kingdom|empire)\\b'),
+       REGEXP_INSTR(COALESCE(loc.OVERVIEW, ''),
+           '\\b(city|cities|town|village|hamlet|municipality|commune|borough|capital|settlement|metropolis|suburb|neighborhood|neighbourhood|township|locality|parish|urban area)\\b'),
+       REGEXP_INSTR(COALESCE(loc.OVERVIEW, ''),
+           '\\b(island|islands|archipelago|islet|atoll)\\b'),
+       -- ⚠ « theatre of WWI » est un front, pas une salle. Exception nommee.
+       REGEXP_INSTR(COALESCE(loc.OVERVIEW, ''),
+           '\\btheatre\\b(?!\\s+of\\s)|\\btheater\\b|\\b(station|terminal|airport|airfield|aerodrome|building|skyscraper|museum|castle|palace|chateau|fortress|fort|citadel|cinema|stadium|arena|prison|jail|penitentiary|bridge|tunnel|viaduct|aqueduct|street|avenue|boulevard|highway|motorway|church|cathedral|chapel|abbey|monastery|temple|mosque|synagogue|shrine|hotel|casino|restaurant|school|university|college|academy|institute|library|hospital|clinic|tower|lighthouse|monument|memorial|studio|factory|mill|brewery|winery|mine|farm|ranch|house|mansion|manor|villa|estate|store|shop|mall|market|square|plaza|park|garden|zoo|aquarium|cemetery|port|harbour|harbor|dock|dam|canal|railway|railroad|metro|subway|tramway|headquarters|barracks|observatory|bunker|pier)\\b'),
+       REGEXP_INSTR(COALESCE(loc.OVERVIEW, ''),
+           '\\b(river|stream|creek|mountain|mountains|mount|hill|hills|peak|summit|lake|loch|pond|beach|shore|coast|forest|woods|jungle|desert|dune|valley|gorge|canyon|ravine|glacier|volcano|crater|waterfall|falls|bay|gulf|cove|cave|cavern|sea|ocean|strait|fjord|reef|plateau|steppe|marsh|swamp|wetland|salt pan|salt flat|geyser|oasis|cliff)\\b'),
+       -- ⚠ « department store » et « state park » ne sont pas des divisions. Exceptions nommees.
+       REGEXP_INSTR(COALESCE(loc.OVERVIEW, ''),
+           '\\bdepartment\\b(?!\\s+store)|\\bstate\\b(?!\\s+(park|forest|highway|route|prison|penitentiary|university|college|school))|\\b(region|province|county|prefecture|canton|territory|oblast|voivodeship|governorate|autonomous community|comarca|shire)\\b')
 FROM T_WC_T2S_LOCATION loc
 WHERE COALESCE(loc.DELETED, 0) = 0;
+
+-- Le plus tot l'emporte. 999999 marque l'absence de tout mot connu, donc un lieu non
+-- jugeable, qu'il ait une description ou non.
+UPDATE TMP_LOC_INDICE
+SET POS_MIN = LEAST(COALESCE(NULLIF(POS_FICTION,   0), 999999),
+                    COALESCE(NULLIF(POS_COUNTRY,   0), 999999),
+                    COALESCE(NULLIF(POS_CITY,      0), 999999),
+                    COALESCE(NULLIF(POS_ISLAND,    0), 999999),
+                    COALESCE(NULLIF(POS_STRUCTURE, 0), 999999),
+                    COALESCE(NULLIF(POS_NATURE,    0), 999999),
+                    COALESCE(NULLIF(POS_REGION,    0), 999999));
+
+-- L'ordre des WHEN ne sert qu'a departager deux familles trouvees a la MEME position,
+-- ce qui suppose un mot present dans deux listes. Il n'y en a aucun aujourd'hui ; l'ordre
+-- est la pour que le jour ou il y en aura un, le resultat reste reproductible.
+UPDATE TMP_LOC_INDICE
+SET INDICE = CASE WHEN POS_MIN = 999999       THEN NULL
+                  WHEN POS_MIN = POS_FICTION   THEN 'fiction'
+                  WHEN POS_MIN = POS_COUNTRY   THEN 'country'
+                  WHEN POS_MIN = POS_CITY      THEN 'city'
+                  WHEN POS_MIN = POS_ISLAND    THEN 'island'
+                  WHEN POS_MIN = POS_STRUCTURE THEN 'structure'
+                  WHEN POS_MIN = POS_NATURE    THEN 'nature'
+                  WHEN POS_MIN = POS_REGION    THEN 'region' END;
 
 -- LA DEFINITION DE L'INCOMPATIBILITE, POSEE UNE SEULE FOIS. Les sections F3, F4 et I la
 -- lisent toutes les trois ; l'ecrire trois fois serait garantir qu'une des trois derive
@@ -360,10 +440,7 @@ WHERE COALESCE(loc.DELETED, 0) = 0;
 --
 -- SONT RETENUS LES SEULS COUPLES QUI NE PEUVENT PAS ETRE VRAIS TOUS LES DEUX : une
 -- riviere n'est pas une region, une gare n'est pas une ville, un lieu de fiction n'est
--- rien d'autre. Les couples DISCUTABLES sont volontairement laisses dehors (city contre
--- region pour une commune, structure contre city pour un quartier) : ils restent
--- visibles dans la matrice F2, et les compter gonflerait une borne dont toute la valeur
--- est qu'on puisse la citer sans la defendre.
+-- rien d'autre.
 UPDATE TMP_LOC_INDICE
 SET INCOMPATIBLE = 1
 WHERE INDICE IS NOT NULL
@@ -375,6 +452,20 @@ WHERE INDICE IS NOT NULL
        OR (INDICE = 'country'   AND STOCKE IN ('structure', 'nature', 'fiction'))
        OR (INDICE = 'city'      AND STOCKE IN ('structure', 'nature', 'fiction'))
        OR (INDICE = 'region'    AND STOCKE IN ('structure', 'nature', 'fiction')));
+
+-- ⚠ LE COUPLE city / region A SA PROPRE CASE, ET IL LE MERITE. C'est le plus gros
+-- desaccord de la matrice, et c'est aussi le seul dont les deux membres peuvent etre
+-- vrais a la fois : une commune francaise EST une entite administrative. Le compter en
+-- « certain » gonflerait un chiffre dont toute la valeur est qu'on puisse le citer sans
+-- le defendre ; ne pas le compter du tout cacherait la famille que la section E designe
+-- comme le premier defaut du corpus. Il est donc compte A PART, et les deux nombres ne
+-- s'additionnent jamais.
+UPDATE TMP_LOC_INDICE
+SET DISCUTABLE = 1
+WHERE INDICE IS NOT NULL
+  AND STOCKE IS NOT NULL
+  AND (   (INDICE = 'city'   AND STOCKE = 'region')
+       OR (INDICE = 'region' AND STOCKE = 'city'));
 
 SELECT 'F1. Couverture de la mesure' AS SECTION;
 
@@ -420,6 +511,19 @@ WHERE i.INCOMPATIBLE = 1
 GROUP BY i.STOCKE, i.INDICE
 ORDER BY ERREURS_CERTAINES DESC;
 
+-- Le couple city / region, compte a part et JAMAIS ajoute au precedent.
+SELECT 'F3-bis. Le couple city / region, la famille des communes' AS SECTION;
+
+SELECT i.STOCKE                                                         AS TYPE_STOCKE,
+       i.INDICE                                                         AS TYPE_PROBABLE,
+       COUNT(*)                                                         AS LIEUX,
+       SUM(COALESCE(loc.MOVIE_COUNT, 0) + COALESCE(loc.SERIE_COUNT, 0)) AS EXPOSITION
+FROM TMP_LOC_INDICE i
+INNER JOIN T_WC_T2S_LOCATION loc ON loc.ID_LOCATION = i.ID_LOCATION
+WHERE i.DISCUTABLE = 1
+GROUP BY i.STOCKE, i.INDICE
+ORDER BY LIEUX DESC;
+
 -- Les cent plus exposees de ces erreurs certaines, a lire pour nommer les familles.
 SELECT 'F4. Les erreurs certaines les plus exposees' AS SECTION;
 
@@ -432,6 +536,33 @@ INNER JOIN T_WC_T2S_LOCATION loc ON loc.ID_LOCATION = i.ID_LOCATION
 WHERE i.INCOMPATIBLE = 1
 ORDER BY EXPOSITION DESC, loc.ID_LOCATION
 LIMIT 100;
+
+-- ⚠ LA SECTION QUI SURVEILLE LE MOTIF LUI-MEME. La version 1 a rendu 579 erreurs sans
+-- que rien, dans sa sortie, ne permette de voir qu'une bonne part etait fausse : il a
+-- fallu lire les cent lignes de F4 une a une. Les sept temoins ci-dessous sont les cas
+-- exacts qui l'avaient cassee. Ils portent chacun le verdict attendu ; si l'un d'eux
+-- change, c'est le motif qui a bouge, pas le corpus, et la borne redevient suspecte.
+SELECT 'F5. Les temoins du motif, verdicts attendus en commentaire' AS SECTION;
+
+SELECT loc.ID_WIKIDATA, loc.LOCATION_NAME,
+       t.ATTENDU                                                        AS INDICE_ATTENDU,
+       i.INDICE                                                         AS INDICE_OBTENU,
+       CASE WHEN i.INDICE <=> t.ATTENDU THEN 'ok' ELSE '>>> ECART' END  AS VERDICT,
+       LEFT(loc.OVERVIEW, 70)                                           AS DESCRIPTION
+FROM (
+      SELECT 'Q208181'  AS QID, 'structure' AS ATTENDU   -- Blenheim Palace, « country house »
+  UNION ALL SELECT 'Q11290',   'structure'               -- Grand Central, « terminal in New York City »
+  UNION ALL SELECT 'Q23337',   'city'                    -- Salt Lake City, « capital city [...] Salt Lake County »
+  UNION ALL SELECT 'Q1022',    'city'                    -- Stuttgart, « city on the Neckar river »
+  UNION ALL SELECT 'Q218613',  'structure'               -- Galeries Lafayette, « department store »
+  UNION ALL SELECT 'Q6523617', 'structure'               -- Leo Carrillo State Park, « state park »
+  UNION ALL SELECT 'Q152989',  NULL                      -- Western Front, « theatre of WWI », non jugeable
+  UNION ALL SELECT 'Q97',      'nature'                  -- Atlantic Ocean, temoin de controle
+  UNION ALL SELECT 'Q25373',   'fiction'                 -- Atlantis, « mythological large island » : fiction avant island
+     ) t
+INNER JOIN T_WC_T2S_LOCATION loc ON loc.ID_WIKIDATA = t.QID
+LEFT JOIN TMP_LOC_INDICE i ON i.ID_LOCATION = loc.ID_LOCATION
+ORDER BY CASE WHEN i.INDICE <=> t.ATTENDU THEN 1 ELSE 0 END, loc.LOCATION_NAME;
 
 -- ---------------------------------------------------------------------------
 -- G. LES FAMILLES REPEREES A LA MAIN LE 2026-09-14
@@ -532,13 +663,13 @@ ORDER BY MD5(CONCAT('t2s-014-type-', loc.ID_LOCATION))
 LIMIT 100;
 
 -- ---------------------------------------------------------------------------
--- I. LES CINQ CHIFFRES A RECOPIER DANS LE TICKET
+-- I. LES SIX CHIFFRES A RECOPIER DANS LE TICKET
 --
 --    Ce sont ceux que le passage d'apres devra rendre meilleurs, et le seul moyen de
 --    savoir si le retravail a repare ou deplace le probleme. Les recopier tels quels
 --    dans TMDB-MOVIE-PREPROCESS-014, avec la date du releve.
 -- ---------------------------------------------------------------------------
-SELECT 'I. Le bilan en cinq nombres' AS SECTION;
+SELECT 'I. Le bilan en six nombres' AS SECTION;
 
 SELECT (SELECT COUNT(*) FROM T_WC_T2S_LOCATION WHERE COALESCE(DELETED, 0) = 0)
                                                                         AS LIEUX_VIVANTS,
@@ -548,7 +679,10 @@ SELECT (SELECT COUNT(*) FROM T_WC_T2S_LOCATION WHERE COALESCE(DELETED, 0) = 0)
           FROM T_WC_T2S_LOCATION
          WHERE COALESCE(DELETED, 0) = 0 AND LOCATION_TYPE IS NULL)      AS EXPOSITION_SANS_TYPE,
        (SELECT COUNT(*) FROM TMP_LOC_VERDICT WHERE CANDIDATS >= 2)      AS LIEUX_CONTESTES,
-       (SELECT COUNT(*) FROM TMP_LOC_INDICE WHERE INCOMPATIBLE = 1)     AS ERREURS_CERTAINES;
+       (SELECT COUNT(*) FROM TMP_LOC_INDICE WHERE INCOMPATIBLE = 1)     AS ERREURS_CERTAINES,
+       -- ⚠ NE JAMAIS ADDITIONNER CETTE COLONNE A LA PRECEDENTE : l'une compte des
+       -- desaccords impossibles, l'autre une famille ou les deux types se defendent.
+       (SELECT COUNT(*) FROM TMP_LOC_INDICE WHERE DISCUTABLE = 1)       AS CITY_CONTRE_REGION;
 
 DROP TEMPORARY TABLE IF EXISTS TMP_LOC_CANDIDATE;
 DROP TEMPORARY TABLE IF EXISTS TMP_LOC_CANDIDATE_BIS;
