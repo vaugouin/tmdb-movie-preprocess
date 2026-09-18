@@ -7233,15 +7233,33 @@ ORDER BY COMPTE DESC
                     # and rewrite ASSERTIONS_QUERY_RESULT = "<ID_COL> IN (...)" so
                     # time-varying samples (e.g. "trending series") stay current.
                     # Runs LAST in the pipeline, after POPULARITY (Process 5) is fresh.
-                    # Guardrails: single read-only SELECT, exactly one ID_* column,
-                    # per-statement timeout, and a cap on the number of ids written (a
-                    # refresh SQL missing its LIMIT would otherwise write 100k+ ids -> a
-                    # ~1 MB assertion that bloats /samples); skip + log on anything else.
+                    # Guardrails: single read-only SELECT, one ID_* column (optionally
+                    # plus a CONTENT_TYPE discriminator, see below), per-statement
+                    # timeout, and a cap on the number of ids written (a refresh SQL
+                    # missing its LIMIT would otherwise write 100k+ ids -> a ~1 MB
+                    # assertion that bloats /samples); skip + log on anything else.
+                    #
+                    # TYPED (two-column) MODE. A movie+series question resolves to an
+                    # ID_CONTENT list whose integers are ambiguous: the two id spaces
+                    # overlap, so 4194 is both the movie "A Matter of Resistance" and
+                    # the series "Star Wars: The Clone Wars", and nothing in a bare
+                    # "ID_CONTENT IN (...)" says which one an id stands for. Returning
+                    # CONTENT_TYPE alongside the id lifts the ambiguity: the ids are
+                    # split per type and written as "ID_MOVIE IN (...) AND ID_SERIE IN
+                    # (...)". That shape needs no new assertion syntax -- the evaluator
+                    # already synthesizes virtual ID_MOVIE / ID_SERIE / ID_PERSON
+                    # columns from a unified ID_CONTENT + CONTENT_TYPE result set, so
+                    # each clause scores against its own half.
                     print("T2S_EVALUATION_ASSERTION_REFRESH processing")
                     start_time = time.time()
                     cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Refresh living-eval assertions","Current sub process in the TMDb database preprocess",0)
                     intassertionmaxstatementtime = 15
                     intassertionmaxids = 50  # a well-formed living assertion is small (LIMIT N); many more = a missing LIMIT
+                    # CONTENT_TYPE value -> the per-table assertion column it maps to. These are
+                    # exactly the three kinds the evaluator's unified-schema bridge knows how to
+                    # synthesize; any other value is a refresh SQL we cannot write an assertion
+                    # for, so it is skipped rather than guessed at.
+                    arrassertioncontenttypecolumn = {"movie": "ID_MOVIE", "serie": "ID_SERIE", "person": "ID_PERSON"}
                     cursor2.execute(
                         "SELECT ID_T2S_EVALUATION, ASSERTION_REFRESH_SQL "
                         "FROM T_WC_T2S_EVALUATION "
@@ -7274,31 +7292,66 @@ ORDER BY COMPTE DESC
                             print(f"  eval {lngevalid}: SKIP (query error: {exrefresh})")
                             lngskipped += 1
                             continue
-                        if len(arridcols) != 1 or not str(arridcols[0]).upper().startswith("ID_"):
-                            print(f"  eval {lngevalid}: SKIP (query must return exactly one ID_* column, got {arridcols})")
+                        # Two shapes are accepted: one ID_* column (untyped, the historical
+                        # form), or that column plus CONTENT_TYPE (typed, which disambiguates
+                        # a movie+series id list). Anything else is skipped.
+                        arridcolnames = [strd for strd in arridcols if str(strd).upper().startswith("ID_")]
+                        arrtypecolnames = [strd for strd in arridcols if str(strd).upper() == "CONTENT_TYPE"]
+                        inttyped = 1 if (len(arridcols) == 2 and len(arridcolnames) == 1 and len(arrtypecolnames) == 1) else 0
+                        if len(arridcolnames) != 1 or (len(arridcols) != 1 and inttyped == 0):
+                            print(f"  eval {lngevalid}: SKIP (query must return one ID_* column, optionally plus CONTENT_TYPE, got {arridcols})")
                             lngskipped += 1
                             continue
-                        strcol = arridcols[0]
-                        arrids = []
+                        strcol = arridcolnames[0]
+                        strtypecol = arrtypecolnames[0] if inttyped == 1 else ""
+                        arridsbycol = {}   # assertion column -> ids, in the query's returned order
+                        arrcolorder = []   # those columns, in first-seen order
+                        lngidtotal = 0
                         intbadvalue = 0
+                        strbadtype = ""
                         for rowid in arridrows:
                             valid = rowid[strcol]
                             if valid is None:
                                 continue
                             try:
-                                arrids.append(int(valid))
+                                lngid = int(valid)
                             except (TypeError, ValueError):
                                 intbadvalue = 1
                                 break
-                        if intbadvalue == 1 or len(arrids) == 0:
+                            if inttyped == 1:
+                                strcontenttype = str(rowid[strtypecol] or "").strip().lower()
+                                strtargetcol = arrassertioncontenttypecolumn.get(strcontenttype, "")
+                                if strtargetcol == "":
+                                    strbadtype = strcontenttype
+                                    break
+                            else:
+                                strtargetcol = strcol
+                            if strtargetcol not in arridsbycol:
+                                arridsbycol[strtargetcol] = []
+                                arrcolorder.append(strtargetcol)
+                            # An id can legitimately appear under two different CONTENT_TYPEs
+                            # (same integer, different entity), so dedupe per column, not globally.
+                            if lngid not in arridsbycol[strtargetcol]:
+                                arridsbycol[strtargetcol].append(lngid)
+                                lngidtotal += 1
+                        if strbadtype != "":
+                            print(f"  eval {lngevalid}: SKIP (unsupported CONTENT_TYPE '{strbadtype}' -- expected one of {sorted(arrassertioncontenttypecolumn)})")
+                            lngskipped += 1
+                            continue
+                        if intbadvalue == 1 or lngidtotal == 0:
                             print(f"  eval {lngevalid}: SKIP (no usable integer ids returned)")
                             lngskipped += 1
                             continue
-                        if len(arrids) > intassertionmaxids:
-                            print(f"  eval {lngevalid}: SKIP ({len(arrids)} ids > {intassertionmaxids} cap -- add a LIMIT to its ASSERTION_REFRESH_SQL)")
+                        if lngidtotal > intassertionmaxids:
+                            print(f"  eval {lngevalid}: SKIP ({lngidtotal} ids > {intassertionmaxids} cap -- add a LIMIT to its ASSERTION_REFRESH_SQL)")
                             lngskipped += 1
                             continue
-                        strassertion = strcol + " IN (" + ", ".join(str(intid) for intid in arrids) + ")"
+                        # One clause per entity kind, ANDed: every half must be present in the
+                        # answer, which is what a "movies and series" question asks for.
+                        strassertion = " AND ".join(
+                            strassertioncol + " IN (" + ", ".join(str(intid) for intid in arridsbycol[strassertioncol]) + ")"
+                            for strassertioncol in arrcolorder
+                        )
                         cursor2.execute(
                             "UPDATE T_WC_T2S_EVALUATION "
                             "SET ASSERTIONS_QUERY_RESULT = %s, ASSERTION_REFRESH_LAST = NOW() "

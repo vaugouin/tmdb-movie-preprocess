@@ -1048,8 +1048,28 @@ Refreshes "living" evaluation assertions so time-varying samples/evals (e.g. *tr
 
 **Operations:**
 - Selects evals with a non-empty `ASSERTION_REFRESH_SQL` and `DELETED = 0`, oldest-refreshed first.
-- For each, runs the stored canonical query under **guardrails** — a single read-only `SELECT` (no `;`-chaining, no `INTO OUTFILE`/`DUMPFILE`), exactly one `ID_*` column, bounded by a per-statement `max_statement_time` — then rewrites `ASSERTIONS_QUERY_RESULT = "<ID_COL> IN (...)"` in the query's returned order and stamps `ASSERTION_REFRESH_LAST = NOW()`.
+- For each, runs the stored canonical query under **guardrails**: a single read-only `SELECT` (no `;`-chaining, no `INTO OUTFILE`/`DUMPFILE`), one `ID_*` column (optionally plus `CONTENT_TYPE`, see below), bounded by a per-statement `max_statement_time`. It then rewrites `ASSERTIONS_QUERY_RESULT = "<ID_COL> IN (...)"` in the query's returned order and stamps `ASSERTION_REFRESH_LAST = NOW()`.
 - Malformed / non-conforming queries are **skipped and logged**; the run never aborts. Counts are published as server variables (`strtmdbmoviepreprocessassertionrefreshcount` / `…skipped`).
+
+**Typed refresh SQL (`ID_CONTENT` + `CONTENT_TYPE`).** A question spanning movies *and* series resolves to a list of integers that is ambiguous on its own: the two id spaces overlap, so `4194` is both the movie *A Matter of Resistance* and the series *Star Wars: The Clone Wars*. An assertion reading `ID_CONTENT IN (4194, ...)` does not say which, and the `/samples` preview that hydrates it has to guess (it tries movies first), so a showcase card can end up with the wrong poster and the wrong title.
+
+Returning the discriminator alongside the id removes the guess. When the query returns exactly two columns, one `ID_*` and one `CONTENT_TYPE`, the ids are split per type and written as one clause per kind:
+
+```sql
+SELECT t.ID_CONTENT, t.CONTENT_TYPE FROM (
+  SELECT m.ID_MOVIE AS ID_CONTENT, 'movie' AS CONTENT_TYPE, m.DAT_RELEASE AS DAT_FIRST_AIR
+  FROM T_WC_T2S_MOVIE m ...
+  UNION
+  SELECT s.ID_SERIE AS ID_CONTENT, 'serie' AS CONTENT_TYPE, s.DAT_FIRST_AIR
+  FROM T_WC_T2S_SERIE s ...
+) AS t
+ORDER BY t.DAT_FIRST_AIR ASC
+LIMIT 50
+```
+
+writes `ASSERTIONS_QUERY_RESULT = "ID_MOVIE IN (...) AND ID_SERIE IN (...)"`. This needs no new assertion syntax: the evaluator already synthesizes virtual `ID_MOVIE` / `ID_SERIE` / `ID_PERSON` columns from a unified `ID_CONTENT` + `CONTENT_TYPE` result set, so each clause scores against its own half, and the `AND` requires both halves to be present. Supported `CONTENT_TYPE` values are `movie`, `serie` and `person`; any other value skips the eval rather than guessing. The id cap applies to the combined total.
+
+The one-column form is unchanged and remains right for a single-kind question (`ID_SERIE`, `ID_PERSON`, ...).
 
 > Second writer on `T_WC_T2S_EVALUATION` (authored via the `tmdb-front` back office), scoped to the two assertion-refresh columns only. See backlog AES-05 / TMDB-MOVIE-PREPROCESS-026.
 
