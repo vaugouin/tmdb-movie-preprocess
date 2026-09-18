@@ -1,0 +1,590 @@
+-- test-014-location-type-errors.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-09-15 21:13:11
+--
++----------------------------+
+| SECTION                    |
++----------------------------+
+| A. Fraicheur de la matiere |
++----------------------------+
++--------+---------+-----------+---------------------+---------------------+
+| LIGNES | VIVANTS | SUPPRIMES | PLUS_ANCIEN         | PLUS_RECENT         |
++--------+---------+-----------+---------------------+---------------------+
+|  12165 |   12165 |         0 | 2026-09-15 02:23:33 | 2026-09-15 02:23:34 |
++--------+---------+-----------+---------------------+---------------------+
++---------------+---------+---------------------+
+| LOCATION_TYPE | CLASSES | CONSTRUITE_LE       |
++---------------+---------+---------------------+
+| fiction       |     169 | 2026-09-15 02:22:57 |
+| country       |     211 | 2026-09-15 02:22:57 |
+| city          |    2741 | 2026-09-15 02:22:57 |
+| island        |     115 | 2026-09-15 02:22:57 |
+| structure     |   13890 | 2026-09-15 02:22:57 |
+| nature        |     504 | 2026-09-15 02:22:59 |
+| region        |   15722 | 2026-09-15 02:22:59 |
++---------------+---------+---------------------+
++--------------------------------------------------------+
+| SECTION                                                |
++--------------------------------------------------------+
+| B. Construction de la matiere et controle de coherence |
++--------------------------------------------------------+
++---------------------------------------------------------------+
+| SECTION                                                       |
++---------------------------------------------------------------+
+| B1. Type recalcule contre type stocke (attendu : 0 desaccord) |
++---------------------------------------------------------------+
++---------------+------------------+------------------+------------+
+| LIEUX_VIVANTS | ACCORD_SANS_TYPE | ACCORD_AVEC_TYPE | DESACCORDS |
++---------------+------------------+------------------+------------+
+|         12165 |              920 |            11245 |          0 |
++---------------+------------------+------------------+------------+
++------------------------------------------------+
+| SECTION                                        |
++------------------------------------------------+
+| C. Repartition des types, lignes et exposition |
++------------------------------------------------+
++---------------+-------+-----------+------------+----------------+
+| LOCATION_TYPE | LIEUX | PCT_LIEUX | EXPOSITION | PCT_EXPOSITION |
++---------------+-------+-----------+------------+----------------+
+| city          |  4124 |      33.9 |      39772 |           45.3 |
+| country       |   363 |       3.0 |      20893 |           23.8 |
+| region        |  3071 |      25.2 |      19540 |           22.3 |
+| structure     |  2751 |      22.6 |       4531 |            5.2 |
+| (sans type)   |   920 |       7.6 |       1370 |            1.6 |
+| fiction       |   424 |       3.5 |        677 |            0.8 |
+| island        |   227 |       1.9 |        527 |            0.6 |
+| nature        |   285 |       2.3 |        505 |            0.6 |
++---------------+-------+-----------+------------+----------------+
++-----------------------------------------+
+| SECTION                                 |
++-----------------------------------------+
+| D1. Combien de cones chaque lieu touche |
++-----------------------------------------+
++---------------+-------+------------+
+| CONES_TOUCHES | LIEUX | EXPOSITION |
++---------------+-------+------------+
+|             1 |  9569 |      53270 |
+|             2 |  1640 |      32305 |
+|             3 |    35 |        869 |
+|             4 |     1 |          1 |
++---------------+-------+------------+
++-------------------------------------------------+
+| SECTION                                         |
++-------------------------------------------------+
+| D2. Qui a battu qui (carte du rayon de souffle) |
++-------------------------------------------------+
++-----------+-----------+-------+------------+-------------------------------------------------------------------------------------+
+| GAGNANT   | PERDANT   | LIEUX | EXPOSITION | LES_CINQ_PLUS_EXPOSES                                                               |
++-----------+-----------+-------+------------+-------------------------------------------------------------------------------------+
+| city      | region    |  1201 |      19772 | London | Paris | Rome | Hong Kong | Berlin                                          |
+| country   | region    |   179 |      13541 | Indonesia | England | Italy | Spain | Germany                                       |
+| structure | region    |   161 |        215 | Old Royal Naval College | Ashridge | Blenheim Palace | Vasquez Rocks | Colosseum    |
+| city      | structure |    54 |         91 | Auschwitz | Ashridge | Gloucester Cathedral | Times Square | Palace of Caserta      |
+| nature    | region    |    47 |         82 | Tibet | Pearl Harbor | Carpathians | Tatra Mountains | Bonneville Salt Flats        |
+| island    | region    |    34 |        158 | Mallorca | Crete | Ibiza | Gotland | Tenerife                                       |
+| city      | island    |    22 |         31 | Santa Catalina Island | Devil's Island | City Island | Södermalm | Djurgården       |
+| country   | city      |    19 |        970 | Milan | Venice | Hamburg | Singapore | Florence                                     |
+| structure | nature    |    14 |         24 | Wadi Rum | Baekdu Mountain | Brecon Beacons | Adršpach-Teplice Rocks | Snowdonia    |
+| city      | nature    |     7 |         11 | Coney Island | Copacabana | Te Henga (Bethells Beach) | Palolem Beach | Golden Horn |
+| island    | structure |     7 |         13 | Belle Île | Devil's Island | Ford Island | Suomenlinna | Krk                        |
+| island    | nature    |     3 |          5 | Floreana Island | Gaztelugatxe | Sakurajima                                         |
+| country   | nature    |     1 |          1 | Hoggar Mountains                                                                    |
+| country   | structure |     1 |          1 | São Tomé and Príncipe                                                               |
+| fiction   | region    |     1 |          3 | Naboo                                                                               |
++-----------+-----------+-------+------------+-------------------------------------------------------------------------------------+
++----------------------------------------------------+
+| SECTION                                            |
++----------------------------------------------------+
+| E. Les classes qui decident, par poids de decision |
++----------------------------------------------------+
++-----------+----------------------+-------------+---------------+------------+-----------------------------------------------------------------------------------------------------------------------+
+| ID_CLASSE | CLASSE               | TYPE_IMPOSE | LIEUX_DECIDES | EXPOSITION | EXEMPLES                                                                                                              |
++-----------+----------------------+-------------+---------------+------------+-----------------------------------------------------------------------------------------------------------------------+
+| Q1549591  | big city             | city        |           790 |      22833 | New York City | Paris | Rome | Hong Kong                                                                              |
+| Q515      | city                 | city        |           674 |      18260 | New York City | Los Angeles | London | Hong Kong                                                                      |
+| Q484170   | (classe muette)      | region      |           624 |       1165 | Marseille | Saint-Tropez | Nantes | Toulon                                                                            |
+| Q3957     | town                 | city        |           389 |        723 | Ooty | Blackpool | Monte Carlo | Gernsbach                                                                            |
+| Q1093829  | (classe muette)      | city        |           386 |      11088 | New York City | Los Angeles | San Francisco | Washington, D.C.                                                        |
+| Q79007    | street               | structure   |           276 |        304 | rue du Vertbois | Leningradsky Avenue | Charles Bridge | Strand                                                       |
+| Q486972   | human settlement     | city        |           235 |       1440 | Moscow | Washington, D.C. | Bogotá | Macau                                                                            |
+| Q3624078  | (classe muette)      | country     |           222 |      16863 | Indonesia | France | Italy | Mexico                                                                                   |
+| Q2074737  | (classe muette)      | region      |           216 |       1286 | Madrid | Almería | Seville | Bilbao                                                                                   |
+| Q6256     | country              | country     |           206 |      18677 | Indonesia | England | France | Italy                                                                                  |
+| Q62049    | (classe muette)      | city        |           205 |       1837 | Atlanta | Pittsburgh | San Diego | Seattle                                                                            |
+| Q23442    | island               | island      |           192 |        468 | Long Island | Mallorca | Tahiti | Crete                                                                               |
+| Q532      | village              | city        |           182 |        206 | La Couronne | Ashridge | Charlestown | Teriberka                                                                      |
+| Q23413    | castle               | structure   |           163 |        240 | Pernštejn Castle | Křivoklát Castle | Bouzov Castle | Champlâtreux                                                    |
+| Q1964689  | fictional city       | fiction     |           145 |        249 | Gotham City | Bikini Bottom | Dimmsdale | Metropolis                                                                  |
+| Q751876   | château              | structure   |           144 |        232 | Palace of Versailles | Vaux-le-Vicomte | Sychrov Castle | Château de Chambord                                         |
+| Q747074   | (classe muette)      | region      |           143 |        202 | Lierna | Bellagio | Bologna | Lecco                                                                                   |
+| Q123705   | neighborhood         | city        |           136 |        221 | Hollywood | La Plaine Saint-Denis | Jackson Heights | Times Square                                                    |
+| Q82794    | region               | region      |           131 |       1070 | Africa | Europe | Asia | Antarctica                                                                                   |
+| Q55488    | railway station      | structure   |           127 |        153 | Marylebone station | London Paddington station | Praha hlavní nádraží | Paris-Gare-de-Lyon                            |
+| Q12813115 | (classe muette)      | city        |           125 |        231 | Gothenburg | Trollhättan | Uppsala | Luleå                                                                            |
+| Q42744322 | (classe muette)      | city        |           116 |       1155 | Berlin | Munich | Cologne | Leipzig                                                                                   |
+| Q7930989  | (classe muette)      | city        |           114 |       1147 | Moscow | Saint Petersburg | Kraków | Minsk                                                                            |
+| Q3024240  | (classe muette)      | country     |           112 |       1155 | Russian Empire | Soviet Union | Ancient Rome | Joseon                                                                 |
+| Q174782   | square               | structure   |           108 |        146 | Trafalgar Square | parvis Notre-Dame - place Jean-Paul-II | place de la Concorde | Champ de Mars                      |
+| Q2264924  | port city            | city        |            96 |       6422 | New York City | Stockholm | Istanbul | Shanghai                                                                       |
+| Q41176    | building             | structure   |            96 |        117 | TV-huset | Kanalhuset | Lancaster House | Television Centre                                                           |
+| Q51929311 | (classe muette)      | city        |            93 |      18114 | New York City | London | Paris | Rome                                                                                 |
+| Q902814   | border city          | city        |            93 |       2150 | Rome | Vancouver | San Diego | Detroit                                                                                |
+| Q375336   | film studio          | structure   |            89 |       1059 | Pinewood Studios | Shepperton Studios | Studios de la Victorine | Warner Bros. Studios, Leavesden                     |
+| Q33146843 | (classe muette)      | region      |            88 |        143 | Girona | Cadaqués | El Port de la Selva | Blanes                                                                      |
+| Q33506    | museum               | structure   |            80 |        109 | Old Royal Naval College | Palace of Fontainebleau | Belarusian State Museum of Folk Architecture and Life | Fort Bard |
+| Q498162   | (classe muette)      | city        |            77 |        100 | Kernville | Lone Pine | Montauk | Joshua Tree                                                                         |
+| Q24354    | theatre building     | structure   |            75 |         87 | Royal Albert Hall | Hampton Court Palace | Hollywood Pantages Theatre | Beacon Theatre                                |
+| Q856076   | (classe muette)      | region      |            75 |        115 | Sipoo | Kirkkonummi | Vihti | Pelkosenniemi                                                                           |
+| Q17343829 | (classe muette)      | city        |            67 |        112 | Langley | Montauk | Newhall | Valencia                                                                                |
+| Q27686    | hotel                | structure   |            66 |         81 | Riviera Hotel and Casino | InterContinental Paris Le Grand | The Biltmore Los Angeles | Ashford Castle, County Mayo   |
+| Q15127012 | (classe muette)      | city        |            65 |         69 | Quantico | Metaline Falls | Superior | Essex                                                                          |
+| Q15978299 | (classe muette)      | city        |            64 |        308 | Prague | Třebíč | Brno | Štramberk                                                                                    |
+| Q6465     | department of France | region      |            63 |        226 | Nord | Finistère | Bouches-du-Rhône | Seine-Saint-Denis                                                               |
++-----------+----------------------+-------------+---------------+------------+-----------------------------------------------------------------------------------------------------------------------+
++--------------------------------------------------------+
+| SECTION                                                |
++--------------------------------------------------------+
+| F. Desaccords entre le type et la description Wikidata |
++--------------------------------------------------------+
++-----------------------------+
+| SECTION                     |
++-----------------------------+
+| F1. Couverture de la mesure |
++-----------------------------+
++---------------+-----------+---------------+-------------+
+| LIEUX_VIVANTS | JUGEABLES | NON_JUGEABLES | PCT_COUVERT |
++---------------+-----------+---------------+-------------+
+|         12165 |      9424 |          2741 |        77.5 |
++---------------+-----------+---------------+-------------+
++---------------------------------------------------------+
+| SECTION                                                 |
++---------------------------------------------------------+
+| F2. Matrice type stocke contre indice de la description |
++---------------------------------------------------------+
++-------------+-----------+-------+------------+
+| STOCKE      | INDICE    | LIEUX | EXPOSITION |
++-------------+-----------+-------+------------+
+| city        | city      |  3209 |      37791 |
+| structure   | structure |  1527 |       2842 |
+| region      | city      |  1360 |       3183 |
+| region      | region    |   811 |      13193 |
+| fiction     | fiction   |   365 |        584 |
+| city        | region    |   269 |        844 |
+| nature      | nature    |   229 |        427 |
+| island      | island    |   203 |        488 |
+| country     | country   |   202 |      18287 |
+| (sans type) | structure |   201 |        276 |
+| (sans type) | fiction   |   181 |        242 |
+| region      | nature    |   153 |        605 |
+| region      | structure |    98 |        122 |
+| structure   | city      |    72 |        101 |
+| country     | region    |    66 |        713 |
+| city        | nature    |    49 |        115 |
+| structure   | nature    |    48 |         62 |
+| region      | island    |    48 |        482 |
+| city        | island    |    46 |         79 |
+| structure   | region    |    45 |         70 |
+| structure   | country   |    40 |         60 |
+| city        | structure |    39 |         48 |
+| (sans type) | nature    |    29 |         32 |
+| region      | country   |    27 |        114 |
+| (sans type) | region    |    16 |         18 |
+| structure   | island    |    16 |         17 |
+| country     | city      |    13 |        757 |
+| (sans type) | city      |    11 |         12 |
+| city        | country   |    10 |         33 |
+| nature      | region    |     9 |         20 |
+| country     | island    |     8 |         98 |
+| island      | nature    |     3 |          5 |
+| island      | region    |     3 |          8 |
+| (sans type) | island    |     3 |          4 |
+| structure   | fiction   |     3 |          6 |
+| fiction     | island    |     2 |         12 |
+| nature      | island    |     2 |          6 |
+| region      | fiction   |     2 |          4 |
+| fiction     | city      |     1 |          1 |
+| nature      | structure |     1 |          1 |
+| island      | structure |     1 |          1 |
+| (sans type) | country   |     1 |          1 |
+| island      | country   |     1 |          2 |
+| nature      | country   |     1 |          1 |
++-------------+-----------+-------+------------+
++------------------------------------------+
+| SECTION                                  |
++------------------------------------------+
+| F3. Borne inferieure du nombre d erreurs |
++------------------------------------------+
++-------------------+--------------------+
+| ERREURS_CERTAINES | EXPOSITION_TOUCHEE |
++-------------------+--------------------+
+|               579 |               1245 |
++-------------------+--------------------+
++-----------+---------------+-------------------+--------------------+
+| TYPE_FAUX | TYPE_PROBABLE | ERREURS_CERTAINES | EXPOSITION_TOUCHEE |
++-----------+---------------+-------------------+--------------------+
+| region    | nature        |               153 |                605 |
+| region    | structure     |                98 |                122 |
+| structure | city          |                72 |                101 |
+| city      | nature        |                49 |                115 |
+| structure | nature        |                48 |                 62 |
+| structure | region        |                45 |                 70 |
+| structure | country       |                40 |                 60 |
+| city      | structure     |                39 |                 48 |
+| structure | island        |                16 |                 17 |
+| nature    | region        |                 9 |                 20 |
+| structure | fiction       |                 3 |                  6 |
+| fiction   | island        |                 2 |                 12 |
+| region    | fiction       |                 2 |                  4 |
+| fiction   | city          |                 1 |                  1 |
+| nature    | structure     |                 1 |                  1 |
+| nature    | country       |                 1 |                  1 |
++-----------+---------------+-------------------+--------------------+
++---------------------------------------------+
+| SECTION                                     |
++---------------------------------------------+
+| F4. Les erreurs certaines les plus exposees |
++---------------------------------------------+
++-------------+-------------+----------------------------------------+-----------+-----------+------------+---------------------------------------------------------------------------------------------+
+| ID_LOCATION | ID_WIKIDATA | LOCATION_NAME                          | STOCKE    | INDICE    | EXPOSITION | DESCRIPTION                                                                                 |
++-------------+-------------+----------------------------------------+-----------+-----------+------------+---------------------------------------------------------------------------------------------+
+|         133 | Q664609     | Caribbean                              | region    | nature    |        101 | region to the center-east of America composed of many islands / coastal regions surroundin  |
+|         354 | Q97         | Atlantic Ocean                         | region    | nature    |         82 | ocean between Europe, Africa and the Americas                                               |
+|         157 | Q4918       | Mediterranean Sea                      | region    | nature    |         63 | sea between Europe, Africa and Asia                                                         |
+|         819 | Q23337      | Salt Lake City                         | city      | nature    |         48 | capital city of the U.S. state of Utah and seat of Salt Lake County                         |
+|          94 | Q98         | Pacific Ocean                          | region    | nature    |         47 | ocean between Asia, Australia and the Americas                                              |
+|         265 | Q130359     | Andean natural region of Colombia      | region    | nature    |         27 | Mountainous region of central Colombia - Andes mountain chain                               |
+|         520 | Q17070      | Réunion                                | region    | nature    |         27 | overseas department of France in the Indian Ocean                                           |
+|         358 | Q7835       | Crimea                                 | region    | nature    |         17 | Eastern European peninsula, in the Black Sea and Sea of Azov, disputed between Ukraine (de  |
+|         446 | Q25373      | Atlantis                               | fiction   | island    |         11 | mythological large island in Plato's dialogues                                              |
+|         274 | Q152989     | Western Front                          | region    | structure |         10 | theatre of WWI in France and Belgium                                                        |
+|        1197 | Q1239       | Indian Ocean                           | region    | nature    |          9 | ocean bounded by Africa, Asia, Australia, and Antarctica                                    |
+|        4727 | Q6523617    | Leo Carrillo State Park                | structure | region    |          9 | state park in California, United States                                                     |
+|        1315 | Q1022       | Stuttgart                              | city      | nature    |          7 | city on the Neckar river and capital of the federal state Baden-Württemberg, Germany        |
+|        1337 | Q6583       | Sahara                                 | region    | nature    |          7 | desert on the African continent                                                             |
+|        1713 | Q36678      | West Bank                              | region    | nature    |          7 | Palestinian territory on the western bank of the Jordan River, occupied by Israel           |
+|        2723 | Q19813      | Hatfield House                         | structure | country   |          7 | country house in Hatfield, Hertfordshire, England, UK                                       |
+|        5058 | Q939811     | Tabernas Desert                        | region    | nature    |          7 | desert in Spain                                                                             |
+|        1927 | Q17252      | Tibet                                  | nature    | region    |          6 | plateau region in west China                                                                |
+|        2021 | Q5425102    | George Bush Center for Intelligence    | structure | region    |          6 | headquarters for the Central Intelligence Agency, located in Langley, in Fairfax County, V  |
+|        5238 | Q40729      | Wadi Rum                               | structure | nature    |          6 | valley in southern Jordan                                                                   |
+|         496 | Q43708      | Bermuda Triangle                       | region    | nature    |          5 | region in the western part of the North Atlantic Ocean between Florida, Bermuda and Puerto  |
+|        1077 | Q25220      | Swiss Alps                             | region    | nature    |          5 | portion of the Alps mountain range that lies within Switzerland                             |
+|        1433 | Q350134     | North Atlantic Ocean                   | region    | nature    |          5 | northern area of the Atlantic ocean                                                         |
+|        1852 | Q11290      | Grand Central Terminal                 | structure | city      |          5 | railway terminal in New York City                                                           |
+|        4683 | Q160409     | Central Park                           | structure | city      |          5 | public park at the center of Manhattan in New York City, New York, United States            |
+|         184 | Q16641      | American Samoa                         | region    | nature    |          4 | unincorporated territory of the United States of America, located in the Pacific Ocean      |
+|        1179 | Q166        | Black Sea                              | region    | nature    |          4 | sea between Europe and Asia                                                                 |
+|        1212 | Q1081023    | Bonneville Salt Flats                  | nature    | region    |          4 | densely packed salt pan in northwestern Tooele County, Utah, United States                  |
+|        1265 | Q545        | Baltic Sea                             | region    | nature    |          4 | inland sea of ​​the Atlantic Ocean basin                                                    |
+|        1833 | Q23635      | Bermuda                                | region    | nature    |          4 | British overseas territory in the North Atlantic Ocean                                      |
+|        2013 | Q184355     | Mojave Desert                          | region    | nature    |          4 | desert in southwestern United States                                                        |
+|        3112 | Q68986      | St. Moritz                             | city      | nature    |          4 | resort town in the Engadine valley in Switzerland                                           |
+|        5665 | Q3569306    | Windsor Great Park                     | structure | city      |          4 | Royal Park near the town of Windsor, England                                                |
+|        6322 | Q262500     | Gloucester Cathedral                   | city      | structure |          4 | cathedral in England                                                                        |
+|        6721 | Q208181     | Blenheim Palace                        | structure | country   |          4 | country house near Woodstock, Oxfordshire, England, UK                                      |
+|        8630 | Q1015079    | Burghley House                         | structure | country   |          4 | grand sixteenth-century country house near Stamford, Lincolnshire, England, UK              |
+|         175 | Q106652     | Scottish Highlands                     | nature    | region    |          3 | historic region of Scotland                                                                 |
+|         704 | Q218613     | Galeries Lafayette Haussmann           | structure | region    |          3 | department store in Paris, France                                                           |
+|         840 | Q680614     | 30 Rockefeller Plaza                   | structure | city      |          3 | Art Deco skyscraper at the Rockefeller Center in Midtown Manhattan, New York City           |
+|        1070 | Q734149     | Torne Valley                           | region    | nature    |          3 | valley at the border of Sweden and Finland                                                  |
+|        1493 | Q2451409    | Starfleet Academy                      | region    | fiction   |          3 | fictional educational institution                                                           |
+|        1627 | Q816843     | San Fernando Valley                    | region    | nature    |          3 | urbanized valley in Los Angeles County, California, United States                           |
+|        1886 | Q923845     | San Dimas                              | city      | nature    |          3 | city in the San Gabriel Valley of Los Angeles County, California, United States             |
+|        2116 | Q47700      | Kalahari Desert                        | region    | nature    |          3 | desert in southern Africa                                                                   |
+|        2376 | Q1329141    | Pont des Arts                          | region    | structure |          3 | bridge across the Seine in Paris                                                            |
+|        2411 | Q45823      | Barents Sea                            | region    | nature    |          3 | marginal sea of the Arctic Ocean, located off the northern coasts of Norway and Russia      |
+|        2539 | Q34575      | Aegean Sea                             | region    | nature    |          3 | part of the Mediterranean Sea, between the Greek mainland, the Turkish mainland, Crete, an  |
+|        2803 | Q177397     | Area 51                                | region    | nature    |          3 | classified United States Air Force base at Groom Lake in Nye and Lincoln counties in Nevad  |
+|        2858 | Q107635     | Baekdu Mountain                        | structure | nature    |          3 | volcano on the border between North Korea and China                                         |
+|        2924 | Q3036964    | Silvercup Studios                      | structure | city      |          3 | Film and television production facility in New York City                                    |
+|        3018 | Q796020     | Santa's workshop                       | structure | fiction   |          3 | fictional workshop in the story of Santa Claus                                              |
+|        3673 | Q189657     | Kakadu National Park                   | structure | region    |          3 | protected area in the Northern Territory of Australia                                       |
+|        3699 | Q1714967    | Jægersborg Dyrehave                    | region    | nature    |          3 | forest park north of Copenhagen, Denmark                                                    |
+|        4027 | Q1130666    | Lambeth Bridge                         | region    | structure |          3 | Grade II listed road bridge in London, United Kingdom                                       |
+|        5038 | Q83125      | Tower Bridge                           | region    | structure |          3 | bascule and suspension bridge in London                                                     |
+|        5065 | Q390418     | Pont Alexandre III                     | region    | structure |          3 | bridge that spans the Seine in Paris, France                                                |
+|        5189 | Q695194     | Rathaus Schöneberg                     | structure | city      |          3 | city hall of the Berlin district of Tempelhof-Schöneberg                                    |
+|        5820 | Q847613     | Wenceslas Square                       | structure | city      |          3 | city square in Prague                                                                       |
+|        5828 | Q19841      | Knebworth House                        | structure | country   |          3 | country house in Knebworth, Hertfordshire, England, UK                                      |
+|        5871 | Q2628510    | Badminton House                        | structure | country   |          3 | country house in Gloucestershire, England, UK                                               |
+|        6306 | Q944225     | Waddesdon Manor                        | structure | country   |          3 | Grade I listed country house in Buckinghamshire, England, UK                                |
+|        6898 | Q3078780    | Forest of Halatte                      | region    | nature    |          3 | forest in France                                                                            |
+|        6919 | Q1534537    | Schnals Valley                         | region    | nature    |          3 | valley of South Tyrol, Italy                                                                |
+|        7395 | Q12047645   | Pusté kostely                          | region    | nature    |          3 | valley in Cvikov, Czech Republic                                                            |
+|        7561 | Q1146311    | Lancaster House                        | structure | region    |          3 | mansion in the St James's district in the West End of London                                |
+|        9214 | Q4530871    | Elektrozavodsky bridge                 | region    | structure |          3 | bridge in Russia                                                                            |
+|       10330 | Q2255867    | Fort Bard                              | structure | nature    |          3 | fortified complex in the Aosta Valley, Italy                                                |
+|         365 | Q21767547   | Cheyenne Mountain Complex              | region    | nature    |          2 | Military base within Cheyenne Mountain, Colorado, United States                             |
+|         503 | Q11260      | Broadway                               | structure | city      |          2 | road in New York City and Westchester County, New York, United States                       |
+|         537 | Q36124      | Strait of Gibraltar                    | region    | nature    |          2 | strait that connects the Atlantic Ocean to the Mediterranean Sea                            |
+|         735 | Q215023     | Nidaros Cathedral                      | city      | structure |          2 | cathedral in Trondheim, Norway                                                              |
+|         845 | Q82931      | Coral Sea                              | region    | nature    |          2 | Marginal sea in the Pacific Ocean off the northeast coast of Australia                      |
+|         965 | Q57052      | Jiangxi                                | region    | nature    |          2 | province of central China, located around the Gan River south of the Yangtze                |
+|         990 | Q659745     | Italian Front                          | region    | structure |          2 | military campaign in the European Theater of World War I                                    |
+|        1189 | Q118388     | Death Valley                           | region    | nature    |          2 | desert basin in Inyo and San Bernadino counties in California, United States                |
+|        1312 | Q581044     | Lincoln Center for the Performing Arts | structure | city      |          2 | performing arts venue in New York City                                                      |
+|        1352 | Q13415123   | Syria                                  | region    | nature    |          2 | an area located east of the Mediterranean sea                                               |
+|        1357 | Q183464     | Livonia                                | region    | nature    |          2 | historic region along the eastern shores of the Baltic Sea                                  |
+|        1575 | Q109858     | Fifth Avenue                           | city      | structure |          2 | north-south avenue in Manhattan, New York                                                   |
+|        1640 | Q42070      | Gobi Desert                            | region    | nature    |          2 | desert in China and Mongolia                                                                |
+|        1735 | Q36332      | Iguaçu Falls                           | region    | nature    |          2 | waterfalls on the Igazú River on the border of Misiones, Argentina and Paraná, Brazil       |
+|        1741 | Q11767      | Mesopotamia                            | region    | nature    |          2 | historical region within the Tigris–Euphrates river system                                  |
+|        1869 | Q229269     | Rub' al Khali                          | region    | nature    |          2 | desert                                                                                      |
+|        1877 | Q869540     | Kleine Scheidegg                       | city      | nature    |          2 | mountain pass in Switzerland                                                                |
+|        2016 | Q34116      | Thunder Bay                            | city      | nature    |          2 | city in Thunder Bay District, Ontario, Canada                                               |
+|        2299 | Q4412       | West Africa                            | region    | nature    |          2 | western-most geographic region of the continent of Africa, adjacent to the Atlantic Ocean   |
+|        2649 | Q1015874    | Sherman Oaks                           | city      | nature    |          2 | neighborhood in the San Fernando Valley in Los Angeles, California, United States           |
+|        2721 | Q172822     | NULL                                   | structure | nature    |          2 | hydroelectric dam on the Colorado River, United States                                      |
+|        2764 | Q130322     | Orinoquía natural region               | region    | nature    |          2 | natural region of Colombia that belongs to the Orinoco River watershed                      |
+|        2883 | Q162843     | Negev                                  | region    | nature    |          2 | desert and semidesert region of southern Israel                                             |
+|        3148 | Q954207     | Central Park Zoo                       | structure | city      |          2 | zoo in New York City, New York, USA                                                         |
+|        3194 | Q44133      | White Sea                              | region    | nature    |          2 | marginal sea of the Arctic Ocean                                                            |
+|        3359 | Q124377     | Canary Wharf                           | city      | structure |          2 | privately-owned district in the London Borough of Tower Hamlets                             |
+|        3360 | Q178611     | Jura Mountains                         | region    | nature    |          2 | mountain chain in Switzerland and France                                                    |
+|        3870 | Q211778     | Lake District                          | nature    | region    |          2 | mountainous region in North West England, UK                                                |
+|        3902 | Q36755      | Sinai Peninsula                        | region    | nature    |          2 | peninsula in the Red Sea                                                                    |
+|        3983 | Q186547     | Scandinavian Mountains                 | region    | nature    |          2 | mountain range in Finland, Norway and Sweden                                                |
+|        3991 | Q1693       | North Sea                              | region    | nature    |          2 | marginal sea of the Atlantic Ocean                                                          |
+|        4043 | Q125023640  | Chavo's Neighborhood                   | structure | fiction   |          2 | Fictional neighborhood of Chavo del ocho                                                    |
+|        4897 | Q680166     | Schleißheim palace complex             | structure | city      |          2 | comprises three palaces in a grand baroque park in the village of Oberschleißheim near Mun  |
++-------------+-------------+----------------------------------------+-----------+-----------+------------+---------------------------------------------------------------------------------------------+
++-----------------------------------------------+
+| SECTION                                       |
++-----------------------------------------------+
+| G. Familles nommees, suivies par motif de nom |
++-----------------------------------------------+
++-------------------------------+--------------+-------+-----------+------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| FAMILLE                       | TYPE_ATTENDU | LIEUX | SANS_TYPE | TYPE_AUTRE | TYPE_ATTENDU_OK | EXEMPLES                                                                                                                                                                       |
++-------------------------------+--------------+-------+-----------+------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| pont, tunnel, ouvrage         | structure    |    68 |         1 |         59 |               8 | Pont des Arts [region] | Elektrozavodsky bridge [region] | Lambeth Bridge [region] | Charles Bridge [structure]                                                                |
+| gare, station, aeroport       | structure    |   245 |        81 |         16 |             148 | London Heathrow Airport [NULL] | Paris-Charles de Gaulle Airport [NULL] | Marylebone station [structure] | Grand Central Terminal [structure]                                  |
+| ligne ferroviaire ou de metro | structure    |    62 |         2 |          8 |              52 | St Pancras railway station [structure] | Eigerwand railway station [NULL] | London King's Cross railway station [structure] | Villefranche-sur-Mer railway station [structure] |
+| universite, ecole             | structure    |   154 |        83 |          3 |              68 | University of Toronto [NULL] | Old Royal Naval College [structure] | University of Cambridge [NULL] | University of Toronto Scarborough [region]                               |
++-------------------------------+--------------+-------+-----------+------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++---------------------------------------------------------+
+| SECTION                                                 |
++---------------------------------------------------------+
+| H1. Echantillon des 100 plus exposes, a juger a la main |
++---------------------------------------------------------+
++-------------+-------------+------------------+----------------------+-------------+---------------------+------------+----------------------------------------------------------------------------------+
+| ID_LOCATION | ID_WIKIDATA | LOCATION_NAME    | LOCATION_NAME_FR     | TYPE_ACTUEL | CONES_TOUCHES       | EXPOSITION | DESCRIPTION                                                                      |
++-------------+-------------+------------------+----------------------+-------------+---------------------+------------+----------------------------------------------------------------------------------+
+|           2 | Q60         | New York City    | New York             | city        | city                |       3842 | most populous city in the United States                                          |
+|           4 | Q65         | Los Angeles      | Los Angeles          | city        | city                |       3254 | seat of Los Angeles County, and largest city in California, United States        |
+|          21 | Q84         | London           | Londres              | city        | city,region         |       2926 | capital and largest city of England and the United Kingdom                       |
+|          38 | Q90         | Paris            | Paris                | city        | city,region         |       2392 | capital and most populous city in France                                         |
+|           5 | Q99         | California       | Californie           | region      | region              |       2224 | state of the United States of America                                            |
+|          92 | Q252        | Indonesia        | Indonésie            | country     | country,region      |       1519 | island country in Southeast Asia and Oceania                                     |
+|         112 | Q21         | England          | Angleterre           | country     | country,region      |       1438 | country in north-west Europe, part of the United Kingdom                         |
+|           3 | Q220        | Rome             | Rome                 | city        | city,region         |       1090 | capital and largest city of Italy                                                |
+|         126 | Q142        | France           | France               | country     | country             |        882 | country in Western Europe and other continents (through its overseas territories |
+|          51 | Q8646       | Hong Kong        | Hong Kong            | city        | city,region         |        805 | city and special administrative region of China                                  |
+|          45 | Q38         | Italy            | Italie               | country     | country,region      |        722 | country in southern Europe                                                       |
+|         158 | Q62         | San Francisco    | San Francisco        | city        | city                |        709 | consolidated city and county in California, United States                        |
+|         111 | Q64         | Berlin           | Berlin               | city        | city,region         |        705 | federated state, capital and largest city of Germany                             |
+|          63 | Q96         | Mexico           | Mexique              | country     | country             |        703 | country in North America                                                         |
+|        4558 | Q661896     | Pinewood Studios | Pinewood Studios     | structure   | structure           |        669 | British film studio and television studio situated in Iver Heath, Buckinghamshir |
+|          70 | Q2807       | Madrid           | Madrid               | region      | region              |        655 | capital of Spain                                                                 |
+|          54 | Q24639      | Vancouver        | Vancouver            | city        | city                |        636 | largest city in the province of British Columbia, Canada                         |
+|         176 | Q1408       | New Jersey       | New Jersey           | region      | region              |        601 | state of the United States of America                                            |
+|          16 | Q1297       | Chicago          | Chicago              | city        | city                |        600 | city and county seat of Cook County, and largest city in State of Illinois, Unit |
+|          56 | Q29         | Spain            | Espagne              | country     | country,region      |        550 | country in southwestern Europe with territories in Africa                        |
+|          47 | Q1754       | Stockholm        | Stockholm            | city        | city                |        547 | capital and largest city of Sweden                                               |
+|          32 | Q17         | Japan            | Japon                | country     | country             |        532 | island country in East Asia                                                      |
+|          60 | Q649        | Moscow           | Moscou               | city        | city,region         |        530 | capital and most populous city of Russia                                         |
+|         269 | Q183        | Germany          | Allemagne            | country     | country,region      |        517 | country in Central Europe                                                        |
+|         162 | Q172        | Toronto          | Toronto              | city        | city,region         |        502 | capital and largest city of the province of Ontario, Canada                      |
+|         202 | Q1490       | Tokyo            | Tokyo                | city        | city,region         |        474 | capital and largest city of Japan                                                |
+|         104 | Q30         | United States    | États-Unis           | country     | country,region      |        471 | country located primarily in North America                                       |
+|         136 | Q406        | Istanbul         | Istanbul             | city        | city                |        471 | largest city in Turkey                                                           |
+|          64 | Q340        | Montreal         | Montréal             | city        | city,region         |        470 | largest city in Quebec, Canada                                                   |
+|          24 | Q812        | Florida          | Floride              | region      | region              |        463 | state of the United States of America                                            |
+|          65 | Q2634       | Naples           | Naples               | city        | city,region         |        453 | capital city of Campania, Italy                                                  |
+|          23 | Q816        | Arizona          | Arizona              | region      | region              |        447 | state of the United States of America                                            |
+|          98 | Q1439       | Texas            | Texas                | region      | region              |        440 | state of the United States of America                                            |
+|           9 | Q61         | Washington, D.C. | Washington           | city        | city                |        413 | capital city of the United States of America                                     |
+|          25 | Q43         | Turkey           | Turquie              | country     | country,region      |        407 | country in West Asia and Southeast Europe                                        |
+|         228 | Q408        | Australia        | Australie            | country     | country,region      |        403 | country in Oceania                                                               |
+|         114 | Q34404      | New Orleans      | La Nouvelle-Orléans  | city        | city                |        379 | largest city of the state of Louisiana, United States                            |
+|         224 | Q41         | Greece           | Grèce                | country     | country,region      |        375 | country in Southeast Europe                                                      |
+|          19 | Q15         | Africa           | Afrique              | region      | region              |        365 | continent                                                                        |
+|         103 | Q1522       | New Mexico       | Nouveau-Mexique      | region      | region              |        353 | state of the United States of America                                            |
+|         106 | Q668        | India            | Inde                 | country     | country,region      |        352 | country in South Asia                                                            |
+|          15 | Q1156       | Mumbai           | Bombay               | city        | city                |        330 | capital city in Maharashtra, India                                               |
+|          36 | Q1384       | New York         | État de New York     | region      | region              |        328 | state of the United States of America                                            |
+|         107 | Q1492       | Barcelona        | Barcelone            | city        | city,region         |        317 | city in Catalonia, Spain                                                         |
+|          95 | Q8678       | Rio de Janeiro   | Rio de Janeiro       | city        | city,region         |        299 | city of Rio de Janeiro state, Brazil                                             |
+|         182 | Q1486       | Buenos Aires     | Buenos Aires         | city        | city,region         |        299 | capital and largest city of Argentina                                            |
+|          41 | Q1741       | Vienna           | Vienne               | city        | city,region         |        297 | capital of and state in Austria                                                  |
+|          31 | Q176        | Quebec           | Québec               | region      | region              |        296 | province of Canada                                                               |
+|          87 | Q1454       | North Carolina   | Caroline du Nord     | region      | region              |        296 | state of the United States of America                                            |
+|         122 | Q490        | Milan            | Milan                | country     | country,city,region |        292 | Italian commune and capital city of Lombardy                                     |
+|         105 | Q16         | Canada           | Canada               | country     | country,region      |        287 | country in North America                                                         |
+|         177 | Q258        | South Africa     | Afrique du Sud       | country     | country             |        285 | country in southern Africa                                                       |
+|          29 | Q39         | Switzerland      | Suisse               | country     | country,region      |        280 | country in Central Europe                                                        |
+|          67 | Q8684       | Seoul            | Séoul                | city        | city                |        275 | capital and largest city of South Korea                                          |
+|         290 | Q8652       | Miami            | Miami                | city        | city                |        274 | city in Miami-Dade County, Florida, United States                                |
+|          22 | Q22         | Scotland         | Écosse               | country     | country             |        271 | country in north-west Europe, part of the United Kingdom                         |
+|         459 | Q664        | New Zealand      | Nouvelle-Zélande     | country     | country,region      |        264 | island country in the southwest Pacific Ocean                                    |
+|         323 | Q869        | Thailand         | Thaïlande            | country     | country,region      |        262 | country in Southeast Asia                                                        |
+|          10 | Q159        | Russia           | Russie               | country     | country,region      |        258 | country in Eastern Europe and Northern Asia, the largest in the world by area    |
+|         256 | Q23556      | Atlanta          | Atlanta              | city        | city,region         |        256 | capital city of the U.S. state of Georgia and seat of Fulton County, also locate |
+|         416 | Q1028       | Morocco          | Maroc                | country     | country             |        245 | sovereign state in North Africa                                                  |
+|         335 | Q1489       | Mexico City      | Mexico               | city        | city,region         |        243 | capital and largest city of Mexico                                               |
+|         148 | Q40         | Austria          | Autriche             | country     | country,region      |        240 | country in Central Europe                                                        |
+|         190 | Q829        | Utah             | Utah                 | region      | region              |        237 | state of the United States of America                                            |
+|          34 | Q34266      | Russian Empire   | Empire russe         | country     | country             |        235 | former empire in Eurasia and North America (1721–1917)                           |
+|          58 | Q79         | Egypt            | Égypte               | country     | country             |        234 | country in Northeast Africa and Southwest Asia                                   |
+|         113 | Q3130       | Sydney           | Sydney               | city        | city                |        233 | capital city of New South Wales, Australia                                       |
+|          30 | Q884        | South Korea      | Corée du Sud         | country     | country             |        224 | country in East Asia                                                             |
+|           7 | Q641        | Venice           | Venise               | country     | country,city,region |        219 | capital city of Veneto, Italy                                                    |
+|         154 | Q8686       | Shanghai         | Shanghaï             | city        | city,region         |        217 | provincial-level municipality in China                                           |
+|         316 | Q1460       | Sicily           | Sicile               | region      | region              |        217 | island in the Mediterranean, region of Italy                                     |
+|         467 | Q219        | Bulgaria         | Bulgarie             | country     | country,region      |        214 | country in southeast Europe                                                      |
+|         128 | Q1428       | Georgia          | Géorgie              | region      | region              |        212 | state of the United States of America                                            |
+|         493 | Q1085       | Prague           | Prague               | city        | city,region         |        211 | capital city of the Czech Republic                                               |
+|          80 | Q20         | Norway           | Norvège              | country     | country             |        210 | country in Northern Europe                                                       |
+|         295 | Q928        | Philippines      | Philippines          | country     | country             |        209 | archipelagic country in Southeast Asia                                           |
+|          86 | Q23482      | Marseille        | Marseille            | region      | region              |        207 | French commune                                                                   |
+|          35 | Q1348       | Kolkata          | Calcutta             | city        | city,region         |        206 | capital city of West Bengal, India                                               |
+|         230 | Q656        | Saint Petersburg | Saint-Pétersbourg    | city        | city,region         |        193 | federal city and former capital of Russia                                        |
+|         222 | Q2624848    | Las Vegas Valley | vallée de Las Vegas  | city        | city                |        192 | metropolitan area in Clark County, Nevada, United States                         |
+|         330 | Q779        | Connecticut      | Connecticut          | region      | region              |        191 | state of the United States of America                                            |
+|          85 | Q15180      | Soviet Union     | Union soviétique     | country     | country,region      |        190 | former country in Eurasia (1922–1991)                                            |
+|         311 | Q155        | Brazil           | Brésil               | country     | country,region      |        190 | country in South America                                                         |
+|          79 | Q956        | Beijing          | Pékin                | city        | city                |        186 | capital city of China                                                            |
+|         301 | Q1973       | British Columbia | Colombie-Britannique | region      | region              |        185 | province of Canada                                                               |
+|        4547 | Q9888       | Ooty             | Ooty                 | city        | city,region         |        184 | town and municipality in the state of Tamil Nadu, Southern India                 |
+|         370 | Q27         | Ireland          | Irlande              | country     | country,region      |        183 | country in Northwestern Europe                                                   |
+|          49 | Q46         | Europe           | Europe               | region      | region              |        176 | terrestrial continent located in north-western Eurasia                           |
+|         327 | Q31         | Belgium          | Belgique             | country     | country,region      |        176 | country in western Europe                                                        |
+|          55 | Q1261       | Colorado         | Colorado             | region      | region              |        174 | state of the United States of America                                            |
+|         174 | Q414        | Argentina        | Argentine            | country     | country,region      |        174 | country in South America                                                         |
+|          18 | Q18419      | Brooklyn         | Brooklyn             | city        | city                |        173 | borough of New York City, New York, United States                                |
+|         123 | Q36         | Poland           | Pologne              | country     | country,region      |        170 | country in Central Europe                                                        |
+|         291 | Q29520      | China            | Chine                | region      | region              |        166 | cultural region, ancient civilization, and nation in East Asia; mostly refers to |
+|         720 | Q1781       | Budapest         | Budapest             | city        | city,region         |        166 | capital and largest city of Hungary                                              |
+|         150 | Q1342       | Pittsburgh       | Pittsburgh           | city        | city,region         |        163 | city and county seat in Allegheny County, Pennsylvania, United States            |
+|        1064 | Q213        | Czech Republic   | Tchéquie             | country     | country,region      |        161 | country in Central Europe                                                        |
+|         129 | Q16552      | San Diego        | San Diego            | city        | city                |        160 | seat of San Diego County, California, United States; second-largest city in Cali |
+|         258 | Q145        | United Kingdom   | Royaume-Uni          | country     | country             |        160 | island country in north-west Europe                                              |
+|          76 | Q794        | Iran             | Iran                 | country     | country,region      |        157 | country in Western Asia                                                          |
++-------------+-------------+------------------+----------------------+-------------+---------------------+------------+----------------------------------------------------------------------------------+
++-----------------------------------------------------------------------+
+| SECTION                                                               |
++-----------------------------------------------------------------------+
+| H2. Echantillon de 100 lieux tires dans toute la table, tirage stable |
++-----------------------------------------------------------------------+
++-------------+-------------+-------------------------------------------------------------+-------------------------------------------------+-------------+----------------+------------+----------------------------------------------------------------------------------+
+| ID_LOCATION | ID_WIKIDATA | LOCATION_NAME                                               | LOCATION_NAME_FR                                | TYPE_ACTUEL | CONES_TOUCHES  | EXPOSITION | DESCRIPTION                                                                      |
++-------------+-------------+-------------------------------------------------------------+-------------------------------------------------+-------------+----------------+------------+----------------------------------------------------------------------------------+
+|         722 | Q1145574    | Jackson Heights                                             | Jackson Heights                                 | city        | city           |          5 | neighborhood in Queens, New York City, USA                                       |
+|        7934 | Q1026939    | California State University, Northridge                     | Université d'État de Californie à Northridge    | (sans type) | NULL           |          1 | public university in Northridge, Los Angeles, California, United States          |
+|        2340 | Q736375     | Latimer Road tube station                                   | Latimer Road                                    | structure   | structure      |          1 | London Underground station of the Circle and Hammersmith & City lines            |
+|       10966 | Q24019640   | Escorca                                                     | Escorca                                         | city        | city           |          1 | place in Escorca Municipality, Spain                                             |
+|       10935 | Q360235     | Ma'anshan                                                   | Ma'anshan                                       | city        | city           |          1 | prefecture-level city in Anhui, China                                            |
+|       10760 | Q141639     | Donnacona                                                   | Donnacona                                       | city        | city           |          1 | town in Quebec, Canada                                                           |
+|        7151 | Q493378     | Culver City                                                 | Culver City                                     | city        | city           |          4 | city in Los Angeles County, California, United States                            |
+|        1249 | Q48256      | Dnipro                                                      | Dnipro                                          | city        | city           |         15 | city and administrative center of Dnipropetrovsk Oblast, Ukraine                 |
+|        5262 | Q683125     | Ustronie Morskie                                            | Ustronie Morskie                                | city        | city           |          1 | village in West Pomeranian Voivodeship, Poland                                   |
+|        1195 | Q1282       | Lazio                                                       | Latium                                          | region      | region         |         27 | region of Italy                                                                  |
+|         810 | Q126148     | Tangier                                                     | Tanger                                          | city        | city           |         29 | city in and capital of Tanger-Tetouan-Al Hoceima, Morocco                        |
+|        3319 | Q193639     | Royal Albert Hall                                           | Royal Albert Hall                               | structure   | structure      |          5 | concert hall in South Kensington, London, England, United Kingdom                |
+|        2813 | Q1073644    | Chinatown                                                   | Chinatown                                       | city        | city           |          2 | neighborhood in San Francisco, California, United States                         |
+|       11339 | Q5099075    | Chillington Hall                                            | Chillington Hall                                | structure   | structure      |          1 | Grade I listed historic house museum in South Staffordshire, England, UK         |
+|        5424 | Q2916719    | Neve Ilan                                                   | NULL                                            | city        | city           |          3 | human settlement in Israel                                                       |
+|        3576 | Q6501000    | Chang'an                                                    | Chang'an                                        | city        | city,region    |          1 | ancient capital and city of China                                                |
+|       11870 | Q2281091    | Worksop                                                     | Worksop                                         | city        | city,region    |          1 | town in Nottinghamshire, United Kingdom                                          |
+|        4670 | Q189715     | Courbevoie                                                  | Courbevoie                                      | region      | region         |          5 | commune in Hauts-de-Seine, France                                                |
+|        8525 | Q3452566    | rue du Rocher                                               | rue du Rocher                                   | structure   | structure      |          2 | street in Paris, France                                                          |
+|        3745 | Q60176      | Yucatán                                                     | Yucatán                                         | region      | region         |          1 | state of Mexico                                                                  |
+|        7901 | Q3426       | Voronezh                                                    | Voronej                                         | city        | city           |          1 | capital city of Voronezh Oblast in central Russia                                |
+|        2557 | Q671774     | Piz Gloria                                                  | Piz Gloria                                      | structure   | structure      |          1 | restaurant in Switzerland                                                        |
+|        8720 | Q23766303   | Betlém                                                      | Betlém                                          | structure   | structure      |          1 | NULL                                                                             |
+|        3784 | Q24014452   | La Granja de San Ildefonso                                  | NULL                                            | city        | city           |          1 | human settlement in Segovia Province, Castile and León, Spain                    |
+|       10441 | Q2144384    | Ratež                                                       | Ratež                                           | city        | city           |          1 | place in Lower Carniola, Slovenia                                                |
+|        9075 | Q443840     | Alton                                                       | Alton                                           | city        | city,region    |          1 | town in Hampshire, England                                                       |
+|        2287 | Q6420545    | Crown colony of Labuan                                      | Colonie de la Couronne de Labuan                | region      | region         |          1 | British colony on Borneo                                                         |
+|        7498 | Q38954      | Teide                                                       | Teide                                           | nature      | nature         |          2 | volcano on Tenerife in the Canary Islands                                        |
+|        7188 | Q2616330    | Bedford Park Boulevard                                      | Bedford Park Bd                                 | structure   | structure      |          1 | New York City Subway station in the Bronx                                        |
+|         224 | Q41         | Greece                                                      | Grèce                                           | country     | country,region |        375 | country in Southeast Europe                                                      |
+|        3438 | Q41183      | Aleppo                                                      | Alep                                            | city        | city           |          1 | city in Aleppo Governorate, Syria                                                |
+|        9006 | Q214432     | Nogent-le-Rotrou                                            | Nogent-le-Rotrou                                | region      | region         |          1 | commune in Eure-et-Loir, France                                                  |
+|        9291 | Q3739388    | USS Walker                                                  | USS Walker                                      | (sans type) | NULL           |          1 | 1943 Fletcher-class destroyer                                                    |
+|        7629 | Q175960     | Malmö stadion                                               | Malmö Stadion                                   | structure   | structure      |          1 | multi-purpose stadium in Malmö, Sweden                                           |
+|         455 | Q1223       | Washington                                                  | Washington                                      | region      | region         |        118 | state of the United States of America                                            |
+|        8238 | Q10755817   | Dionysos                                                    | Diónysos                                        | city        | city           |          1 | town in northeastern Athens, Greece                                              |
+|        1164 | Q52063623   | Southside Reef                                              | NULL                                            | fiction     | fiction        |          1 | narrative location of the 2004 film Shark Tale                                   |
+|        7521 | Q1857392    | Tadoussac                                                   | Tadoussac                                       | city        | city           |          1 | village municipality in Quebec, Canada                                           |
+|       10765 | Q17027122   | Murray's Dude Ranch                                         | NULL                                            | city        | city           |          1 | former Black-owned dude ranch                                                    |
+|        1210 | Q212214     | Amalfi Coast                                                | côte amalfitaine                                | (sans type) | NULL           |          3 | coastal area in the Campania region, Italy                                       |
+|        5022 | Q61126385   | NULL                                                        | NULL                                            | structure   | structure      |          5 | NULL                                                                             |
+|        1869 | Q229269     | Rub' al Khali                                               | Rub al-Khali                                    | region      | region         |          2 | desert                                                                           |
+|        9078 | Q2373736    | Regent Street railway station                               | Regent Street                                   | structure   | structure      |          1 | railway station in Sydney, New South Wales, Australia                            |
+|       11183 | Q3463005    | Saint-Michel                                                | Saint-Michel                                    | city        | city           |          1 | municipality in Montérégie, Quebec, Canada                                       |
+|       12116 | Q1349796    | Port of Barcelona                                           | port de Barcelone                               | region      | region         |          1 | seaport in Spain                                                                 |
+|        7936 | Q12977      | Lloret de Mar                                               | Lloret de Mar                                   | region      | region         |          3 | town in Catalonia, Spain                                                         |
+|        9880 | Q269113     | Villeneuve-lès-Avignon                                      | Villeneuve-lès-Avignon                          | region      | region         |          1 | commune in Gard, France                                                          |
+|        3322 | Q118152     | Meridian                                                    | Meridian                                        | city        | city           |          1 | city in and the county seat of Lauderdale County, Mississippi, United States     |
+|        6875 | Q189849     | Plitvice Lakes National Park                                | parc national des lacs de Plitvice              | structure   | structure      |          1 | national park of Croatia, a UNESCO World Heritage Site                           |
+|        8169 | Q821224     | Berlin                                                      | NULL                                            | structure   | structure      |          1 | cruise ship built in 1980                                                        |
+|         121 | Q30623      | Manchukuo                                                   | Mandchoukouo                                    | country     | country,region |          4 | Japanese puppet state in Manchuria (1932–1945)                                   |
+|         129 | Q16552      | San Diego                                                   | San Diego                                       | city        | city           |        160 | seat of San Diego County, California, United States; second-largest city in Cali |
+|        7165 | Q2421009    | Donaghadee                                                  | Donaghadee                                      | city        | city           |          1 | town in County Down, Northern Ireland, UK                                        |
+|        7970 | Q973726     | Estació del Nord                                            | Estación del Norte                              | structure   | structure      |          1 | railway and bus station in Barcelona                                             |
+|       12064 | Q116215398  | 11 Wilcox Road, South Lambeth, Lambeth, London, England, UK | NULL                                            | structure   | structure      |          1 | building                                                                         |
+|        8277 | Q181962     | Augusta                                                     | Augusta                                         | city        | city,region    |          2 | consolidated city-county in Richmond County, Georgia, United States              |
+|       10716 | Q16466032   | De Hallen Amsterdam                                         | NULL                                            | structure   | structure      |          1 | cultural center in Amsterdam-West, housing a public library, theater, movie thea |
+|        9554 | Q64116      | High Wycombe                                                | High Wycombe                                    | city        | city,region    |          2 | town in Buckinghamshire, England                                                 |
+|        9658 | Q390522     | Mojave Air and Space Port at Rutan Field                    | aéroport et port spatial de Mojave              | (sans type) | NULL           |          1 | facility located in Mojave, California                                           |
+|        3690 | Q41283      | Gwangju                                                     | Gwangju                                         | city        | city           |          1 | metropolitan city in South Korea                                                 |
+|       10062 | Q23042822   | main building of the National Theatre in Prague             | NULL                                            | structure   | structure      |          1 | theatre building in Prague                                                       |
+|       11082 | Q330899     | Tignes                                                      | Tignes                                          | city        | city,region    |          1 | commune in Savoie, France                                                        |
+|        3959 | Q3967502    | Saint Canard                                                | NULL                                            | fiction     | fiction        |          1 | fictional city where Darkwing Duck is set                                        |
+|       11092 | Q1552366    | Château du Haut-Koenigsbourg                                | château du Haut-Koenigsbourg                    | structure   | structure      |          1 | castle in Alsace, France                                                         |
+|        7753 | Q1986252    | Bursledon                                                   | Bursledon                                       | city        | city,region    |          1 | village and civil parish in Hampshire, United Kingdom                            |
+|        4483 | Q156053     | Srebrenica                                                  | Srebrenica                                      | city        | city,region    |          1 | town in Bosnia and Herzegovina                                                   |
+|       11773 | Q49198      | Danbury                                                     | Danbury                                         | city        | city           |          1 | city in Fairfield County, Connecticut, United States                             |
+|        6561 | Q11881999   | NULL                                                        | Vesec u Sobotky                                 | city        | city,region    |          1 | village in Jičín District of Hradec Králové region                               |
+|        7413 | Q10424680   | Baggeby                                                     | NULL                                            | city        | city           |          1 | NULL                                                                             |
+|        2315 | Q212029     | Sifnos                                                      | Sifnos                                          | island      | island         |          2 | island of Cyclades, Aegean Sea, Greece                                           |
+|        2070 | Q101067792  | Outer Land                                                  | NULL                                            | (sans type) | NULL           |          1 | fictional location in Mio, My Son by Astrid Lindgren                             |
+|        4019 | Q1750652    | Norrmalmstorg                                               | Norrmalmstorg                                   | structure   | structure      |          1 | square in central Stockholm, Sweden                                              |
+|         298 | Q81856      | Beaverton                                                   | Beaverton                                       | city        | city           |          1 | city in Washington County, Oregon, United States                                 |
+|        3503 | Q316870     | Young Pioneer camp                                          | NULL                                            | (sans type) | NULL           |          1 | vacation or summer camp for Young Pioneers                                       |
+|        7381 | Q1583289    | Hempstead                                                   | Hempstead                                       | city        | city           |          1 | town in Nassau County, New York, United States, suburb of NYC                    |
+|        9223 | Q576671     | Highland Park                                               | Highland Park                                   | city        | city           |          1 | city in Lake County, Illinois, United States                                     |
+|        6868 | Q4238558    | NULL                                                        | NULL                                            | city        | city,region    |          1 | human settlement in Belokalitvinsky District, Rostov Oblast, Russia              |
+|        9688 | Q5932       | Friesland                                                   | Frise                                           | region      | region         |          1 | district of Lower Saxony, Germany                                                |
+|        4528 | Q2191       | Leningrad Oblast                                            | oblast de Léningrad                             | region      | region         |          4 | federal subject of Russia                                                        |
+|        5910 | Q23185      | Mytishchi                                                   | Mytichtchi                                      | city        | city           |          1 | city in Mytishchinsky District of Moscow Oblast, Russia                          |
+|       11800 | Q767811     | Chipping Campden                                            | Chipping Campden                                | city        | city,region    |          1 | town in Gloucestershire, England                                                 |
+|        5190 | Q1898628    | Inowłódz                                                    | Inowłódz                                        | city        | city           |          1 | city and urban gmina of Poland                                                   |
+|        8106 | Q6684       | Le Perthus                                                  | Le Perthus                                      | city        | city,region    |          1 | commune in Pyrénées-Orientales, France                                           |
+|       10281 | Q1635185    | Real Valle de Camargo                                       | Camargo                                         | region      | region         |          1 | municipality in Cantabria, Spain                                                 |
+|        7389 | Q1703550    | Sogndal Airport, Haukåsen                                   | aérodrome de Sogndal                            | (sans type) | NULL           |          1 | airport in Sogndal Municipality, Norway                                          |
+|        3523 | Q2328897    | Moscou                                                      | Moscou                                          | city        | city           |          1 | neighbourhood of the Belgian city of Ghent                                       |
+|       12010 | Q1235033    | Doksany                                                     | Doksany                                         | region      | region         |          1 | village in Litoměřice District of Ústí nad Labem region                          |
+|        8452 | Q762727     | Taroudant                                                   | Taroudant                                       | city        | city,region    |          1 | City in Souss-Massa, Morocco                                                     |
+|        5009 | Q188082     | Český Krumlov                                               | Český Krumlov                                   | city        | city,region    |          2 | town in the Czech Republic                                                       |
+|        9784 | Q3393516    | Pointe-aux-Trembles                                         | Pointe-aux-Trembles                             | city        | city,region    |          1 | neighborhood in Montreal, Quebec, Canada, former city                            |
+|        9997 | Q273746     | Urk                                                         | Urk                                             | city        | city,region    |          1 | town and municipality in Flevoland, the Netherlands                              |
+|        2307 | Q132783     | Hermitage Museum                                            | musée de l'Ermitage                             | structure   | structure      |          1 | museum in Saint Petersburg, Russia                                               |
+|        1519 | Q1867       | Taipei                                                      | Taipei                                          | city        | city,region    |         29 | special municipality and capital city of Taiwan                                  |
+|       10908 | Q37798200   | Schloss Walterskirchen                                      | NULL                                            | structure   | structure      |          1 | castle in Wolfsthal, Austria                                                     |
+|         270 | Q12233      | Santander                                                   | Santander                                       | region      | region         |          1 | capital of the autonomous community of Cantabria, Spain                          |
+|        7671 | Q5367746    | Elsternwick                                                 | Elsternwick                                     | city        | city           |          1 | suburb of Melbourne, Victoria, Australia                                         |
+|        5547 | Q2637328    | Tende railway station                                       | Tende                                           | structure   | structure      |          1 | railway station in Tende, France                                                 |
+|        8683 | Q1887504    | Wilanów                                                     | Wilanów                                         | city        | city           |          1 | District of Warsaw, Poland.                                                      |
+|        8076 | Q7553567    | Sofala                                                      | Sofala                                          | city        | city           |          1 | town in New South Wales, Australia                                               |
+|        7004 | Q106620828  | Wattholma bruk                                              | NULL                                            | (sans type) | NULL           |          1 | Swedish Iron Works                                                               |
++-------------+-------------+-------------------------------------------------------------+-------------------------------------------------+-------------+----------------+------------+----------------------------------------------------------------------------------+
++-----------------------------+
+| SECTION                     |
++-----------------------------+
+| I. Le bilan en cinq nombres |
++-----------------------------+
++---------------+-----------+----------------------+-----------------+-------------------+
+| LIEUX_VIVANTS | SANS_TYPE | EXPOSITION_SANS_TYPE | LIEUX_CONTESTES | ERREURS_CERTAINES |
++---------------+-----------+----------------------+-----------------+-------------------+
+|         12165 |       920 |                 1370 |            1676 |               579 |
++---------------+-----------+----------------------+-----------------+-------------------+
