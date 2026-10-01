@@ -387,6 +387,7 @@ Links persons to movies in the T2S layer, validating that both ends exist in T2S
 - Processes in chunks of 1000 records.
 - Validates FK existence in `T_WC_T2S_PERSON` and `T_WC_T2S_MOVIE` before inserting.
 - `INSERT … ON DUPLICATE KEY UPDATE` for credit fields: type, character, department, job, display order.
+- Writes `DELETED = 0` (since 2026-10-01; it was left NULL before, so any consumer filtering `DELETED = 0` on a credit table matched nothing, which is what made several Process 70 refresh SQLs return 0 rows). Deleted credits are removed physically, never flagged.
 - Deletes stale records within processed ranges.
 
 ---

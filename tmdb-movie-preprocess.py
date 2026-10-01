@@ -4726,12 +4726,12 @@ RENAME TABLE
     INSERT INTO T_WC_T2S_PERSON_MOVIE (
         ID_T2S_PERSON_MOVIE, ID_PERSON, ID_MOVIE, ID_CREDIT, 
         CREDIT_TYPE, CAST_CHARACTER, CREW_DEPARTMENT, CREW_JOB, 
-        DISPLAY_ORDER 
+        DISPLAY_ORDER, DELETED 
     )
     SELECT 
         ID_TMDB_PERSON_MOVIE, ID_PERSON, ID_MOVIE, ID_CREDIT,
         CREDIT_TYPE, CAST_CHARACTER, CREW_DEPARTMENT, CREW_JOB, 
-        DISPLAY_ORDER 
+        DISPLAY_ORDER, 0 
     FROM T_WC_TMDB_PERSON_MOVIE
     WHERE ID_TMDB_PERSON_MOVIE >= {lngpersonmovierangestart} AND ID_TMDB_PERSON_MOVIE <= {lngpersonmovierangeend}
     AND ID_PERSON IN (
@@ -4748,7 +4748,8 @@ RENAME TABLE
         CAST_CHARACTER = VALUES(CAST_CHARACTER),
         CREW_DEPARTMENT = VALUES(CREW_DEPARTMENT),
         CREW_JOB = VALUES(CREW_JOB),
-        DISPLAY_ORDER = VALUES(DISPLAY_ORDER) """
+        DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+        DELETED = VALUES(DELETED) """
                             cursor2.execute(strsqlpersonmovies)
                             cp.connectioncp.commit()
                             
@@ -4791,12 +4792,12 @@ RENAME TABLE
     INSERT INTO T_WC_T2S_PERSON_SERIE (
         ID_T2S_PERSON_SERIE, ID_PERSON, ID_SERIE, ID_CREDIT, 
         CREDIT_TYPE, CAST_CHARACTER, CREW_DEPARTMENT, CREW_JOB, 
-        DISPLAY_ORDER 
+        DISPLAY_ORDER, DELETED 
     )
     SELECT 
         ID_TMDB_PERSON_SERIE, ID_PERSON, ID_SERIE, ID_CREDIT,
         CREDIT_TYPE, CAST_CHARACTER, CREW_DEPARTMENT, CREW_JOB, 
-        DISPLAY_ORDER 
+        DISPLAY_ORDER, 0 
     FROM T_WC_TMDB_PERSON_SERIE
     WHERE ID_TMDB_PERSON_SERIE >= {lngpersonserierangestart} AND ID_TMDB_PERSON_SERIE <= {lngpersonserierangeend}
     AND ID_PERSON IN (
@@ -4813,7 +4814,8 @@ RENAME TABLE
         CAST_CHARACTER = VALUES(CAST_CHARACTER),
         CREW_DEPARTMENT = VALUES(CREW_DEPARTMENT),
         CREW_JOB = VALUES(CREW_JOB),
-        DISPLAY_ORDER = VALUES(DISPLAY_ORDER) """
+        DISPLAY_ORDER = VALUES(DISPLAY_ORDER),
+        DELETED = VALUES(DELETED) """
                             cursor2.execute(strsqlpersonmovies)
                             cp.connectioncp.commit()
                             
@@ -7338,8 +7340,15 @@ ORDER BY COMPTE DESC
                             print(f"  eval {lngevalid}: SKIP (unsupported CONTENT_TYPE '{strbadtype}' -- expected one of {sorted(arrassertioncontenttypecolumn)})")
                             lngskipped += 1
                             continue
+                        # Two different failures, reported apart: an empty result usually means a
+                        # filter matches nothing (a stale name, or `DELETED = 0` on a column the
+                        # pipeline leaves NULL), a non-integer value means the wrong column.
+                        if len(arridrows) == 0:
+                            print(f"  eval {lngevalid}: SKIP (query returned 0 rows -- check its filters)")
+                            lngskipped += 1
+                            continue
                         if intbadvalue == 1 or lngidtotal == 0:
-                            print(f"  eval {lngevalid}: SKIP (no usable integer ids returned)")
+                            print(f"  eval {lngevalid}: SKIP (no usable integer ids in {len(arridrows)} row(s) of column {strcol})")
                             lngskipped += 1
                             continue
                         if lngidtotal > intassertionmaxids:
