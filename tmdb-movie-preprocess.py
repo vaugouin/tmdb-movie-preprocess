@@ -7294,15 +7294,16 @@ ORDER BY COMPTE DESC
                             print(f"  eval {lngevalid}: SKIP (query error: {exrefresh})")
                             lngskipped += 1
                             continue
-                        # Exactly one ID_* column carries the ids (untyped, the historical form),
-                        # optionally with a CONTENT_TYPE (typed, which disambiguates a movie+series
-                        # id list). Any other column (a count, a name, a sort key the ORDER BY
-                        # needs) is ignored: only two ID_* columns are ambiguous, since we could
-                        # not tell which one holds the answer.
-                        arridcolnames = [strd for strd in arridcols if str(strd).upper().startswith("ID_")]
+                        # The FIRST ID_* column of the select list carries the ids (untyped, the
+                        # historical form), optionally with a CONTENT_TYPE (typed, which
+                        # disambiguates a movie+series id list). Every other column is ignored,
+                        # later ID_* ones included: a showcase query routinely carries ID_IMDB or
+                        # ID_CRITERION_SPINE for display or for its ORDER BY (eval 2523), and the
+                        # select-list order says which id is the answer.
+                        arridcolnames = [strd for strd in arridcols if str(strd).upper().startswith("ID_")][:1]
                         arrtypecolnames = [strd for strd in arridcols if str(strd).upper() == "CONTENT_TYPE"]
                         if len(arridcolnames) != 1 or len(arrtypecolnames) > 1:
-                            print(f"  eval {lngevalid}: SKIP (query must return exactly one ID_* column, optionally plus CONTENT_TYPE, got {arridcols})")
+                            print(f"  eval {lngevalid}: SKIP (query must return an ID_* column, optionally plus one CONTENT_TYPE, got {arridcols})")
                             lngskipped += 1
                             continue
                         inttyped = 1 if len(arrtypecolnames) == 1 else 0
