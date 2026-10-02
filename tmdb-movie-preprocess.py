@@ -7294,16 +7294,18 @@ ORDER BY COMPTE DESC
                             print(f"  eval {lngevalid}: SKIP (query error: {exrefresh})")
                             lngskipped += 1
                             continue
-                        # Two shapes are accepted: one ID_* column (untyped, the historical
-                        # form), or that column plus CONTENT_TYPE (typed, which disambiguates
-                        # a movie+series id list). Anything else is skipped.
+                        # Exactly one ID_* column carries the ids (untyped, the historical form),
+                        # optionally with a CONTENT_TYPE (typed, which disambiguates a movie+series
+                        # id list). Any other column (a count, a name, a sort key the ORDER BY
+                        # needs) is ignored: only two ID_* columns are ambiguous, since we could
+                        # not tell which one holds the answer.
                         arridcolnames = [strd for strd in arridcols if str(strd).upper().startswith("ID_")]
                         arrtypecolnames = [strd for strd in arridcols if str(strd).upper() == "CONTENT_TYPE"]
-                        inttyped = 1 if (len(arridcols) == 2 and len(arridcolnames) == 1 and len(arrtypecolnames) == 1) else 0
-                        if len(arridcolnames) != 1 or (len(arridcols) != 1 and inttyped == 0):
-                            print(f"  eval {lngevalid}: SKIP (query must return one ID_* column, optionally plus CONTENT_TYPE, got {arridcols})")
+                        if len(arridcolnames) != 1 or len(arrtypecolnames) > 1:
+                            print(f"  eval {lngevalid}: SKIP (query must return exactly one ID_* column, optionally plus CONTENT_TYPE, got {arridcols})")
                             lngskipped += 1
                             continue
+                        inttyped = 1 if len(arrtypecolnames) == 1 else 0
                         strcol = arridcolnames[0]
                         strtypecol = arrtypecolnames[0] if inttyped == 1 else ""
                         arridsbycol = {}   # assertion column -> ids, in the query's returned order

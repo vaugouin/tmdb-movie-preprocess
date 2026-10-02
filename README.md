@@ -1049,7 +1049,7 @@ Refreshes "living" evaluation assertions so time-varying samples/evals (e.g. *tr
 
 **Operations:**
 - Selects evals with a non-empty `ASSERTION_REFRESH_SQL` and `DELETED = 0`, oldest-refreshed first.
-- For each, runs the stored canonical query under **guardrails**: a single read-only `SELECT` (no `;`-chaining, no `INTO OUTFILE`/`DUMPFILE`), one `ID_*` column (optionally plus `CONTENT_TYPE`, see below), bounded by a per-statement `max_statement_time`. It then rewrites `ASSERTIONS_QUERY_RESULT = "<ID_COL> IN (...)"` in the query's returned order and stamps `ASSERTION_REFRESH_LAST = NOW()`.
+- For each, runs the stored canonical query under **guardrails**: a single read-only `SELECT` (no `;`-chaining, no `INTO OUTFILE`/`DUMPFILE`), exactly one `ID_*` column (optionally plus `CONTENT_TYPE`, see below; any other column, such as a count the `ORDER BY` needs, is ignored), bounded by a per-statement `max_statement_time`. It then rewrites `ASSERTIONS_QUERY_RESULT = "<ID_COL> IN (...)"` in the query's returned order and stamps `ASSERTION_REFRESH_LAST = NOW()`.
 - Malformed / non-conforming queries are **skipped and logged**; the run never aborts. Counts are published as server variables (`strtmdbmoviepreprocessassertionrefreshcount` / `…skipped`).
 
 **Typed refresh SQL (`ID_CONTENT` + `CONTENT_TYPE`).** A question spanning movies *and* series resolves to a list of integers that is ambiguous on its own: the two id spaces overlap, so `4194` is both the movie *A Matter of Resistance* and the series *Star Wars: The Clone Wars*. An assertion reading `ID_CONTENT IN (4194, ...)` does not say which, and the `/samples` preview that hydrates it has to guess (it tries movies first), so a showcase card can end up with the wrong poster and the wrong title.
