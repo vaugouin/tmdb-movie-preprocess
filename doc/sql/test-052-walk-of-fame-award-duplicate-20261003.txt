@@ -1,0 +1,183 @@
+-- test-052-walk-of-fame-award-duplicate.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-03 08:11:21
+--
++----------------------------------------------------+
+| section                                            |
++----------------------------------------------------+
+| === D1 . lignes walk of fame de T_WC_T2S_AWARD === |
++----------------------------------------------------+
++----------+-------------+------------------------------------------+------------------------------------------+--------------+------------+---------+--------------+-----------------+-------------+--------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_AWARD | ID_WIKIDATA | AWARD_NAME                               | AWARD_NAME_FR                            | AWARD_SOURCE | AWARD_TYPE | DELETED | PERSON_COUNT | liens_personnes | liens_films | liens_series | overview                                                                                                                                                                        |
++----------+-------------+------------------------------------------+------------------------------------------+--------------+------------+---------+--------------+-----------------+-------------+--------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|     9550 | Q17985761   | star on Hollywood Walk of Fame           | étoile du Hollywood Walk of Fame         | P166         | award      |       0 |         2177 |            2177 |           1 |            0 | award in the Hollywood Walk of Fame, Hollywood, California, United States                                                                                                       |
+|    29296 | Q857933     | Canada's Walk of Fame                    | Allée des célébrités canadiennes         | P166         | award      |       0 |          142 |             142 |           0 |            3 | street in Toronto, Ontario, Canada                                                                                                                                              |
+|    30794 | Q98399879   | Haugesund Walk of Fame                   | Haugesund Walk of Fame                   | P166         | award      |       0 |           12 |              12 |           0 |            0 | award                                                                                                                                                                           |
+|    27042 | Q71719      | Hollywood Walk of Fame                   | Walk of Fame                             | P166         | award      |       0 |            6 |               6 |           0 |            0 | more than 2,700 five-pointed terrazzo and brass stars embedded in the sidewalks along 15 blocks of Hollywood Boulevard and three blocks of Vine Street in Hollywood, California |
+|    24644 | Q6049273    | International Civil Rights Walk of Fame  | International Civil Rights Walk of Fame  | P166         | award      |       0 |            3 |               3 |           0 |            0 | museo Yhdysvalloissa                                                                                                                                                            |
+|      800 | Q106515063  | Black Music & Entertainment Walk of Fame | Black Music & Entertainment Walk of Fame | P166         | award      |       0 |            2 |               2 |           0 |            0 | walk of fame located in Atlanta, Georgia                                                                                                                                        |
+|    41794 | Q7589721    | St. Louis Walk of Fame                   | St. Louis Walk of Fame                   | P166         | award      |       0 |            1 |               1 |           0 |            0 | award                                                                                                                                                                           |
+|    28249 | Q776096     | Italian Walk of Fame                     | Italian Walk of Fame                     | P166         | award      |       0 |            1 |               1 |           0 |            0 | walk of fame in Toronto, Ontario                                                                                                                                                |
+|    46683 | Q69394811   | Caledon Walk of Fame                     | Caledon Walk of Fame                     | P166         | award      |       0 |            1 |               1 |           0 |            0 | walk of fame in Caledon, Ontario, Canada                                                                                                                                        |
+|      458 | Q104860729  | Bronx Walk of Fame                       | Bronx Walk of Fame                       | P166         | award      |       0 |            1 |               1 |           0 |            0 | hall of Fame in New York, U.S                                                                                                                                                   |
++----------+-------------+------------------------------------------+------------------------------------------+--------------+------------+---------+--------------+-----------------+-------------+--------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++---------------------------------------------+
+| section                                     |
++---------------------------------------------+
+| === D2 . classes P31 et verdict du cone === |
++---------------------------------------------+
++----------+-------------+------------------------------------------+------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+-----------+----------------------+--------------+
+| ID_AWARD | ID_WIKIDATA | AWARD_NAME                               | label_wikidata                           | description_wikidata                                                                                                                                   | p31       | p31_label            | verdict      |
++----------+-------------+------------------------------------------+------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+-----------+----------------------+--------------+
+|      458 | Q104860729  | Bronx Walk of Fame                       | Bronx Walk of Fame                       | hall of Fame in New York, U.S                                                                                                                          | NULL      | (classe non cachee)  | hors cone    |
+|      800 | Q106515063  | Black Music & Entertainment Walk of Fame | Black Music & Entertainment Walk of Fame | walk of fame located in Atlanta, Georgia                                                                                                               | NULL      | (classe non cachee)  | hors cone    |
+|     9550 | Q17985761   | star on Hollywood Walk of Fame           | star on Hollywood Walk of Fame           | award in the Hollywood Walk of Fame, Hollywood, California, United States                                                                              | Q618779   | award                | dans le cone |
+|     9550 | Q17985761   | star on Hollywood Walk of Fame           | star on Hollywood Walk of Fame           | award in the Hollywood Walk of Fame, Hollywood, California, United States                                                                              | Q721747   | commemorative plaque | hors cone    |
+|    24644 | Q6049273    | International Civil Rights Walk of Fame  | International Civil Rights Walk of Fame  | NULL                                                                                                                                                   | Q47502370 | walk of fame         | dans le cone |
+|    27042 | Q71719      | Hollywood Walk of Fame                   | Hollywood Walk of Fame                   | more than 2,700 five-pointed terrazzo and brass stars embedded in the sidewalks along 15 blocks of Hollywood Boulevard and three blocks of Vine Street | Q1046088  | hall of fame         | dans le cone |
+|    27042 | Q71719      | Hollywood Walk of Fame                   | Hollywood Walk of Fame                   | more than 2,700 five-pointed terrazzo and brass stars embedded in the sidewalks along 15 blocks of Hollywood Boulevard and three blocks of Vine Street | Q47502370 | walk of fame         | dans le cone |
+|    27042 | Q71719      | Hollywood Walk of Fame                   | Hollywood Walk of Fame                   | more than 2,700 five-pointed terrazzo and brass stars embedded in the sidewalks along 15 blocks of Hollywood Boulevard and three blocks of Vine Street | Q4989906  | monument             | hors cone    |
+|    28249 | Q776096     | Italian Walk of Fame                     | Italian Walk of Fame                     | walk of fame in Toronto, Ontario                                                                                                                       | Q47502370 | walk of fame         | dans le cone |
+|    29296 | Q857933     | Canada's Walk of Fame                    | Canada's Walk of Fame                    | street in Toronto, Ontario, Canada                                                                                                                     | Q47502370 | walk of fame         | dans le cone |
+|    29296 | Q857933     | Canada's Walk of Fame                    | Canada's Walk of Fame                    | street in Toronto, Ontario, Canada                                                                                                                     | Q79007    | street               | hors cone    |
+|    30794 | Q98399879   | Haugesund Walk of Fame                   | Haugesund Walk of Fame                   | award                                                                                                                                                  | Q618779   | award                | dans le cone |
+|    30794 | Q98399879   | Haugesund Walk of Fame                   | Haugesund Walk of Fame                   | award                                                                                                                                                  | Q15275719 | recurring event      | hors cone    |
+|    41794 | Q7589721    | St. Louis Walk of Fame                   | St. Louis Walk of Fame                   | award                                                                                                                                                  | Q47502370 | walk of fame         | dans le cone |
+|    46683 | Q69394811   | Caledon Walk of Fame                     | Caledon Walk of Fame                     | walk of fame in Caledon, Ontario, Canada                                                                                                               | Q47502370 | walk of fame         | dans le cone |
++----------+-------------+------------------------------------------+------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------+-----------+----------------------+--------------+
++---------------------------------------------------------------+
+| section                                                       |
++---------------------------------------------------------------+
+| === D3 . personnes par combinaison de lignes walk of fame === |
++---------------------------------------------------------------+
++-------------------------------------------------------------------------------------+-----------+
+| combinaison                                                                         | personnes |
++-------------------------------------------------------------------------------------+-----------+
+| 9550 star on Hollywood Walk of Fame                                                 |      2133 |
+| 29296 Canada's Walk of Fame                                                         |       107 |
+| 9550 star on Hollywood Walk of Fame + 29296 Canada's Walk of Fame                   |        35 |
+| 30794 Haugesund Walk of Fame                                                        |        12 |
+| 9550 star on Hollywood Walk of Fame + 27042 Hollywood Walk of Fame                  |         4 |
+| 9550 star on Hollywood Walk of Fame + 24644 International Civil Rights Walk of Fame |         3 |
+| 800 Black Music & Entertainment Walk of Fame + 9550 star on Hollywood Walk of Fame  |         2 |
+| 27042 Hollywood Walk of Fame                                                        |         2 |
+| 458 Bronx Walk of Fame                                                              |         1 |
+| 28249 Italian Walk of Fame                                                          |         1 |
+| 46683 Caledon Walk of Fame                                                          |         1 |
+| 41794 St. Louis Walk of Fame                                                        |         1 |
++-------------------------------------------------------------------------------------+-----------+
++------------------------------------------------------------------------------+
+| section                                                                      |
++------------------------------------------------------------------------------+
+| === D4 . personnes sur une ligne walk of fame sans star on, 40 premieres === |
++------------------------------------------------------------------------------+
++-----------+----------------------------+-------------+------------+--------+
+| ID_PERSON | PERSON_NAME                | ID_WIKIDATA | popularite | lignes |
++-----------+----------------------------+-------------+------------+--------+
+|       206 | Jim Carrey                 | Q40504      |        6.7 | 29296  |
+|     53714 | Rachel McAdams             | Q190386     |        5.4 | 29296  |
+|     18269 | Brendan Fraser             | Q193555     |        5.0 | 29296  |
+|     19274 | Seth Rogen                 | Q220308     |        4.7 | 29296  |
+|       290 | Christopher Plummer        | Q190523     |        3.8 | 29296  |
+|     76555 | Jakob Oftebro              | Q11977902   |        3.7 | 30794  |
+|      6736 | Pamela Anderson            | Q83325      |        3.4 | 29296  |
+|     25540 | Sandra Oh                  | Q40337      |        3.2 | 29296  |
+|     76556 | Pål Sverre Hagen           | Q2013068    |        3.0 | 30794  |
+|   1511450 | Glenn Gould                | Q216924     |        3.0 | 29296  |
+|   1549008 | Abel Tesfaye               | Q2121062    |        3.0 | 29296  |
+|     11514 | Catherine O'Hara           | Q233365     |        2.7 | 29296  |
+|   1479774 | Marie Blokhus              | Q17057513   |        2.7 | 30794  |
+|       519 | Martin Short               | Q329744     |        2.6 | 29296  |
+|      8536 | Victor Garber              | Q270664     |        2.5 | 29296  |
+|       707 | Dan Aykroyd                | Q105221     |        2.5 | 29296  |
+|     10690 | Anna Paquin                | Q199884     |        2.3 | 29296  |
+|     11916 | Liv Ullmann                | Q191064     |        2.3 | 30794  |
+|      7180 | John Candy                 | Q218532     |        2.3 | 29296  |
+|      2109 | Kim Cattrall               | Q209175     |        2.3 | 29296  |
+|     19957 | Wendy Crewson              | Q253891     |        2.1 | 29296  |
+|    155488 | Kelly Clarkson             | Q483507     |        2.0 | 27042  |
+|   1394758 | Ine Marie Wilmann          | Q17113974   |        2.0 | 30794  |
+|      8263 | Andrea Martin              | Q442309     |        1.9 | 29296  |
+|        98 | Sarah Polley               | Q234212     |        1.8 | 29296  |
+|     50877 | Jill Hennessy              | Q237925     |        1.8 | 29296  |
+|     26510 | Eugene Levy                | Q312129     |        1.8 | 29296  |
+|     19143 | Jason Priestley            | Q311769     |        1.7 | 29296  |
+|     54734 | Evan Goldberg              | Q3061320    |        1.7 | 29296  |
+|      4160 | Helen Shaver               | Q288146     |        1.5 | 29296  |
+|       224 | David Cronenberg           | Q55422      |        1.5 | 29296  |
+|     11794 | Frances Bay                | Q292446     |        1.4 | 29296  |
+|     63769 | Ane Dahl Torp              | Q1779957    |        1.3 | 30794  |
+|      7668 | Hume Cronyn                | Q395205     |        1.3 | 29296  |
+|     77976 | Anders Baasmo Christiansen | Q1780001    |        1.3 | 30794  |
+|    592574 | Andrea Bræin Hovig         | Q4580536    |        1.3 | 30794  |
+|    133259 | Arthur Hiller              | Q455043     |        1.3 | 29296  |
+|    197315 | Drake                      | Q33240      |        1.2 | 29296  |
+|   2067605 | Jessie Reyez               | Q29898660   |        1.1 | 29296  |
+|      7742 | Kristoffer Joner           | Q1190263    |        1.1 | 30794  |
++-----------+----------------------------+-------------+------------+--------+
++--------------------------------------------------------------------------+
+| section                                                                  |
++--------------------------------------------------------------------------+
+| === D5 . statements Wikidata pointant vers ces lignes, par propriete === |
++--------------------------------------------------------------------------+
++----------+-------------+------------------------------------------+-------------+------------+------------------+
+| ID_AWARD | ID_WIKIDATA | AWARD_NAME                               | ID_PROPERTY | statements | sujets_distincts |
++----------+-------------+------------------------------------------+-------------+------------+------------------+
+|      458 | Q104860729  | Bronx Walk of Fame                       | P166        |          1 |                1 |
+|      800 | Q106515063  | Black Music & Entertainment Walk of Fame | P166        |          2 |                2 |
+|      800 | Q106515063  | Black Music & Entertainment Walk of Fame | P463        |          1 |                1 |
+|     9550 | Q17985761   | star on Hollywood Walk of Fame           | P166        |       2287 |             2285 |
+|    24644 | Q6049273    | International Civil Rights Walk of Fame  | P166        |          4 |                4 |
+|    27042 | Q71719      | Hollywood Walk of Fame                   | P166        |          6 |                6 |
+|    27042 | Q71719      | Hollywood Walk of Fame                   | P921        |          1 |                1 |
+|    28249 | Q776096     | Italian Walk of Fame                     | P166        |          1 |                1 |
+|    29296 | Q857933     | Canada's Walk of Fame                    | P166        |        156 |              156 |
+|    30794 | Q98399879   | Haugesund Walk of Fame                   | P166        |         12 |               12 |
+|    41794 | Q7589721    | St. Louis Walk of Fame                   | P166        |          1 |                1 |
+|    46683 | Q69394811   | Caledon Walk of Fame                     | P166        |          1 |                1 |
++----------+-------------+------------------------------------------+-------------+------------+------------------+
++--------------------------------------------------------+
+| section                                                |
++--------------------------------------------------------+
+| === D6 . paires de noms du meme type, 50 premieres === |
++--------------------------------------------------------+
++----------+---------+------------+--------------------------------------------------+------------+----------+-----------+----------------------------------+-------------+
+| motif    | id_long | qid_long   | nom_long                                         | liens_long | id_court | qid_court | nom_court                        | liens_court |
++----------+---------+------------+--------------------------------------------------+------------+----------+-----------+----------------------------------+-------------+
+| M1 of    |   54850 | Q17231624  | Legionnaire of Legion of Merit                   |         65 |    27191 | Q724443   | Legion of Merit                  |          26 |
+| M2 award |   54165 | Q60666083  | Gold Medal award                                 |         15 |    19641 | Q406039   | gold medal                       |          14 |
+| M1 of    |   54976 | Q20894507  | Grand Cross of Royal Norwegian Order of Merit    |         21 |    30254 | Q94422    | Royal Norwegian Order of Merit   |           8 |
+| M2 award |    9087 | Q17354954  | Un certain regard Award                          |         11 |      964 | Q1071326  | Un Certain Regard                |           7 |
+| M1 on    |    9550 | Q17985761  | star on Hollywood Walk of Fame                   |       2178 |    27042 | Q71719    | Hollywood Walk of Fame           |           6 |
+| M1 of    |   38308 | Q1816763   | Prisoner of War Medal                            |          6 |    25908 | Q6513761  | War Medal                        |           7 |
+| M1 of    |   41133 | Q6054302   | International Women of Courage Award             |          4 |     2158 | Q1137620  | Courage Award                    |          15 |
+| M1 of    |   11644 | Q20799983  | Pinter International Writer of Courage Award     |          2 |     2158 | Q1137620  | Courage Award                    |          15 |
+| M1 of    |   41133 | Q6054302   | International Women of Courage Award             |          4 |    32135 | Q19803183 | Courage Award                    |           2 |
+| M1 of    |   55325 | Q63343771  | Commander of Order of Manuel Amador Guerrero     |          2 |    15318 | Q2803223  | Order of Manuel Amador Guerrero  |           6 |
+| M1 of    |   55323 | Q63343768  | Grand Cross of Order of Manuel Amador Guerrero   |          2 |    15318 | Q2803223  | Order of Manuel Amador Guerrero  |           6 |
+| M1 of    |   11644 | Q20799983  | Pinter International Writer of Courage Award     |          2 |    32135 | Q19803183 | Courage Award                    |           2 |
+| M2 award |    8717 | Q16993081  | Golden PEN Award                                 |          2 |    41903 | Q776009   | Golden Pen                       |           8 |
+| M1 of    |   32219 | Q9195092   | Knight of Freedom Award                          |          2 |     6288 | Q1453512  | Freedom Award                    |          20 |
+| M2 prize |   43262 | Q12834935  | Golden Pen Prize                                 |          1 |    41903 | Q776009   | Golden Pen                       |           8 |
+| M2 award |   55462 | Q141444847 | Audience Award                                   |          1 |    11944 | Q211198   | audience                         |           1 |
+| M2 award |    6841 | Q15296294  | National Artist Award                            |         15 |    48257 | Q19762830 | National Artist                  |           1 |
+| M2 award |   32141 | Q21866939  | National Society of Film Critics Award           |          1 |     3474 | Q1206671  | National Society of Film Critics |           2 |
+| M1 of    |   16222 | Q298950    | Order of Leopold                                 |          2 |    48154 | Q1767199  | Leopold                          |           1 |
+| M2 award |   54165 | Q60666083  | Gold Medal award                                 |         15 |    54440 | Q63390112 | Gold Medal                       |           1 |
+| M1 of    |   55324 | Q63343769  | Grand Officer of Order of Manuel Amador Guerrero |          1 |    15318 | Q2803223  | Order of Manuel Amador Guerrero  |           6 |
+| M1 of    |   14541 | Q26126     | Order of Leopold                                 |         11 |    48154 | Q1767199  | Leopold                          |           1 |
+| M2 award |    8717 | Q16993081  | Golden PEN Award                                 |          2 |    47623 | Q12106935 | Golden Pen                       |           1 |
+| M2 prize |   43262 | Q12834935  | Golden Pen Prize                                 |          1 |    47623 | Q12106935 | Golden Pen                       |           1 |
++----------+---------+------------+--------------------------------------------------+------------+----------+-----------+----------------------------------+-------------+
++---------------------------------------------------+
+| section                                           |
++---------------------------------------------------+
+| === D6 bis . nombre total de paires par motif === |
++---------------------------------------------------+
++----------+--------+
+| motif    | paires |
++----------+--------+
+| M1 of    |     13 |
+| M1 on    |      1 |
+| M2 award |      8 |
+| M2 prize |      2 |
++----------+--------+
