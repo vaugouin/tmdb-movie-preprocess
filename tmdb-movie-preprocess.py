@@ -131,7 +131,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -182,6 +182,10 @@ try:
             # Process 64 alone, for the first backfill and for reruns on demand
             # (TMDB-MOVIE-PREPROCESS-049). In main it sits between 1 and 2.
             arrprocessscopewikidatacolour = {64: 'WIKIDATA_COLOR'}
+            # Genres and person aliases only (Processes 50 and 51, TMDB-MOVIE-PREPROCESS-053 / -054):
+            # the first build of the three tables, and reruns on demand, without the main run.
+            # In main, 51 follows 6 and 50 precedes 11. Run with TMDB_PREPROCESS_SCOPE=genre-alias.
+            arrprocessscopegenrealias = {51: 'T2S_PERSON_ALSO_KNOWN_AS', 50: 'T2S_GENRE'}
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
                 arrprocessscope = arrprocessscopewikidatatopics
@@ -199,6 +203,8 @@ try:
                 arrprocessscope = arrprocessscopelocations
             elif strprocessscope in ("wikidata-colour", "wikidata-color"):
                 arrprocessscope = arrprocessscopewikidatacolour
+            elif strprocessscope in ("genre-alias", "genres-aliases"):
+                arrprocessscope = arrprocessscopegenrealias
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
@@ -212,7 +218,7 @@ try:
             # il restait un piege pour le prochain lecteur et un precedent a ne pas suivre.
             # Un forcage ponctuel se fait par la variable d'environnement, jamais par une
             # date en dur qui survit a son jour.
-            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations | wikidata-colour)", 0)
+            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations | wikidata-colour | genre-alias)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
@@ -6370,6 +6376,157 @@ WHERE s.ID_SEASON BETWEEN {lngseasonrangestart} AND {lngseasonrangeend} """
     ) """
                             cursor2.execute(strsqlpersonepisodesdelete)
                             cp.connectioncp.commit()
+
+                elif intindex == 50:
+                    #----------------------------------------------------
+                    # TMDB-MOVIE-PREPROCESS-053: the genre vocabulary in the T2S read-model, under
+                    # T2S column names (ID_GENRE, GENRE_NAME) instead of the legacy lowercase
+                    # `id` / `name` of the TMDb source, so fastapi-text2sql can drop its last
+                    # reads of T_WC_TMDB_GENRE / _LANG (FASTAPI-TEXT2SQL-313). No gate,
+                    # APPLIES_TO_MOVIE / APPLIES_TO_SERIE carry the scope. Placed before 11 and 12
+                    # in the main scope so the junction tables and their reference are refreshed
+                    # in the same pass.
+                    # NEVER a rebuild, a TRUNCATE or a table swap here (Philippe, 2026-10-04): the
+                    # tables are created once, then kept in step by an upsert followed by the
+                    # removal of the rows gone from the source. A query on T_WC_T2S_GENRE must
+                    # always find the table and its rows, at any moment of the run.
+                    print("T2S_GENRE processing")
+                    if 1:
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_GENRE and TMDB_GENRE_LANG to T2S_GENRE and T2S_GENRE_LANG","Current sub process in the TMDb database preprocess",0)
+                        # Self-installing: the swap below needs the target to exist for CREATE ... LIKE.
+                        cursor2.execute("""
+CREATE TABLE IF NOT EXISTS T_WC_T2S_GENRE (
+  ID_GENRE int(11) NOT NULL,
+  GENRE_NAME varchar(250) DEFAULT NULL,
+  APPLIES_TO_MOVIE tinyint(1) NOT NULL DEFAULT 0,
+  APPLIES_TO_SERIE tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (ID_GENRE),
+  KEY GENRE_NAME (GENRE_NAME),
+  KEY APPLIES_TO_MOVIE (APPLIES_TO_MOVIE),
+  KEY APPLIES_TO_SERIE (APPLIES_TO_SERIE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+""")
+                        cursor2.execute("""
+CREATE TABLE IF NOT EXISTS T_WC_T2S_GENRE_LANG (
+  ID_ROW int(11) NOT NULL,
+  ID_GENRE int(11) NOT NULL,
+  LANG varchar(10) DEFAULT NULL,
+  GENRE_NAME varchar(250) DEFAULT NULL,
+  PRIMARY KEY (ID_ROW),
+  KEY ID_GENRE (ID_GENRE),
+  KEY LANG (LANG),
+  KEY GENRE_NAME (GENRE_NAME)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+""")
+                        cp.connectioncp.commit()
+                        arrgenresyncs = (
+                            ("T_WC_T2S_GENRE", """
+INSERT INTO T_WC_T2S_GENRE (ID_GENRE, GENRE_NAME, APPLIES_TO_MOVIE, APPLIES_TO_SERIE)
+SELECT id, name, APPLIES_TO_MOVIE, APPLIES_TO_SERIE
+FROM T_WC_TMDB_GENRE
+ON DUPLICATE KEY UPDATE
+    GENRE_NAME = VALUES(GENRE_NAME),
+    APPLIES_TO_MOVIE = VALUES(APPLIES_TO_MOVIE),
+    APPLIES_TO_SERIE = VALUES(APPLIES_TO_SERIE)
+""", """
+DELETE t FROM T_WC_T2S_GENRE t
+LEFT JOIN T_WC_TMDB_GENRE g ON g.id = t.ID_GENRE
+WHERE g.id IS NULL
+"""),
+                            # ID_ROW kept from the source, as for every T2S image table.
+                            ("T_WC_T2S_GENRE_LANG", """
+INSERT INTO T_WC_T2S_GENRE_LANG (ID_ROW, ID_GENRE, LANG, GENRE_NAME)
+SELECT ID_ROW, id, LANG, name
+FROM T_WC_TMDB_GENRE_LANG
+ON DUPLICATE KEY UPDATE
+    ID_GENRE = VALUES(ID_GENRE),
+    LANG = VALUES(LANG),
+    GENRE_NAME = VALUES(GENRE_NAME)
+""", """
+DELETE t FROM T_WC_T2S_GENRE_LANG t
+LEFT JOIN T_WC_TMDB_GENRE_LANG l ON l.ID_ROW = t.ID_ROW
+WHERE l.ID_ROW IS NULL
+"""),
+                        )
+                        for strtable, strupsert, strdelete in arrgenresyncs:
+                            cursor2.execute(strupsert)
+                            lngupserted = cursor2.rowcount
+                            cursor2.execute(strdelete)
+                            lngdeleted = cursor2.rowcount
+                            cp.connectioncp.commit()
+                            cursor.execute(f"SELECT COUNT(*) AS row_count FROM {strtable}")
+                            print(f"{strtable}: {cursor.fetchone()['row_count']} rows ({lngupserted} upsert row count, {lngdeleted} removed)")
+
+                elif intindex == 51:
+                    #----------------------------------------------------
+                    # TMDB-MOVIE-PREPROCESS-054: the person aliases of the T2S scope only. The
+                    # source T_WC_TMDB_PERSON_ALSO_KNOWN_AS (normalized by tmdb-person-preprocess,
+                    # Process 2) covers every TMDb person; fastapi-text2sql resolves names against
+                    # it, so an alias of a person outside T_WC_T2S_PERSON could win a match the
+                    # generated SQL would never find. Placed right after Process 6 in the main
+                    # scope, so the gate is the T_WC_T2S_PERSON of this very run. ID_ROW is kept
+                    # (the API uses it as the row id); PERSON_NAME_NORM / PERSON_NAME_KEY are
+                    # generated columns, recomputed by MariaDB from PERSON_NAME, never inserted.
+                    # Full rebuild through a _BUILD table and an atomic swap, as Process 32.
+                    print("T2S_PERSON_ALSO_KNOWN_AS processing")
+                    if 1:
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_PERSON_ALSO_KNOWN_AS to T2S_PERSON_ALSO_KNOWN_AS","Current sub process in the TMDb database preprocess",0)
+                        # Raw string: the regex must reach MariaDB as a backslash-p class, the same expression as the source.
+                        cursor2.execute(r"""
+CREATE TABLE IF NOT EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS (
+  ID_ROW int(11) NOT NULL,
+  ID_PERSON int(11) NOT NULL,
+  PERSON_NAME varchar(200) DEFAULT NULL,
+  LANGUAGE_FAMILY varchar(10) DEFAULT NULL,
+  DELETED int(5) DEFAULT NULL,
+  DISPLAY_ORDER int(5) DEFAULT NULL,
+  ID_CREATOR int(5) DEFAULT NULL,
+  DAT_CREAT date DEFAULT NULL,
+  ID_OWNER int(5) DEFAULT NULL,
+  TIM_UPDATED datetime DEFAULT NULL,
+  ID_USER_UPDATED int(5) DEFAULT NULL,
+  PERSON_NAME_NORM varchar(255) GENERATED ALWAYS AS (lcase(regexp_replace(regexp_replace(PERSON_NAME,'[^\\p{L}\\p{N} ]+',' '),' +',' '))) STORED,
+  PERSON_NAME_KEY varchar(255) GENERATED ALWAYS AS (replace(PERSON_NAME_NORM,' ','')) STORED,
+  PRIMARY KEY (ID_ROW),
+  UNIQUE KEY UQ_T2S_PERSON_ALSO_KNOWN_AS_PERSON_NAME (ID_PERSON, PERSON_NAME),
+  KEY ID_PERSON (ID_PERSON),
+  KEY DELETED (DELETED),
+  KEY LANGUAGE_FAMILY (LANGUAGE_FAMILY),
+  KEY PERSON_NAME (PERSON_NAME),
+  KEY IDX_T2S_PERSON_NAME_NORM (PERSON_NAME_NORM),
+  KEY IDX_T2S_PERSON_NAME_KEY (PERSON_NAME_KEY),
+  FULLTEXT KEY ft_person_name_norm (PERSON_NAME_NORM)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+""")
+                        cp.connectioncp.commit()
+                        cursor2.execute("DROP TABLE IF EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD")
+                        cursor2.execute("CREATE TABLE T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD LIKE T_WC_T2S_PERSON_ALSO_KNOWN_AS")
+                        cp.connectioncp.commit()
+                        cursor2.execute("""
+INSERT INTO T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD (
+    ID_ROW, ID_PERSON, PERSON_NAME, LANGUAGE_FAMILY,
+    DELETED, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED
+)
+SELECT
+    a.ID_ROW, a.ID_PERSON, a.PERSON_NAME, a.LANGUAGE_FAMILY,
+    a.DELETED, a.DISPLAY_ORDER, a.ID_CREATOR, a.DAT_CREAT, a.ID_OWNER, a.TIM_UPDATED, a.ID_USER_UPDATED
+FROM T_WC_TMDB_PERSON_ALSO_KNOWN_AS a
+INNER JOIN T_WC_T2S_PERSON p ON p.ID_PERSON = a.ID_PERSON
+""")
+                        cp.connectioncp.commit()
+                        cursor2.execute("DROP TABLE IF EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS_OLD")
+                        cursor2.execute("""
+RENAME TABLE
+    T_WC_T2S_PERSON_ALSO_KNOWN_AS TO T_WC_T2S_PERSON_ALSO_KNOWN_AS_OLD,
+    T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD TO T_WC_T2S_PERSON_ALSO_KNOWN_AS
+""")
+                        cursor2.execute("DROP TABLE IF EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS_OLD")
+                        cp.connectioncp.commit()
+                        cursor.execute("SELECT COUNT(*) AS row_count FROM T_WC_T2S_PERSON_ALSO_KNOWN_AS")
+                        lngt2scount = cursor.fetchone()['row_count']
+                        cursor.execute("SELECT COUNT(*) AS row_count FROM T_WC_TMDB_PERSON_ALSO_KNOWN_AS")
+                        lngsourcecount = cursor.fetchone()['row_count']
+                        print(f"T_WC_T2S_PERSON_ALSO_KNOWN_AS: {lngt2scount} rows kept out of {lngsourcecount} source aliases")
 
                 elif intindex == 32:
                     #----------------------------------------------------

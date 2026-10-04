@@ -21,9 +21,10 @@ for intindex, strdesc in arrprocessscope.items():
 - `wikidata-all` (alias `wikidata`) — **all** Wikidata linkers run **sequentially in one container** (Process 60 → 63 → future network/genre/character). This is the scope to **schedule**: one process means one Wikimedia request stream, so the linkers never contend for the rate limit. The `wikidata-topics` / `wikidata-companies` scopes remain for targeted single-linker / debug runs.
 - `locations` (alias `location`) — **only** Process 72 (rebuild `T_WC_T2S_LOCATION` and its two association tables from the Wikidata V2 statements `P840` / `P915`, plus the `T_WC_T2S_LOCATION_CLASS` cone table that `LOCATION_TYPE` is derived from). Wrapper: `tmdb-movie-preprocess-locations.sh`. **`ID_LOCATION` is stable across rebuilds** (fixed 2026-09-13): a known place keeps its id and `DAT_CREAT`, a place that left the perimeter stays as a `DELETED = 1` row so its id is never reused, a new place gets an id above `MAX(ID_LOCATION)` of the served table; consumers must filter `DELETED = 0`. Recette: `doc/sql/test-014-location-id-stability.sql`, run before and after a pass. **Does not fill the image columns** — those belong to Process 71, so chain `wikipedia-main-image` after the first pass or `WIKIPEDIA_MAIN_IMAGE_URL` stays NULL, which reads as "no image" when it is in fact "no pass".
 - `wikidata-colour` (alias `wikidata-color`), **only** Process 64 (colour flags from Wikidata `P462` for films without a French Format line, TMDB-MOVIE-PREPROCESS-049). For the first backfill and reruns on demand; in `main` it runs between 1 and 2.
+- `genre-alias` (alias `genres-aliases`), **only** Processes 51 and 50 (`T_WC_T2S_PERSON_ALSO_KNOWN_AS`, then `T_WC_T2S_GENRE` and `T_WC_T2S_GENRE_LANG`). For the first build of the three tables and reruns on demand; in `main`, 51 runs right after 6 and 50 right before 11. Wrapper: `tmdb-movie-preprocess-genre-alias.sh`.
 - `neighbours` (aliases `neighbors`, `similar-recommendations`) — **only** Processes 36-39 (rebuild the T2S `similar` / `recommendation` neighbour tables from the raw `T_WC_TMDB_*` twins). Handy as a **unit test** right after creating the four T2S tables, without the whole pipeline. Wrapper: `tmdb-movie-preprocess-neighbours.sh`.
 
-The `main` scope runs processes: **1, 64, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 36, 37, 38, 39, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40, 72, 70, 71**. Process 72 (locations) sits **before** 71: the image copier fills every T2S entity table and must therefore find the locations already built. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
+The `main` scope runs processes: **1, 64, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 51, 7, 8, 9, 10, 50, 11, 12, 36, 37, 38, 39, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40, 72, 70, 71**. Process 72 (locations) sits **before** 71: the image copier fills every T2S entity table and must therefore find the locations already built. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
 
 Progress is tracked server-side via `cp.f_setservervariable()`. Multiple cursor objects (`cursor`, `cursor2` … `cursor5`) allow parallel DB operations within a single process.
 
@@ -736,6 +737,32 @@ Copies episode videos into the T2S layer.
 
 ---
 
+### Process 50 - T2S_GENRE
+
+Copies the TMDb genre vocabulary and its translations into the T2S layer, under T2S column names (TMDB-MOVIE-PREPROCESS-053), so `fastapi-text2sql` no longer reads the TMDb reference tables (FASTAPI-TEXT2SQL-313).
+
+**Reads:** `T_WC_TMDB_GENRE`, `T_WC_TMDB_GENRE_LANG`
+**Writes:** `T_WC_T2S_GENRE` (`ID_GENRE`, `GENRE_NAME`, `APPLIES_TO_MOVIE`, `APPLIES_TO_SERIE`), `T_WC_T2S_GENRE_LANG` (`ID_ROW`, `ID_GENRE`, `LANG`, `GENRE_NAME`)
+
+**Filter:** none; `APPLIES_TO_MOVIE` / `APPLIES_TO_SERIE` carry the movie and series scopes.
+
+**Operations:** The source's legacy lowercase `id` / `name` become `ID_GENRE` / `GENRE_NAME`; `ID_ROW` of the translations is kept. Both tables are created if missing (first run), then kept in step by `INSERT … ON DUPLICATE KEY UPDATE` followed by the deletion of the rows gone from the source. **Never a rebuild, a `TRUNCATE` or a table swap** (Philippe, 2026-10-04): a query on `T_WC_T2S_GENRE` must always find the table and its rows, at any moment of the run. Runs right before Processes 11 and 12 in `main`, so the genre junctions and their reference are refreshed in the same pass.
+
+---
+
+### Process 51 - T2S_PERSON_ALSO_KNOWN_AS
+
+Copies the person aliases of the T2S persons only (TMDB-MOVIE-PREPROCESS-054). The source holds the aliases of every TMDb person; `fastapi-text2sql` resolves names against them, so an alias of a person outside `T_WC_T2S_PERSON` could win a match that the generated SQL would never find.
+
+**Reads:** `T_WC_TMDB_PERSON_ALSO_KNOWN_AS` (written and normalized by `tmdb-person-preprocess`, Process 2), `T_WC_T2S_PERSON`
+**Writes:** `T_WC_T2S_PERSON_ALSO_KNOWN_AS`
+
+**Filter:** `ID_PERSON` exists in `T_WC_T2S_PERSON`
+
+**Operations:** Same columns as the source, `ID_ROW` kept (the API uses it as the row id). `PERSON_NAME_NORM` / `PERSON_NAME_KEY` are generated columns with the same expressions as the source, recomputed by MariaDB rather than copied. The table is created if missing, then fully rebuilt through a `*_BUILD` table and an atomic `RENAME TABLE` swap. Runs right after Process 6 in `main`, so the gate is the `T_WC_T2S_PERSON` of the same run. The log prints how many aliases were kept out of the source total.
+
+---
+
 ### Process 60 — Link Wikidata items to topics
 
 Links TMDb keywords to Wikidata items before process `3` builds `T_WC_T2S_TOPIC`, and spreads the work over rolling daily batches.
@@ -1133,6 +1160,8 @@ The one-column form is unchanged and remains right for a single-kind question (`
 | T_WC_TMDB_EPISODE_IMAGE | T_WC_T2S_EPISODE_IMAGE |
 | T_WC_TMDB_SEASON_VIDEO | T_WC_T2S_SEASON_VIDEO |
 | T_WC_TMDB_EPISODE_VIDEO | T_WC_T2S_EPISODE_VIDEO |
+| T_WC_TMDB_GENRE / T_WC_TMDB_GENRE_LANG | T_WC_T2S_GENRE, T_WC_T2S_GENRE_LANG |
+| T_WC_TMDB_PERSON_ALSO_KNOWN_AS (T2S persons only) | T_WC_T2S_PERSON_ALSO_KNOWN_AS |
 | T_WC_TMDB_LIST / T_WC_CUSTOM_LIST (TARGET_TABLE=1) | T_WC_T2S_LIST, T_WC_T2S_MOVIE_LIST, T_WC_T2S_SERIE_LIST |
 | T_WC_TMDB_COLLECTION / T_WC_CUSTOM_LIST (TARGET_TABLE=2) | T_WC_T2S_COLLECTION, T_WC_T2S_MOVIE_COLLECTION, T_WC_T2S_SERIE_COLLECTION |
 | T_WC_TMDB_KEYWORD / T_WC_TMDB_LIST / T_WC_TMDB_COLLECTION | T_WC_T2S_TOPIC |
