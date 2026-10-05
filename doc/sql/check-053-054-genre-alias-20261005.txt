@@ -1,0 +1,108 @@
+-- check-053-054-genre-alias.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-05 08:29:33
+--
++---------------------+
+| measured_at         |
++---------------------+
+| 2026-10-05 08:29:33 |
++---------------------+
++--------------------+
+| section            |
++--------------------+
+| === A . genres === |
++--------------------+
++----------------+----------+-------------+
+| t2s_table      | t2s_rows | source_rows |
++----------------+----------+-------------+
+| T2S_GENRE      |       27 |          27 |
+| T2S_GENRE_LANG |       19 |          19 |
++----------------+----------+-------------+
++---------------------------------------------------------------+---+
+| check_name                                                    | n |
++---------------------------------------------------------------+---+
+| genres whose name or flags differ from the source (must be 0) | 0 |
+| translations that differ from the source (must be 0)          | 0 |
+| T2S_MOVIE_GENRE rows whose genre is missing (must be 0)       | 0 |
+| T2S_SERIE_GENRE rows whose genre is missing (must be 0)       | 0 |
++---------------------------------------------------------------+---+
++----------+--------------------+------------------+------------------+
+| ID_GENRE | GENRE_NAME         | APPLIES_TO_MOVIE | APPLIES_TO_SERIE |
++----------+--------------------+------------------+------------------+
+|       28 | Action             |                1 |                0 |
+|    10759 | Action & Adventure |                0 |                1 |
+|       12 | Adventure          |                1 |                0 |
+|       16 | Animation          |                1 |                1 |
+|       35 | Comedy             |                1 |                1 |
+|       80 | Crime              |                1 |                1 |
+|       99 | Documentary        |                1 |                1 |
+|       18 | Drama              |                1 |                1 |
+|    10751 | Family             |                1 |                1 |
+|       14 | Fantasy            |                1 |                0 |
+|       36 | History            |                1 |                0 |
+|       27 | Horror             |                1 |                0 |
+|    10762 | Kids               |                0 |                1 |
+|    10402 | Music              |                1 |                0 |
+|     9648 | Mystery            |                1 |                1 |
+|    10763 | News               |                0 |                1 |
+|    10764 | Reality            |                0 |                1 |
+|    10749 | Romance            |                1 |                0 |
+|    10765 | Sci-Fi & Fantasy   |                0 |                1 |
+|      878 | Science Fiction    |                1 |                0 |
+|    10766 | Soap               |                0 |                1 |
+|    10767 | Talk               |                0 |                1 |
+|       53 | Thriller           |                1 |                0 |
+|    10770 | TV Movie           |                1 |                0 |
+|    10752 | War                |                1 |                0 |
+|    10768 | War & Politics     |                0 |                1 |
+|       37 | Western            |                1 |                1 |
++----------+--------------------+------------------+------------------+
++----------------------------+
+| section                    |
++----------------------------+
+| === B . person aliases === |
++----------------------------+
++-------------+----------------+---------------------------------+
+| t2s_aliases | source_aliases | aliases_of_out_of_scope_persons |
++-------------+----------------+---------------------------------+
+|      641738 |        6123767 |                         5482029 |
++-------------+----------------+---------------------------------+
++----------------------------------------------------------------------------+---+
+| check_name                                                                 | n |
++----------------------------------------------------------------------------+---+
+| T2S aliases whose person is not in T2S_PERSON (must be 0)                  | 0 |
+| source aliases of T2S persons missing from T2S (must be 0)                 | 0 |
+| aliases whose content or generated keys differ from the source (must be 0) | 0 |
++----------------------------------------------------------------------------+---+
++-----------+----------------+------------------------------------------------+-----------------+------------------------------------------------+-----------------------------------------------+
+| ID_PERSON | canonical_name | alias                                          | LANGUAGE_FAMILY | PERSON_NAME_NORM                               | PERSON_NAME_KEY                               |
++-----------+----------------+------------------------------------------------+-----------------+------------------------------------------------+-----------------------------------------------+
+|      5026 | Akira Kurosawa | أكيرا كوروساوا                                 | Arabic          | أكيرا كوروساوا                                 | أكيراكوروساوا                                 |
+|      5026 | Akira Kurosawa | อะกิระ คุโระซะวะ                               | Thai            | อะกิระ คุโระซะวะ                               | อะกิระคุโระซะวะ                               |
+|      5026 | Akira Kurosawa | 黑澤明                                         | Chinese         | 黑澤明                                         | 黑澤明                                        |
+|      5026 | Akira Kurosawa | Kurosawa Akira                                 | Latin           | kurosawa akira                                 | kurosawaakira                                 |
+|      5026 | Akira Kurosawa | 아키라 구로사와                                | Hangul          | 아키라 구로사와                                | 아키라구로사와                                |
+|      5026 | Akira Kurosawa | 쿠로사와 아키라                                | Hangul          | 쿠로사와 아키라                                | 쿠로사와아키라                                |
+|      5026 | Akira Kurosawa | 아키라 쿠로사와                                | Hangul          | 아키라 쿠로사와                                | 아키라쿠로사와                                |
+|      5026 | Akira Kurosawa | آکیرا کوروساوا                                 | Persian         | آکیرا کوروساوا                                 | آکیراکوروساوا                                 |
+|      5026 | Akira Kurosawa | Akira Kurosawa                                 | Latin           | akira kurosawa                                 | akirakurosawa                                 |
+|       608 | Hayao Miyazaki | Сабуро Акицу                                   | Cyrillic        | сабуро акицу                                   | сабуроакицу                                   |
+|       608 | Hayao Miyazaki | 宮崎 駿                                        | Chinese         | 宮崎 駿                                        | 宮崎駿                                        |
+|       608 | Hayao Miyazaki | 秋津 三朗                                      | Chinese         | 秋津 三朗                                      | 秋津三朗                                      |
+|       608 | Hayao Miyazaki | Akitsu Saburo                                  | Latin           | akitsu saburo                                  | akitsusaburo                                  |
+|       608 | Hayao Miyazaki | हयाओ मियाज़ाकी                                 | Devanagari      | हयाओ मियाज़ाकी                                 | हयाओमियाज़ाकी                                 |
+|       608 | Hayao Miyazaki | 宮﨑駿                                         | Chinese         | 宮﨑駿                                         | 宮﨑駿                                        |
+|       608 | Hayao Miyazaki | Hayao Miýazaki                                 | Latin           | hayao miýazaki                                 | hayaomiýazaki                                 |
+|       608 | Hayao Miyazaki | ಹಯಾವೊ ಮಿಯಾಜಾಕಿ                                 | Kannada         | ಹಯಾವೊ ಮಿಯಾಜಾಕಿ                                 | ಹಯಾವೊಮಿಯಾಜಾಕಿ                                 |
+|       608 | Hayao Miyazaki | ሃያኦ ሚያዛኪ                                       | Ethiopic        | ሃያኦ ሚያዛኪ                                       | ሃያኦሚያዛኪ                                       |
+|       608 | Hayao Miyazaki | ฮายาโอะ มิยาซากิ                               | Thai            | ฮายาโอะ มิยาซากิ                               | ฮายาโอะมิยาซากิ                               |
+|       608 | Hayao Miyazaki | 照樹務                                         | Chinese         | 照樹務                                         | 照樹務                                        |
+|     12453 | Wong Kar-Wai   | Wong Kar Wai                                   | Latin           | wong kar wai                                   | wongkarwai                                    |
+|     12453 | Wong Kar-Wai   | Kar Wai Wong                                   | Latin           | kar wai wong                                   | karwaiwong                                    |
+|     12453 | Wong Kar-Wai   | Kar-wai Wong                                   | Latin           | kar wai wong                                   | karwaiwong                                    |
+|     12453 | Wong Kar-Wai   | 왕 가위                                        | Hangul          | 왕 가위                                        | 왕가위                                        |
+|     12453 | Wong Kar-Wai   | ウォン・カーワァイ                             | Japanese        | ウォン カーワァイ                              | ウォンカーワァイ                              |
+|     12453 | Wong Kar-Wai   | Vương Gia Vệ                                   | Latin           | vương gia vệ                                   | vươnggiavệ                                    |
+|     12453 | Wong Kar-Wai   | Wong Kar-Wai                                   | Latin           | wong kar wai                                   | wongkarwai                                    |
+|     12453 | Wong Kar-Wai   | 王家衞                                         | Chinese         | 王家衞                                         | 王家衞                                        |
+|     12453 | Wong Kar-Wai   | WKW                                            | Latin           | wkw                                            | wkw                                           |
++-----------+----------------+------------------------------------------------+-----------------+------------------------------------------------+-----------------------------------------------+
