@@ -6472,8 +6472,11 @@ WHERE l.ID_ROW IS NULL
                     if 1:
                         cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copying from TMDB_PERSON_ALSO_KNOWN_AS to T2S_PERSON_ALSO_KNOWN_AS","Current sub process in the TMDb database preprocess",0)
                         # Raw string: the regex must reach MariaDB as a backslash-p class, the same expression as the source.
-                        cursor2.execute(r"""
-CREATE TABLE IF NOT EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS (
+                        # p{M} keeps the combining marks, i.e. the vowels of the abugidas (TMDB-PERSON-PREPROCESS-008).
+                        # The _BUILD table is created from this DDL, not LIKE the live table, so a change to the
+                        # generated columns reaches the live table at the next run through the swap, without a manual drop.
+                        strakaddl = r"""
+CREATE TABLE {table} (
   ID_ROW int(11) NOT NULL,
   ID_PERSON int(11) NOT NULL,
   PERSON_NAME varchar(200) DEFAULT NULL,
@@ -6485,7 +6488,7 @@ CREATE TABLE IF NOT EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS (
   ID_OWNER int(5) DEFAULT NULL,
   TIM_UPDATED datetime DEFAULT NULL,
   ID_USER_UPDATED int(5) DEFAULT NULL,
-  PERSON_NAME_NORM varchar(255) GENERATED ALWAYS AS (lcase(regexp_replace(regexp_replace(PERSON_NAME,'[^\\p{L}\\p{N} ]+',' '),' +',' '))) STORED,
+  PERSON_NAME_NORM varchar(255) GENERATED ALWAYS AS (lcase(regexp_replace(regexp_replace(PERSON_NAME,'[^\\p{L}\\p{M}\\p{N} ]+',' '),' +',' '))) STORED,
   PERSON_NAME_KEY varchar(255) GENERATED ALWAYS AS (replace(PERSON_NAME_NORM,' ','')) STORED,
   PRIMARY KEY (ID_ROW),
   UNIQUE KEY UQ_T2S_PERSON_ALSO_KNOWN_AS_PERSON_NAME (ID_PERSON, PERSON_NAME),
@@ -6497,10 +6500,11 @@ CREATE TABLE IF NOT EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS (
   KEY IDX_T2S_PERSON_NAME_KEY (PERSON_NAME_KEY),
   FULLTEXT KEY ft_person_name_norm (PERSON_NAME_NORM)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-""")
+"""
+                        cursor2.execute(strakaddl.replace("CREATE TABLE {table}", "CREATE TABLE IF NOT EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS"))
                         cp.connectioncp.commit()
                         cursor2.execute("DROP TABLE IF EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD")
-                        cursor2.execute("CREATE TABLE T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD LIKE T_WC_T2S_PERSON_ALSO_KNOWN_AS")
+                        cursor2.execute(strakaddl.replace("{table}", "T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD"))
                         cp.connectioncp.commit()
                         cursor2.execute("""
 INSERT INTO T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD (

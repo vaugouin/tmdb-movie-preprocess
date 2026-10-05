@@ -759,7 +759,7 @@ Copies the person aliases of the T2S persons only (TMDB-MOVIE-PREPROCESS-054). T
 
 **Filter:** `ID_PERSON` exists in `T_WC_T2S_PERSON`
 
-**Operations:** Same columns as the source, `ID_ROW` kept (the API uses it as the row id). `PERSON_NAME_NORM` / `PERSON_NAME_KEY` are generated columns with the same expressions as the source, recomputed by MariaDB rather than copied. The table is created if missing, then fully rebuilt through a `*_BUILD` table and an atomic `RENAME TABLE` swap. Runs right after Process 6 in `main`, so the gate is the `T_WC_T2S_PERSON` of the same run. The log prints how many aliases were kept out of the source total.
+**Operations:** Same columns as the source, `ID_ROW` kept (the API uses it as the row id). `PERSON_NAME_NORM` / `PERSON_NAME_KEY` are generated columns with the same expressions as the source, recomputed by MariaDB rather than copied. The table is created if missing, then fully rebuilt through a `*_BUILD` table and an atomic `RENAME TABLE` swap. The `_BUILD` table is created from the DDL written in the code, not `LIKE` the live table, so a change to the generated columns reaches the live table at the next run without a manual drop. Since TMDB-PERSON-PREPROCESS-008 the `PERSON_NAME_NORM` class is `[^\p{L}\p{M}\p{N} ]+`: combining marks are kept, because in Devanagari, Thai, Kannada and the other abugidas the vowels are marks, and dropping them split every word. Runs right after Process 6 in `main`, so the gate is the `T_WC_T2S_PERSON` of the same run. The log prints how many aliases were kept out of the source total.
 
 ---
 
