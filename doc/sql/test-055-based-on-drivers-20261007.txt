@@ -1,0 +1,266 @@
+-- test-055-based-on-drivers.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-07 09:36:20
+--
++-----------------------------+
+| SECTION                     |
++-----------------------------+
+| 1. P144 on V2, all subjects |
++-----------------------------+
++------------+-------+------------+--------------+---------------+--------------+
+| STATEMENTS | LIVE  | DEPRECATED | DELETED_FLAG | SUBJECTS_LIVE | TARGETS_LIVE |
++------------+-------+------------+--------------+---------------+--------------+
+|      35536 | 35520 |         16 |            0 |         33829 |        23520 |
++------------+-------+------------+--------------+---------------+--------------+
++---------------+------------+----------+---------+
+| SUBJECT_KIND  | STATEMENTS | SUBJECTS | TARGETS |
++---------------+------------+----------+---------+
+| core movie    |      20295 |    19369 |   14090 |
+| core serie    |      11508 |    11029 |    8646 |
+| other subject |       3717 |     3431 |    2543 |
++---------------+------------+----------+---------+
++-------------------------------------------+
+| SECTION                                   |
++-------------------------------------------+
+| 2. P144 on T2S works, volume and coverage |
++-------------------------------------------+
++-------+--------------------+-----------------+-------------+-------+------------------+
+| KIND  | T2S_WORKS_WITH_QID | WORKS_WITH_P144 | PCT_COVERED | LINKS | DISTINCT_TARGETS |
++-------+--------------------+-----------------+-------------+-------+------------------+
+| movie |             275001 |           16768 |        6.10 | 17578 |            12491 |
+| serie |              55760 |            7273 |       13.04 |  7644 |             6088 |
++-------+--------------------+-----------------+-------------+-------+------------------+
++-----------+----------------------+
+| LINKS_ALL | DISTINCT_TARGETS_ALL |
++-----------+----------------------+
+|     25222 |                17454 |
++-----------+----------------------+
++-----------+-------+
+| N_SOURCES | WORKS |
++-----------+-------+
+|         1 | 23152 |
+|         2 |   750 |
+|         3 |    95 |
+|         4 |    21 |
+|         5 |     6 |
+|         6 |     3 |
+|         7 |     4 |
+|         8 |     1 |
+|         9 |     2 |
+|        10 |     1 |
+|        11 |     2 |
+|        12 |     1 |
+|        15 |     1 |
+|        16 |     1 |
+|        24 |     1 |
++-----------+-------+
++---------------------------+
+| SECTION                   |
++---------------------------+
+| 3. Where the targets live |
++---------------------------+
++--------------------------+---------+-------+-------------------+-------------------+
+| TARGET_HOME              | TARGETS | LINKS | LINKS_FROM_MOVIES | LINKS_FROM_SERIES |
++--------------------------+---------+-------+-------------------+-------------------+
+| 1 t2s_movie              |    1358 |  1707 |              1451 |               256 |
+| 2 t2s_serie              |    1507 |  2592 |               809 |              1783 |
+| 3 core_movie_outside_t2s |      50 |    58 |                42 |                16 |
+| 4 core_serie_outside_t2s |     313 |   419 |               155 |               264 |
+| 5 cached_item            |   14155 | 20361 |             15054 |              5307 |
+| 6 missing_everywhere     |      71 |    85 |                67 |                18 |
++--------------------------+---------+-------+-------------------+-------------------+
++------------+-------+------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_TARGET  | LINKS | EXAMPLE_WORKS                                                                                                                                  |
++------------+-------+------------------------------------------------------------------------------------------------------------------------------------------------+
+| Q1982608   |     6 | Kamen Rider #1 | Kamen Rider vs. Ambassador Hell | Kamen Rider vs. Shocker | Kamen Rider: THE FIRST | Kamen Rider: THE NEXT | Shin Kamen Rider |
+| Q5673      |     4 | Big Underground Ball | The Snow Queen | The Ugly Duckling | The Wild Swans                                                                     |
+| Q347685    |     3 | Barmaley | Bibigon | Telephone                                                                                                                 |
+| Q18822150  |     2 | Dick Tracy Special | Dick Tracy Special: Tracy Zooms In                                                                                        |
+| Q4172460   |     2 | Uncle Stepa | Uncle Stepa is a Policeman                                                                                                       |
+| Q4226786   |     2 | Hedgehog in the Fog | Little Boat                                                                                                              |
+| Q435584    |     2 | The Cat's House | Где обедал воробей?                                                                                                          |
+| Q102248399 |     1 | All of a Sudden                                                                                                                                |
+| Q10288122  |     1 | Lottie Dottie Chicken: The Movie                                                                                                               |
+| Q104008372 |     1 | Veleta                                                                                                                                         |
+| Q1053441   |     1 | Urashima Tarō                                                                                                                                  |
+| Q105994    |     1 | Perfume: The Story of a Murderer                                                                                                               |
+| Q11291851  |     1 | Drops of God                                                                                                                                   |
+| Q11329263  |     1 | Penguin's Memory: A Tale of Happiness                                                                                                          |
+| Q117287431 |     1 | Frieda's Case                                                                                                                                  |
+| Q131438494 |     1 | The Robber Kitten                                                                                                                              |
+| Q132191608 |     1 | The 47                                                                                                                                         |
+| Q132964    |     1 | The Bath House                                                                                                                                 |
+| Q1395208   |     1 | Silvio                                                                                                                                         |
+| Q139574368 |     1 | A Honeymoon Adventure                                                                                                                          |
++------------+-------+------------------------------------------------------------------------------------------------------------------------------------------------+
++---------------------------------------------+
+| SECTION                                     |
++---------------------------------------------+
+| 4. Top 50 P31 classes of the cached targets |
++---------------------------------------------+
++------------+---------------------------------+---------+-------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_CLASS   | CLASS_LABEL                     | TARGETS | LINKS | EXAMPLES                                                                                                                                                                                                    |
++------------+---------------------------------+---------+-------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Q7725634   | literary work                   |    8326 | 12117 | The Three Musketeers | A Christmas Carol | The Count of Monte Cristo | Treasure Island | Frankenstein; or, The Modern Prometheus | The Adventures of Pinocchio | Journey to the West | Les Misérables |     |
+| Q21198342  | manga series                    |    1590 |  2186 | Crayon Shin-chan | Case Closed | Boys Over Flowers | Itazura na Kiss | Dr. Slump | One Piece | Tomie | Ghost in the Shell | Lone Wolf and Cub | Doraemon | Rurouni Kenshin | Death Note | Tetsujin 28-go    |
+| Q47461344  | written work                    |    1128 |  1368 | The Vicomte of Bragelonne: Ten Years Later | The Legend of the Condor Heroes | Juedai Shuangjiao | The Postman Always Rings Twice | Letter from an Unknown Woman | Baifa Monü Zhuan | Les Mains d'Orlac     |
+| Q104213567 | light novel series              |     443 |   488 | Sword Art Online | Rascal Does Not Dream | Beyond the Boundary | The Irregular at Magic High School | Kino's Journey | The Case Files of Biblia Bookstore | The Saga of Tanya the Evil | Violet Evergard    |
+| Q7889      | video game                      |     258 |   286 | Persona 3 | Kanon | Air | Monster Strike | Clannad | Dungeon Siege | Rage of Bahamut | Little Busters! | Rewrite | Arknights | Planetarian: The Reverie of a Little Planet | Detention | Phantom of Infe    |
+| Q277759    | book series                     |     228 |   373 | canon of Sherlock Holmes | James Bond | Casper and Emma | Ricky Rapper | The Famous Five | The Whodunit Detective Agency | Ghost Blows Out the Light | The Witcher | Moomins | Goosebumps | Emil from Lö    |
+| Q1667921   | novel series                    |     222 |   331 | How to Train Your Dragon | Tarzan | The Lord of the Rings | Ghost Blows Out the Light | Sound! Euphonium | Q99179974 | Sítio do Picapau Amarelo | The Worst Witch | The Baby-Sitters Club | Jennings | O    |
+| Q58483083  | dramatico-musical work          |     209 |   261 | The Magic Flute | Swan Lake | The King and I | Wicked | The Rocky Horror Show | Annie | The Gipsy Princess | The Merry Widow | Arshin Mal Alan | Jesus Christ Superstar | Mam'zelle Nitouche | Babes in     |
+| Q14406742  | comic book series               |     150 |   228 | Sabrina the Teenage Witch | The Crow | The Walking Dead | Hellboy | Asterix | Major Grom | The Men in Black | Mort & Phil | Largo Winch | Modesty Blaise | Witchblade | The Secret Service | Q3280834 |     |
+| Q116476516 | dramatic work                   |     113 |   399 | Romeo and Juliet | Hamlet | Macbeth | A Doll's House | Hedda Gabler | Othello | King Lear | The Tempest | Pygmalion | Twelfth Night | Peer Gynt | Richard III | The Taming of the Shrew | Ghosts | Lysis    |
+| Q15632617  | fictional human                 |      88 |   208 | Batman | Charlie Chan | Van Veeteren | Madea | Conan the Barbarian | Miss Marple | Iron Man | Captain Marvel | Rapunzel | Alfons Zitterbacke | Cinderella | Lone Ranger | Jacinta Pichimahuida | Tam Sve    |
+| Q196600    | media franchise                 |      84 |   259 | Lupin III | Scooby-Doo | Resident Evil | Tom and Jerry | Dragon Ball | Star Wars | Who Wants to Be a Millionaire? | Survivor | Naruto | Masked Singer | I'm a Celebrity...Get Me Out of Here! | The Smur    |
+| Q15773347  | film character                  |      79 |   230 | Batman | Superman | Hulk | Godzilla | Madea | Conan the Barbarian | Miss Marple | Iron Man | Deadpool | Paddington Bear | Captain Marvel | Rapunzel | Cinderella | Puss in Boots | King Kong | Lone Rang    |
+| Q1114461   | comics character                |      77 |   197 | Batman | Superman | Joe Palooka | Hulk | Thor | Iron Man | Captain Marvel | Supergirl | Blade | Spider-Man | Aquaman | Wonder Woman | John Constantine | Wolverine | Swamp Thing | Doctor Strange | Ghos    |
+| Q7058673   | video game series               |      74 |   102 | Mortal Kombat | Q288035 | Tekken | Shenmue | Battle Arena Toshinden | Q436567 | Q420292 | Q339944 | Inazuma Eleven | Q2515184 | Wing Commander | Hitman | Dragon Age | Dead Space | Battletoads | Touhou    |
+| Q3331189   | version, edition or translation |      70 |    72 | The Year of the Hare | Manslaughter | When Rabbit Howls | Q88997144 | Q79984856 | Ramanan | Qijian Xia Tianshan | The Hell Bent Kid | Q64617791 | Q60477831 | Q52011375 | The Fifth String | La sobrina     |
+| Q15773317  | television character            |      63 |   169 | Batman | Superman | Conan the Barbarian | Miss Marple | Captain Marvel | Puss in Boots | Lone Ranger | Lassie | Blade | Aquaman | Wonder Woman | Daredevil | John Constantine | Tick | RoboCop | Harley     |
+| Q47068459  | children's book series          |      56 |    95 | Nancy Drew Mystery Stories | The Famous Five | Sítio do Picapau Amarelo | The Worst Witch | The Baby-Sitters Club | Jennings | The Railway Series | Karlsson-on-the-Roof | Mary Poppins | Little House o    |
+| Q105543609 | musical work/composition        |      54 |    65 | Jeppe på bjerget | Swan Lake | Pictures at an Exhibition | Peter and the Wolf | Q140085902 | Danse macabre | Pacific 231 | An American in Paris | Yellow Submarine | To an Evening Star | This Is the Ho    |
+| Q7978994   | webtoon                         |      54 |    59 | True Beauty | The Girl Downstairs | Yumi's Cells (webtoon) | Yukwaehan Wangtta | Marry My Husband | My Daughter is a Zombie | Tomb Raider King | Memorist | Why Raeliana Ended Up at the Duke's Mansion     |
+| Q15711870  | animated character              |      51 |   161 | Batman | Superman | Conan the Barbarian | Deadpool | Captain Marvel | Rapunzel | Cinderella | Puss in Boots | King Kong | Blade | Aquaman | Wonder Woman | Daredevil | John Constantine | Mulan | Wolver    |
+| Q838795    | comic strip                     |      50 |   137 | Blondie | Joe Palooka | Dick Tracy | 91:an Karlsson | Bringing Up Father | Flash Gordon | The Phantom | Popeye | Prince Valiant | Heathcliff | Peanuts | Terry and the Pirates | Secret Agent X-9 | Over    |
+| Q213369    | webcomic                        |      43 |    58 | Fox Spirit Matchmaker | Cherry Magic! Thirty Years of Virginity Can Make You a Wizard?! | Under One Person | Rakshasa Street | Heartstopper | Eren the Southpaw | Die Иow | I Love You | Psychic Princes    |
+| Q571       | book                            |      42 |    42 | Q97657705 | Hotel Royal | Tunes of Glory | Alle utlendinger har lukka gardiner | Kissinger: A Biography | Q96308725 | Par ce demi-clair matin | Concussion | Q116025579 | Q115487189 | Q115486785 | Q114    |
+| Q699       | fairy tale                      |      40 |   110 | Snow White | Cinderella | The Little Mermaid | Jack and the Beanstalk | The Beauty Sleeping in the Wood | Rapunzel | Little Briar Rose | Little Peter's Journey to the Moon | The Frog Prince | Moydodyr    |
+| Q3658341   | literary character              |      39 |   102 | Superman | Van Veeteren | Conan the Barbarian | Miss Marple | Alfons Zitterbacke | King Kong | Tam Sventon | Wolverine | Spawn | Simon Templar | Count Dracula | Zorro | Peter Rabbit | Curious George |    |
+| Q59126     | xiaoshuo                        |      36 |    39 | Q140589857 | Nazonotenkōsei | Q11265953 | Q9883794 | Q97674258 | Under the Stars | Q55697033 | 48-ninme no Chūshin | Q141583247 | Q140592682 | Q140592190 | Q140590066 | Q140589703 | Samurai Vendetta |    |
+| Q74262765  | manhwa series                   |      36 |    43 | Sikgaek | True Beauty | The Girl Downstairs | Yumi's Cells (webtoon) | Survival | Marry My Husband | My Daughter is a Zombie | Tomb Raider King | Why Raeliana Ended Up at the Duke's Mansion | Priest |    |
+| Q1004      | comic                           |      35 |    42 | Sikgaek | O Doutrinador | Chickenhare | I Love You | Q10568100 | Q10397313 | Zbeng! | Sad Sack | Sweet Tooth | M. Rex | El tesoro del Cisne Negro | Q57399799 | Here | Gemma Bovery | Black is Beltza |     |
+| Q3297186   | limited series                  |      35 |    47 | Watchmen | Crisis on Infinite Earths | Batman: The Long Halloween | The Dark Knight Returns | Timecop | All-Star Superman | Global Frequency | The Middleman | Remains | Stumptown | Xerxes | Whiteout |    |
+| Q24856     | film series                     |      34 |    52 | Zero Woman | Air Bud | Olsen Gang | The Pink Panther | Spy Kids | The Transporter | Halloween | Our Gang | Bourne franchise | To All the Boys | The Texas Chainsaw Massacre | National Treasure | Q65217    |
+| Q2831984   | comic book album                |      31 |    32 | Asterix and Cleopatra | Chicken with Plums | The Seven Crystal Balls | Asterix and the Normans | Asterix in Britain | Land of the Sons | Asterix the Gaul | Asterix at the Olympic Games | The Big Guy a    |
+| Q8275050   | children's book                 |      30 |    31 | An elk dropped in | Obake Zukan | Peter and Lotta's Christmas | Mijn avonturen door V. Swchwrm | Gummi-Tarzan | Gabriel Churchkitten | Q125287995 | Q125251414 | Q125251410 | Q12325522 | Karlas kabale     |
+| Q865484    | yonkoma                         |      30 |    36 | Kin-iro Mosaic | Sazae-san | Wataten! | Is the Order a Rabbit? | Stardust Telepath | 1031 All Saints Street | Servant × Service | Bocchi the Rock! | RPG Real Estate | Mono | Morita-san wa Mukuchi | Ts    |
+| Q725377    | graphic novel                   |      28 |    28 | Ciudad | Cowboys & Aliens | Cleopatra in Space | Terry and the Gunrunners | Persepolis | Shortcomings | Random Acts of Violence | Our Cancer Year | Land of the Sons | Xerxes | JLA: Earth 2 | Brainiac     |
+| Q24634210  | podcast show                    |      27 |    27 | The Dropout | Attitudes! | Stuff You Should Know | The Shrink Next Door | Dr. Death | Comedy Bang Bang | Slow Burn | Dirty John | Le Jeu des 1000 euros | Lore | 2 Dope Queens | StartUp | Limetown | So    |
+| Q12799318  | short novel                     |      24 |    27 | Q4204698 | Bumbarash | Zakhar Berkut | Q99734897 | Q71691308 | Q62033030 | Q62009724 | Before Sunrise | The Little Silver Fox | Old Khottabych | Q4228844 | Q4191101 | Q4157112 | Vitya Maleev at School    |
+| Q1760610   | comic book                      |      22 |    38 | Teenage Mutant Ninja Turtles | Red | Josie and the Pussycats | Tajja | Global Frequency | Virus | The Punisher War Zone | The Losers | The Journey to Útgarða-Loki | Judoka | The Gifted: Secret Mission    |
+| Q13593966  | literary trilogy                |      20 |    32 | The Lord of the Rings | Remembrance of Earth's Past | Karlsson-on-the-Roof | Under the North Star | Grisbi trilogy | Ciske de Rat trilogy | Lives of the Mayfair Witches | Vampire Blood Trilogy | The S    |
+| Q137637896 | manhua series                   |      20 |    31 | Fox Spirit Matchmaker | Under One Person | Rakshasa Street | Die Иow | Psychic Princess | Biao Ren | Song of the Long March | Fung Wan | Genius Dolls | Chinese Hero: Tales of the Blood Sword | The Kin    |
+| Q47451145  | tale type                       |      18 |    41 | Cinderella | At the Pike's Behest | Kolobok | Little Red Riding Hood | The Fox and the Wolf | Father Frost | Sleeping Beauty | Dog and wolf | The Magic Swan Geese | Straw Bull | Go I Know Not Whither     |
+| Q115378877 | comic book storyline            |      17 |    23 | Crisis on Infinite Earths | The Death of Superman | A Death in the Family | Throne of Atlantis | The Dark Phoenix Saga | Gods and Mortals | Tower of Babel | Batman & Son | Batman: Under the Hood | Day    |
+| Q4400636   | Russian folktale                |      17 |    24 | At the Pike's Behest | The Fox and the Wolf | Father Frost | Masha and the Bear | Dog and wolf | The Magic Swan Geese | The Flying Ship | The Cat, the Rooster, and the Fox | The Peasant and the Bear |    |
+| Q112144412 | esports discipline              |      16 |    16 | Q96417649 | Dota 2 | Gears of War | Injustice: Gods Among Us | Sekiro: Shadows Die Twice | Minecraft | Blade & Soul | Shadowverse | Dead by Daylight | League of Legends | Warcraft III: Reign of Chaos     |
+| Q1221280   | folk tale                       |      16 |    35 | Cinderella | The Tale of the Bamboo Cutter | Kolobok | Ali Baba and the Forty Thieves | Blind Man and the Loon | Q7770813 | Henny Penny | The Cat, the Rooster, and the Fox | Beauty and the Beast | Q42    |
+| Q482994    | album                           |      16 |    16 | Everyday Life | The Lion King: The Gift | EVERYONE AFRAID TO BE FORGOTTEN | My Beautiful Dark Twisted Fantasy | Attention Attention | Act II: The Father of Death | Tommy | Mickey Mouse Disco | Como am    |
+| Q14514600  | group of fictional characters   |      15 |    31 | Avengers | Teen Titans | Guardians of the Galaxy | Justice League | Ultimates | Legion of Super-Heroes | Xenomorph | Wile E. Coyote and the Road Runner | Justice League Dark | Big Hero 6 | Moomins | T    |
+| Q17537576  | creative work                   |      15 |    20 | Csongor és Tünde | Fires on the Plain | David Harum | Crime on Goat Island | Be Faithful Unto Death | Vidas Secas | Trelawny of the "Wells" | Room on the Broom | Raging Bull: My Story | Bébo's Girl |     |
+| Q867335    | literary cycle                  |      15 |    66 | canon of Sherlock Holmes | Arthurian romance | The Adventures of Dennis | One Thousand and One Nights | Sítio do Picapau Amarelo | Legend of the White Snake | Butterfly Lovers | Lensman series | The T    |
+| Q29154430  | book of the Bible               |      14 |    26 | Exodus | Book of Genesis | Gospel of John | Book of Esther | Judges | Gospel of Matthew | Book of Ruth | Joshua | Book of Job | Book of Revelation | Acts of the Apostles | Gospel of Luke | Book of Jon    |
++------------+---------------------------------+---------+-------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++----------------+-------+-------------+
+| CACHED_TARGETS | LINKS | WITHOUT_P31 |
++----------------+-------+-------------+
+|          14155 | 20361 |          41 |
++----------------+-------+-------------+
++--------------------------------+
+| SECTION                        |
++--------------------------------+
+| 5. The 30 most adapted sources |
++--------------------------------+
++------------+-----------------------------------------+---------------+--------+--------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_TARGET  | SOURCE_LABEL                            | TARGET_HOME   | MOVIES | SERIES | ADAPTATIONS                                                                                                                                                                                                 |
++------------+-----------------------------------------+---------------+--------+--------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Q140527    | The Three Musketeers                    | 5 cached_item |     60 |      9 | 3 Musketeers | Albert The Fifth Musketeer | At Sword's Point | Barbie and the Three Musketeers | Bosko the Musketeer | Cyrano and d'Artagnan | D'Artagnan and the Three Musketeers | D'Artagnan and Thre    |
+| Q62879     | A Christmas Carol                       | 5 cached_item |     67 |      1 | A Carol Christmas | A Christmas Carol | A Dennis the Menace Christmas | A Diva's Christmas Carol | A Flintstones Christmas Carol | A Quint-mas Carol | A Special Sesame Street Christmas | All American     |
+| Q191838    | The Count of Monte Cristo               | 5 cached_item |     27 |     15 | Dağlar Kızı Reyhan | El conde de Montecristo | El Conde: Amor y Honor | Ezel | Gankutsuou | Karmma Calling | Le Comte de Monte-Cristo | Long Days of Vengeance | Monte Cristo | Montecristo | Padayottam    |
+| Q876182    | Lupin III                               | 5 cached_item |     38 |      1 | Basette | Lupin Shanshei | Lupin the 3rd: Goemon's Blood Spray | Lupin the 3rd: The Elusiveness of the Fog | Lupin the Third vs. Detective Conan | Lupin the Third vs. Detective Conan: The Movie | Lupi    |
+| Q205683    | Scooby-Doo                              | 5 cached_item |     34 |      0 | Big Top Scooby-Doo! | Daphne & Velma | Happy Halloween, Scooby-Doo! | Scoob! | Scooby-Doo | Scooby-Doo 2: Monsters Unleashed | Scooby-Doo and the Alien Invaders | Scooby-Doo and the Cyber Chase | Scoo    |
+| Q41542     | Dracula                                 | 5 cached_item |     30 |      3 | Blood for Dracula | Bram Stoker's Dracula | Count Dracula | Dracula | Dracula 2000 | Dracula 3D | Dracula in Istanbul | Dracula Untold | Dracula: Dead and Loving It | Dracula: Pages from a Virgin's Di    |
+| Q120300    | Crayon Shin-chan                        | 5 cached_item |     31 |      1 | Crayon Shin-chan: Action Mask vs. Leotard Devil | Crayon Shin-chan: Blitzkrieg! Pig's Hoof's Secret Mission | Crayon Shin-chan: Burst Serving! Kung Fu Boys ~Ramen Rebellion~ | Crayon Shin-chan: Crash!    |
+| Q150827    | Frankenstein; or, The Modern Prometheus | 5 cached_item |     29 |      2 | Army of Frankensteins | Bikini Frankenstein | Flesh for Frankenstein | Frankenstein | Frankenstein 90 | Frankenstein Conquers the World | Frankenstein General Hospital | Frankenstein Must Be Destroyed    |
+| Q185118    | Treasure Island                         | 5 cached_item |     24 |      7 | Animal Treasure Island | Muppet Treasure Island | Pirates of Treasure Island | The Legends of Treasure Island | The Secret of Treasure Island | Treasure Island | Treasure Island in Outer Space | Treas    |
+| Q2695156   | Batman                                  | 5 cached_item |     25 |      6 | Aztec Batman: Clash of Empires | Batman | Batman & Mr. Freeze: SubZero | Batman & Robin | Batman and Harley Quinn | Batman Begins | Batman Beyond | Batman Beyond: Return of the Joker | Batman Forever     |
+| Q83186     | Romeo and Juliet                        | 5 cached_item |     28 |      3 | Bollywood Queen | Gnomeo & Juliet | Juliet & Romeo | Make Your Move | National Theatre Live: Romeo and Juliet | No somos ni Romeo ni Julieta | Private Romeo | Romeo & Juliet | Romeo + Juliet | Romeo ×    |
+| Q526950    | Blondie                                 | 5 cached_item |     28 |      2 | Beware of Blondie | Blondie | Blondie Brings Up Baby | Blondie for Victory | Blondie Goes Latin | Blondie Goes to College | Blondie Has Servant Trouble | Blondie Hits the Jackpot | Blondie in Society     |
+| Q79015     | Superman                                | 5 cached_item |     21 |      9 | Adventures of Superman | Billion Dollar Limited | Destruction Inc. | Electric Earthquake | Eleventh Hour | Japoteurs | Jungle Drums | Krypton | Lois & Clark: The New Adventures of Superman | My Advent    |
+| Q70784     | Journey to the West                     | 5 cached_item |     19 |     10 | A Chinese Odyssey Part One: Pandora's Box | A Chinese Odyssey Part Three | A Chinese Tall Story | A Korean Odyssey | Adventures of the Super Monkey -Journey to the West- | Doraemon: The Record of Nobi    |
+| Q8065468   | The Adventures of Pinocchio             | 5 cached_item |     24 |      5 | Geppetto | Guillermo del Toro's Pinocchio | Pinocchio | Pinocchio 3000 | Pinocchio and the Emperor of the Night | Pinocchio in Outer Space | Pinocchio: The Series | Pinocchio: Unstrung | The Adventure    |
+| Q116453683 | Zorro stories                           | 5 cached_item |     17 |     10 | Behind the Mask of Zorro | Ghost of Zorro | Son of Zorro | The Avenger, Zorro | The Bold Caballero | The Dream of Zorro | The Great Adventure of Zorro | The Legend of Zorro | The Mask of Zorro | The N    |
+| Q41567     | Hamlet                                  | 5 cached_item |     26 |      1 | Doubt | Haider | Hamlet | Hamlet at Elsinore | Hamlet, Prince of Denmark | Karmayogi | Khoon Ka Khoon | Le duel d'Hamlet | Let the Devil Wear Black | Ophelia | Prince of the Himalayas | Shakespeare: T    |
+| Q180736    | Les Misérables                          | 5 cached_item |     18 |      8 | Gavroche | I miserabili | Jean Valjean | Kundan | Les Misérables | Les Misérables - Part 1: Jean Valjean | Les Misérables: Little Girl Cosette | Los miserables | The Galley Slave                          |
+| Q22078244  | Perfect Strangers                       | 1 t2s_movie   |     26 |      0 | (Nie)znajomi | Adult's Situation | Alles Op Tafel | Blood Moon Party | BÚÉK | Full Dekning | Hygge! | Intimate Strangers | Kill Mobile | Loud Connection | Nothing to Hide | Perfect Strangers | Perfect    |
+| Q130283    | Macbeth                                 | 5 cached_item |     24 |      1 | Macbeth | Maqbool | Men Of Respect | Rave Macbeth | Shakespeare: The Animated Tales | Thane of East County | The Tragedy of Macbeth | Throne of Blood | Veeram                                              |
+| Q217352    | Strange Case of Dr Jekyll and Mr Hyde   | 5 cached_item |     24 |      1 | Abbott and Costello Meet Dr. Jekyll and Mr. Hyde | Doctor Jekyll | Dr. Heckyl and Mr. Hype | Dr. Jekyll & Sister Hyde | Dr. Jekyll and Mr. Hyde | Dr. Jekyll and Ms. Hyde | Edge of Sanity | I, Monster     |
+| Q202975    | Wuthering Heights                       | 5 cached_item |     18 |      6 | “Wuthering Heights” | Cumbres Borrascosas | Derbeder | Dil Diya Dard Liya | I Will Wait for You in Heaven | Sparkhouse | The Promise | Wuthering Heights | Wuthering High                                   |
+| Q1048916   | Cyrano de Bergerac                      | 5 cached_item |     22 |      0 | #Roxy | Alfano - Cyrano de Bergerac | Bigger Than the Sky | Black Tights | Cyrano Agency | Cyrano and d'Artagnan | Cyrano de Begerac | Cyrano de Bergerac | Cyrano Fernández | Cyrano, My Love | Duet |     |
+| Q147787    | Anna Karenina                           | 5 cached_item |     18 |      4 | Anna Karenina | Dark as the Night. Anna Karenina | Forbidden Love | Love | Volver a caer                                                                                                                    |
+| Q164974    | Oliver Twist                            | 5 cached_item |     19 |      3 | Manik | Oliver & Company | Oliver Twist | Oliver Twist, Jr. | Oliver! | The Adventures of Oliver Twist | Twist                                                                                              |
+| Q389624    | Charlie Chan                            | 5 cached_item |     22 |      0 | Charlie Chan and the Curse of the Dragon Queen | Charlie Chan at Monte Carlo | Charlie Chan at the Circus | Charlie Chan at the Olympics | Charlie Chan at the Opera | Charlie Chan at the Race Track |     |
+| Q674832    | Carmen                                  | 5 cached_item |     22 |      0 | A Burlesque on Carmen | Carmen | Carmen Jones | Carmen of the North | Carmen: A Hip Hopera | Carmen's Kiss | Gipsy Blood | Man, Pride and Vengeance | The Devil Made a Woman | The Loves of Carmen | U-C    |
+| Q773202    | Yo soy Betty, la fea                    | 2 t2s_serie   |      0 |     21 | A Girl from the Suburbs | Bela, a Feia | Betty in New York | Betty Toons | BrzydUla | El amor no es como lo pintan | I Love Betty La Fea | Jassi Jaissi Koi Nahin | La fea más bella | Lotte | Maria i A    |
+| Q165318    | Crime and Punishment                    | 5 cached_item |     18 |      2 | Crime & Punishment | Crime and Punishment | Crimen y castigo | Fear | Nina | Pickpocket | Sin compasión | Student                                                                                           |
+| Q169844    | RuPaul's Drag Race                      | 2 t2s_serie   |      0 |     20 | Canada's Drag Race | Canada's Drag Race: All Stars | Canada's Drag Race: Canada vs The World | Drag Race Belgium | Drag Race Brasil | Drag Race Down Under | Drag Race España | Drag Race France | Drag     |
++------------+-----------------------------------------+---------------+--------+--------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++--------------+
+| SECTION      |
++--------------+
+| 6. Witnesses |
++--------------+
++-------+---------+----------------+-------------+-----------+--------------------+---------------+
+| KIND  | ID_WORK | TITLE          | ID_WIKIDATA | ID_TARGET | SOURCE_LABEL       | TARGET_HOME   |
++-------+---------+----------------+-------------+-----------+--------------------+---------------+
+| movie |     111 | Scarface       | Q47075      | Q23307577 | Scarface           | 5 cached_item |
+| movie |     111 | Scarface       | Q47075      | Q471306   | Scarface           | 1 t2s_movie   |
+| movie |     694 | The Shining    | Q186341     | Q470937   | The Shining        | 5 cached_item |
+| movie |  329865 | Arrival        | Q20382729   | Q7620415  | Story of Your Life | 5 cached_item |
+| serie |  100088 | The Last of Us | Q87131973   | Q1986744  | NULL               | 5 cached_item |
++-------+---------+----------------+-------------+-----------+--------------------+---------------+
++----------------------------------+
+| SECTION                          |
++----------------------------------+
+| 7. Inverse P4969 on core sources |
++----------------------------------+
++--------------------+--------------+
+| P4969_PAIRS_TO_T2S | MISSING_P144 |
++--------------------+--------------+
+|               2232 |          139 |
++--------------------+--------------+
++----------------------------------------+
+| SECTION                                |
++----------------------------------------+
+| 8. TMDb based-on keywords against P144 |
++----------------------------------------+
++------------+-----------------------------------------+--------+--------+-----------+---------------+
+| ID_KEYWORD | NAME                                    | MOVIES | SERIES | WITH_P144 | PCT_WITH_P144 |
++------------+-----------------------------------------+--------+--------+-----------+---------------+
+|        818 | based on novel or book                  |   8024 |   2975 |      4298 |          39.1 |
+|       9672 | based on true story                     |   3184 |    405 |       340 |           9.5 |
+|      13141 | based on manga                          |   1059 |   1970 |      1721 |          56.8 |
+|      10181 | based on play or musical                |   1951 |     70 |       457 |          22.6 |
+|       9717 | based on comic                          |    869 |    458 |       639 |          48.2 |
+|     156866 | based on short story                    |   1111 |     66 |       152 |          12.9 |
+|      15101 | based on children&#039;s book           |    613 |    149 |       277 |          36.4 |
+|     269769 | based on tv series                      |    568 |    149 |       275 |          38.4 |
+|      41645 | based on video game                     |    351 |    321 |       272 |          40.5 |
+|     319900 | based on light novel                    |     77 |    441 |       434 |          83.8 |
+|     165317 | based on movie                          |    181 |    242 |       172 |          40.7 |
+|     288474 | based on webcomic or webtoon            |     73 |    236 |        81 |          26.2 |
+|     185343 | based on myths, legends or folklore     |    267 |     37 |        46 |          15.1 |
+|     328926 | based on real person                    |    250 |     53 |        29 |           9.6 |
+|     318933 | based on web novel                      |     20 |    268 |        63 |          21.9 |
+|      14641 | based on memoir or autobiography        |    191 |     37 |        89 |          39.0 |
+|      10542 | based on toy                            |    129 |     96 |        56 |          24.9 |
+|     246466 | based on young adult novel              |    183 |     37 |       178 |          80.9 |
+|     179411 | based on fairy tale                     |    203 |     15 |        61 |          28.0 |
+|      41011 | based on song, poem or rhyme            |    179 |      8 |        30 |          16.0 |
+|     268132 | based on short                          |    171 |     15 |        22 |          11.8 |
+|      18712 | based on graphic novel                  |    115 |     47 |        75 |          46.3 |
+|     222243 | based on anime                          |    102 |     46 |        43 |          29.1 |
+|     222216 | based on visual novel                   |     24 |     92 |        60 |          51.7 |
+|      10244 | based on cartoon                        |     80 |     29 |        44 |          40.4 |
+|     290667 | based on manhua                         |     13 |     77 |        27 |          30.0 |
+|     239275 | based on magazine, newspaper or article |     60 |     22 |        10 |          12.2 |
+|     239125 | based on web series                     |     50 |     26 |        15 |          19.7 |
+|     323477 | based on manhwa                         |     11 |     63 |        32 |          43.2 |
+|     364484 | based on a true story                   |     59 |      1 |         4 |           6.7 |
++------------+-----------------------------------------+--------+--------+-----------+---------------+
++-------+------------------+--------------+-----------+
+| KIND  | KEYWORD_AND_P144 | KEYWORD_ONLY | P144_ONLY |
++-------+------------------+--------------+-----------+
+| movie |             5617 |         8221 |     11151 |
+| serie |             3400 |         2572 |      3873 |
++-------+------------------+--------------+-----------+
