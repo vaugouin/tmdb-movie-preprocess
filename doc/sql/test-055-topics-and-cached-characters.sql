@@ -1,0 +1,226 @@
+-- ============================================================================
+-- TMDB-MOVIE-PREPROCESS-055 and -012 : last measurement before building
+-- ============================================================================
+--
+-- READ ONLY. Two questions left open after test-055-types-keywords-characters.sql.
+--
+--   E. (-055) Which TMDb "based on ..." keywords are T2S topics today? If "based on
+--      comic" is a topic, "films based on a comic" has two roads (T2S_TOPIC and the
+--      future T2S_SOURCE_WORK) with two different counts. Also: do T2S topics already
+--      carry characters, the way eval 32 expects Philip Marlowe as a Topic_name1?
+--      Keyword topics are rows of T_WC_T2S_TOPIC with TOPIC_SOURCE = 'keyword' and
+--      ID_RECORD = ID_KEYWORD (tmdb-movie-preprocess.py:1181); a keyword qualifies when
+--      USED_FOR_T2S_TOPIC > 0 OR USE_FOR_TAGGING > 0 (:1051).
+--
+--   F. (-012) The 4,403 "characters" tied to T2S works (P674 / P453) that live only in
+--      the item cache, neither in T_WC_WIKIDATA_CHARACTER nor in T_WC_WIKIDATA_PERSON.
+--      Real characters, or generic roles ("police officer") and noise like "self"?
+--      Their P31 classes decide whether they enter the short T2S_CHARACTER.
+-- ============================================================================
+
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ===========================================================================
+-- E. "BASED ON ..." KEYWORDS AND T2S TOPICS
+-- ===========================================================================
+SELECT 'E1. Every "based on ..." keyword: topic or not, and its reach' AS SECTION;
+
+SELECT k.ID_KEYWORD, k.NAME, k.USED_FOR_T2S_TOPIC, k.USE_FOR_TAGGING,
+       t.ID_TOPIC, t.DELETED AS TOPIC_DELETED, t.MOVIE_COUNT AS TOPIC_MOVIES, t.SERIE_COUNT AS TOPIC_SERIES,
+       (SELECT COUNT(*) FROM T_WC_TMDB_MOVIE_KEYWORD mk WHERE mk.ID_KEYWORD = k.ID_KEYWORD AND COALESCE(mk.DELETED, 0) = 0) AS TMDB_MOVIES,
+       (SELECT COUNT(*) FROM T_WC_TMDB_SERIE_KEYWORD sk WHERE sk.ID_KEYWORD = k.ID_KEYWORD AND COALESCE(sk.DELETED, 0) = 0) AS TMDB_SERIES
+FROM T_WC_TMDB_KEYWORD k
+LEFT JOIN T_WC_T2S_TOPIC t ON t.TOPIC_SOURCE = 'keyword' AND t.ID_RECORD = k.ID_KEYWORD
+WHERE k.NAME LIKE 'based on %' AND COALESCE(k.DELETED, 0) = 0
+ORDER BY TMDB_MOVIES + TMDB_SERIES DESC;
+
+SELECT 'E2. Summary: how many "based on ..." keywords are live topics' AS SECTION;
+
+SELECT COUNT(*) AS BASED_ON_KEYWORDS,
+       SUM(k.USED_FOR_T2S_TOPIC > 0 OR k.USE_FOR_TAGGING > 0) AS QUALIFYING,
+       SUM(t.ID_TOPIC IS NOT NULL AND COALESCE(t.DELETED, 0) = 0) AS LIVE_TOPICS
+FROM T_WC_TMDB_KEYWORD k
+LEFT JOIN T_WC_T2S_TOPIC t ON t.TOPIC_SOURCE = 'keyword' AND t.ID_RECORD = k.ID_KEYWORD
+WHERE k.NAME LIKE 'based on %' AND COALESCE(k.DELETED, 0) = 0;
+
+-- The two evaluations that ask the same question with two entity types today:
+-- eval 32 (Philip Marlowe, Topic_name1) and eval 2293 (Charlotte Corday, Character_name1).
+SELECT 'E3. Marlowe and Corday, as topics and as keywords' AS SECTION;
+
+SELECT 'topic' AS KIND, t.ID_TOPIC AS ID, t.TOPIC_NAME AS NAME, t.TOPIC_SOURCE, t.TOPIC_TYPE,
+       t.ID_RECORD, t.ID_WIKIDATA, t.MOVIE_COUNT, t.SERIE_COUNT, t.DELETED
+FROM T_WC_T2S_TOPIC t
+WHERE t.TOPIC_NAME LIKE '%Marlowe%' OR t.TOPIC_NAME LIKE '%Corday%'
+UNION ALL
+SELECT 'keyword', k.ID_KEYWORD, k.NAME, NULL, NULL, NULL, k.ID_WIKIDATA, NULL, NULL, k.DELETED
+FROM T_WC_TMDB_KEYWORD k
+WHERE k.NAME LIKE '%marlowe%' OR k.NAME LIKE '%corday%';
+
+-- How many live T2S topics are in fact characters: a topic whose Wikidata id, or
+-- failing that whose exact English name, is a core Wikidata character. These are the
+-- Marlowe cases, where a future character entity and a topic would compete.
+SELECT 'E4. T2S topics that are characters' AS SECTION;
+
+DROP TEMPORARY TABLE IF EXISTS TMP_055_TOPIC_CHAR;
+CREATE TEMPORARY TABLE TMP_055_TOPIC_CHAR (
+  ID_TOPIC  INT NOT NULL,
+  MATCH_BY  VARCHAR(10) NOT NULL,
+  ID_CHAR   VARCHAR(50) NOT NULL,
+  PRIMARY KEY (ID_TOPIC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO TMP_055_TOPIC_CHAR (ID_TOPIC, MATCH_BY, ID_CHAR)
+SELECT t.ID_TOPIC, 'qid', wc.ID_WIKIDATA
+FROM T_WC_T2S_TOPIC t
+INNER JOIN T_WC_WIKIDATA_CHARACTER wc ON wc.ID_WIKIDATA = t.ID_WIKIDATA
+WHERE COALESCE(t.DELETED, 0) = 0 AND t.ID_WIKIDATA IS NOT NULL AND t.ID_WIKIDATA <> '';
+
+-- By exact name, only where no Q-id matched. LABEL_EN is indexed on 255 chars.
+INSERT IGNORE INTO TMP_055_TOPIC_CHAR (ID_TOPIC, MATCH_BY, ID_CHAR)
+SELECT t.ID_TOPIC, 'name', MIN(wc.ID_WIKIDATA)
+FROM T_WC_T2S_TOPIC t
+INNER JOIN T_WC_WIKIDATA_CHARACTER wc ON wc.LABEL_EN = t.TOPIC_NAME
+WHERE COALESCE(t.DELETED, 0) = 0
+GROUP BY t.ID_TOPIC;
+
+SELECT t.TOPIC_SOURCE, tc.MATCH_BY, COUNT(*) AS TOPICS,
+       SUM(COALESCE(t.MOVIE_COUNT, 0)) AS MOVIE_LINKS, SUM(COALESCE(t.SERIE_COUNT, 0)) AS SERIE_LINKS
+FROM TMP_055_TOPIC_CHAR tc
+INNER JOIN T_WC_T2S_TOPIC t ON t.ID_TOPIC = tc.ID_TOPIC
+GROUP BY t.TOPIC_SOURCE, tc.MATCH_BY
+ORDER BY TOPICS DESC;
+
+SELECT t.ID_TOPIC, t.TOPIC_NAME, t.TOPIC_SOURCE, tc.MATCH_BY, tc.ID_CHAR, t.MOVIE_COUNT, t.SERIE_COUNT
+FROM TMP_055_TOPIC_CHAR tc
+INNER JOIN T_WC_T2S_TOPIC t ON t.ID_TOPIC = tc.ID_TOPIC
+ORDER BY COALESCE(t.MOVIE_COUNT, 0) + COALESCE(t.SERIE_COUNT, 0) DESC
+LIMIT 30;
+
+-- ===========================================================================
+-- F. THE CHARACTERS THAT LIVE ONLY IN THE ITEM CACHE
+-- ===========================================================================
+DROP TEMPORARY TABLE IF EXISTS TMP_055_T2S_WORK;
+CREATE TEMPORARY TABLE TMP_055_T2S_WORK (
+  ID_WIKIDATA  VARCHAR(50) NOT NULL,
+  KIND         VARCHAR(10) NOT NULL,
+  ID_WORK      INT NOT NULL,
+  TITLE        VARCHAR(250) NULL,
+  PRIMARY KEY (ID_WIKIDATA, KIND),
+  KEY IDX_WORK (KIND, ID_WORK)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO TMP_055_T2S_WORK (ID_WIKIDATA, KIND, ID_WORK, TITLE)
+SELECT m.ID_WIKIDATA, 'movie', m.ID_MOVIE, m.MOVIE_TITLE
+FROM T_WC_T2S_MOVIE m
+WHERE m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '';
+
+INSERT IGNORE INTO TMP_055_T2S_WORK (ID_WIKIDATA, KIND, ID_WORK, TITLE)
+SELECT s.ID_WIKIDATA, 'serie', s.ID_SERIE, s.SERIE_TITLE
+FROM T_WC_T2S_SERIE s
+WHERE s.ID_WIKIDATA IS NOT NULL AND s.ID_WIKIDATA <> '';
+
+-- P674 and P453 ties, as in part D of the previous script (P144 characters are all
+-- core characters or cones of part B, none is cache-only by construction here).
+DROP TEMPORARY TABLE IF EXISTS TMP_055_CHAR_LINK;
+CREATE TEMPORARY TABLE TMP_055_CHAR_LINK (
+  KIND     VARCHAR(10) NOT NULL,
+  ID_WORK  INT NOT NULL,
+  ID_CHAR  VARCHAR(50) NOT NULL,
+  VIA      VARCHAR(5) NOT NULL,
+  PRIMARY KEY (KIND, ID_WORK, ID_CHAR, VIA),
+  KEY IDX_CHAR (ID_CHAR)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO TMP_055_CHAR_LINK (KIND, ID_WORK, ID_CHAR, VIA)
+SELECT w.KIND, w.ID_WORK, iv.ID_ITEM, 'P674'
+FROM T_WC_WIKIDATA_STATEMENT st
+INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT
+INNER JOIN TMP_055_T2S_WORK w ON w.ID_WIKIDATA = st.ID_WIKIDATA
+WHERE st.ID_PROPERTY = 'P674'
+  AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
+  AND COALESCE(st.DELETED, 0) = 0;
+
+INSERT IGNORE INTO TMP_055_CHAR_LINK (KIND, ID_WORK, ID_CHAR, VIA)
+SELECT w.KIND, w.ID_WORK, qiv.ID_ITEM, 'P453'
+FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq
+INNER JOIN T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE qiv ON qiv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER
+INNER JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_STATEMENT = sq.ID_STATEMENT
+INNER JOIN TMP_055_T2S_WORK w ON w.ID_WIKIDATA = st.ID_WIKIDATA
+WHERE sq.ID_QUALIFIER_PROPERTY = 'P453'
+  AND COALESCE(sq.DELETED, 0) = 0
+  AND st.ID_PROPERTY = 'P161'
+  AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
+  AND COALESCE(st.DELETED, 0) = 0;
+
+-- Keep only the cache-only ones.
+DROP TEMPORARY TABLE IF EXISTS TMP_055_CACHED_CHAR;
+CREATE TEMPORARY TABLE TMP_055_CACHED_CHAR (
+  ID_CHAR   VARCHAR(50) NOT NULL,
+  WORKS     INT NOT NULL,
+  VIAS      VARCHAR(20) NULL,
+  LABEL_EN  VARCHAR(500) NULL,
+  PRIMARY KEY (ID_CHAR)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO TMP_055_CACHED_CHAR (ID_CHAR, WORKS, VIAS)
+SELECT l.ID_CHAR, COUNT(DISTINCT l.KIND, l.ID_WORK), GROUP_CONCAT(DISTINCT l.VIA ORDER BY l.VIA SEPARATOR '+')
+FROM TMP_055_CHAR_LINK l
+WHERE EXISTS (SELECT 1 FROM T_WC_WIKIDATA_ITEM wi WHERE wi.ID_WIKIDATA = l.ID_CHAR)
+  AND NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_CHARACTER wc WHERE wc.ID_WIKIDATA = l.ID_CHAR)
+  AND NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_PERSON wp WHERE wp.ID_WIKIDATA = l.ID_CHAR)
+GROUP BY l.ID_CHAR;
+
+UPDATE TMP_055_CACHED_CHAR c
+INNER JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = c.ID_CHAR
+SET c.LABEL_EN = COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.en')), NULLIF(wi.LABEL_EN, ''));
+
+SELECT 'F1. Cache-only characters: count, reach, ties' AS SECTION;
+
+SELECT COUNT(*) AS CACHED_CHARACTERS, SUM(WORKS) AS WORK_LINKS,
+       SUM(WORKS >= 2) AS IN_2_WORKS_OR_MORE,
+       SUM(VIAS = 'P453') AS ONLY_P453, SUM(VIAS = 'P674') AS ONLY_P674, SUM(VIAS = 'P453+P674') AS BOTH,
+       SUM(LABEL_EN IS NULL) AS NO_EN
+FROM TMP_055_CACHED_CHAR;
+
+-- The question: what are they? Their P31, the most frequent first.
+SELECT 'F2. Their 40 most frequent P31 classes' AS SECTION;
+
+SELECT iv.ID_ITEM AS ID_CLASS,
+       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wk.LABELS_JSON, '$.en')), NULLIF(wk.LABEL_EN, '')) AS CLASS_LABEL,
+       COUNT(DISTINCT c.ID_CHAR) AS CHARACTERS, SUM(c.WORKS) AS WORK_LINKS,
+       SUBSTRING(GROUP_CONCAT(DISTINCT COALESCE(c.LABEL_EN, c.ID_CHAR) ORDER BY c.WORKS DESC SEPARATOR ' | '), 1, 200) AS EXAMPLES
+FROM TMP_055_CACHED_CHAR c
+INNER JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_WIKIDATA = c.ID_CHAR
+       AND st.ID_PROPERTY = 'P31'
+       AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
+INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT
+LEFT JOIN T_WC_WIKIDATA_ITEM wk ON wk.ID_WIKIDATA = iv.ID_ITEM
+GROUP BY iv.ID_ITEM, CLASS_LABEL
+ORDER BY CHARACTERS DESC
+LIMIT 40;
+
+SELECT COUNT(*) AS WITHOUT_P31
+FROM TMP_055_CACHED_CHAR c
+WHERE NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT st
+                  WHERE st.ID_WIKIDATA = c.ID_CHAR AND st.ID_PROPERTY = 'P31'
+                    AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated'));
+
+-- The 40 most linked, to read with the eye: a role ("police officer"), a group, a
+-- character the crawler did not classify, or noise.
+SELECT 'F3. The 40 cache-only characters tied to the most T2S works' AS SECTION;
+
+SELECT c.ID_CHAR, c.LABEL_EN, c.WORKS, c.VIAS,
+       (SELECT SUBSTRING(GROUP_CONCAT(DISTINCT COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wk.LABELS_JSON, '$.en')), iv.ID_ITEM) SEPARATOR ' | '), 1, 120)
+        FROM T_WC_WIKIDATA_STATEMENT st
+        INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT
+        LEFT JOIN T_WC_WIKIDATA_ITEM wk ON wk.ID_WIKIDATA = iv.ID_ITEM
+        WHERE st.ID_WIKIDATA = c.ID_CHAR AND st.ID_PROPERTY = 'P31') AS P31_CLASSES
+FROM TMP_055_CACHED_CHAR c
+ORDER BY c.WORKS DESC
+LIMIT 40;
+
+-- ---------------------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS TMP_055_CACHED_CHAR;
+DROP TEMPORARY TABLE IF EXISTS TMP_055_CHAR_LINK;
+DROP TEMPORARY TABLE IF EXISTS TMP_055_T2S_WORK;
+DROP TEMPORARY TABLE IF EXISTS TMP_055_TOPIC_CHAR;
