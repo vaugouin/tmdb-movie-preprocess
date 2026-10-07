@@ -1,0 +1,448 @@
+-- test-055-types-keywords-characters.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-07 11:19:11
+--
++--------------------------------------------+
+| SECTION                                    |
++--------------------------------------------+
+| A1. Homes, persons and characters included |
++--------------------------------------------+
++--------------------------+---------+-------+-------------------+-------------------+
+| HOME                     | SOURCES | LINKS | LINKS_FROM_MOVIES | LINKS_FROM_SERIES |
++--------------------------+---------+-------+-------------------+-------------------+
+| 1 t2s_movie              |    1358 |  1707 |              1451 |               256 |
+| 2 t2s_serie              |    1507 |  2592 |               809 |              1783 |
+| 3 core_movie_outside_t2s |      50 |    58 |                42 |                16 |
+| 4 core_serie_outside_t2s |     313 |   419 |               155 |               264 |
+| 5 core_person            |      44 |    51 |                44 |                 7 |
+| 6 core_character         |     188 |   425 |               285 |               140 |
+| 7 cached_item            |   13992 | 19963 |             14786 |              5177 |
+| 8 missing_everywhere     |       2 |     7 |                 6 |                 1 |
++--------------------------+---------+-------+-------------------+-------------------+
++---------------------------------------------------+
+| SECTION                                           |
++---------------------------------------------------+
+| A2. Persons named as a source, the 20 most linked |
++---------------------------------------------------+
++-----------+----------------------------+-------+
+| ID_TARGET | LABEL_EN                   | LINKS |
++-----------+----------------------------+-------+
+| Q5673     | Hans Christian Andersen    |     4 |
+| Q347685   | Korney Chukovsky           |     3 |
+| Q435584   | Samuil Marshak             |     2 |
+| Q4226786  | Sergei Kozlov              |     2 |
+| Q4109     | NULL                       |     1 |
+| Q7200     | Alexander Pushkin          |     1 |
+| Q9358     | Friedrich Nietzsche        |     1 |
+| Q22686    | NULL                       |     1 |
+| Q105994   | Patrick Süskind            |     1 |
+| Q132964   | Vladimir Mayakovsky        |     1 |
+| Q173563   | Jomo Kenyatta              |     1 |
+| Q181885   | Michael Glinka             |     1 |
+| Q191716   | Gene Roddenberry           |     1 |
+| Q193018   | Gianni Rodari              |     1 |
+| Q208116   | Sergey Mikhalkov           |     1 |
+| Q237564   | Edith Cavell               |     1 |
+| Q355485   | Peter Christen Asbjørnsen  |     1 |
+| Q361707   | Vladimir Suteev            |     1 |
+| Q362133   | Vasily Livanov             |     1 |
+| Q368127   | Elena Ferrante             |     1 |
++-----------+----------------------------+-------+
++--------------------+
+| SECTION            |
++--------------------+
+| A3. Labels by home |
++--------------------+
++--------------------------+---------+-------+-------+-------------+-------------+
+| HOME                     | SOURCES | NO_EN | NO_FR | NO_EN_NO_FR | LINKS_NO_EN |
++--------------------------+---------+-------+-------+-------------+-------------+
+| 1 t2s_movie              |    1358 |     6 |   316 |           3 |           7 |
+| 2 t2s_serie              |    1507 |    48 |   423 |          42 |          99 |
+| 3 core_movie_outside_t2s |      50 |     5 |    35 |           5 |           6 |
+| 4 core_serie_outside_t2s |     313 |    33 |   243 |          32 |          33 |
+| 5 core_person            |      44 |     2 |     5 |           1 |           2 |
+| 6 core_character         |     188 |     2 |    22 |           1 |           2 |
+| 7 cached_item            |   13992 |  1699 |  6800 |        1371 |        1855 |
+| 8 missing_everywhere     |       2 |     2 |     2 |           2 |           7 |
++--------------------------+---------+-------+-------+-------------+-------------+
++------------+----------------------+-------+---------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_TARGET  | HOME                 | LINKS | LABEL_FR                                    | ADAPTATIONS                                                                                                                                                                                                                                               |
++------------+----------------------+-------+---------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Q20899617  | 2 t2s_serie          |    13 | NULL                                        | Junior Taskmaster | Junior Taskmaster Finland | Stormester | Taskmaster | Taskmaster Australia | Taskmaster Canada | Taskmaster Finland | Taskmaster Iceland | Taskmaster Norway | Taskmaster NZ | Taskmaster Spain | Taskmaster Sweden | Taskmasterclass |
+| Q182961    | 7 cached_item        |     9 | Jane Eyre                                   | Jane Eyre                                                                                                                                                                                                                                                 |
+| Q499767    | 2 t2s_serie          |     8 | NULL                                        | Celebrity Jeopardy! | ESPN Jeopardy! | Jeopardy! | Jeopardy! Australia | Jeopardy! Masters | Pop Culture Jeopardy! | Rock & Roll Jeopardy! | Своя игра                                                                                                    |
+| Q16935557  | 2 t2s_serie          |     7 | NULL                                        | À Primeira Vista | First Date Sweden | First Dates | First Dates - Ein Tisch für zwei | First Dates Australia | First Dates Ireland                                                                                                                       |
+| Q92096     | 2 t2s_serie          |     6 | NULL                                        | Fangene på fortet | Fort Boyard | Fort Boyard - Az Erőd | Fort Boyard Russia | Fort Boyard Sweden | Fort Boyard: Ultimate Challenge                                                                                                                       |
+| Q1982608   | 8 missing_everywhere |     6 | NULL                                        | Kamen Rider #1 | Kamen Rider vs. Ambassador Hell | Kamen Rider vs. Shocker | Kamen Rider: THE FIRST | Kamen Rider: THE NEXT | Shin Kamen Rider                                                                                                            |
+| Q288035    | 7 cached_item        |     5 | NULL                                        | Street Fighter | Street Fighter Alpha: The Movie | Street Fighter II: The Animated Movie | Street Fighter: The Legend of Chun-Li                                                                                                                          |
+| Q10686489  | 7 cached_item        |     5 | NULL                                        | Familien Swedenhielm | Swedenhielms                                                                                                                                                                                                                       |
+| Q3795630   | 7 cached_item        |     4 | Le Roman d'un jeune homme pauvre            | Il romanzo di un giovane povero | The Story of a Poor Young Man                                                                                                                                                                                           |
+| Q30134079  | 7 cached_item        |     4 | NULL                                        | Das Schweigen im Walde | Silence of the Forest                                                                                                                                                                                                            |
+| Q99179974  | 7 cached_item        |     4 | NULL                                        | Baian the Assassin | Baian the Assassin, M.D.: Part 1 | Baian the Assassin, M.D.: Part 2 | Professional Killers                                                                                                                                           |
+| Q124724904 | 2 t2s_serie          |     4 | Les Rencontres du Papotin                   | A-Laget | Frågan är fri | The Assembly                                                                                                                                                                                                                    |
+| Q1095715   | 7 cached_item        |     3 | Le Roman d'Ida                              | Ida regénye | Romance of Ida                                                                                                                                                                                                                              |
+| Q1152081   | 2 t2s_serie          |     3 | NULL                                        | Gokaiger Goseiger Super Sentai 199 Hero Great Battle | Tensou Sentai Goseiger vs Shinkenger: Epic on the Silver Screen | Tensou Sentai Goseiger: Epic on The Movie                                                                                        |
+| Q1195717   | 7 cached_item        |     3 | NULL                                        | Kortik | The Cutlass                                                                                                                                                                                                                                      |
+| Q3280834   | 7 cached_item        |     3 | Makinavaja                                  | ¡Semos peligrosos! (Uséase Makinavaja 2) | Makinavaja, el último choriso | Makinavaja: La Serie                                                                                                                                                           |
+| Q6084029   | 7 cached_item        |     3 | NULL                                        | Revenge of the Snakes | Yılanların Öcü                                                                                                                                                                                                                    |
+| Q10894384  | 2 t2s_serie          |     3 | NULL                                        | ¡Vivan los niños! | Carrossel | Carrusel                                                                                                                                                                                                                  |
+| Q11278023  | 7 cached_item        |     3 | Une histoire singulière à l'est du fleuve   | Gentle Lewd Woman: Wet Tongue Nectar | The Strange Tale of Oyuki | The Twilight Story                                                                                                                                                                     |
+| Q16702908  | 7 cached_item        |     3 | NULL                                        | The Drummer's Fate                                                                                                                                                                                                                                        |
++------------+----------------------+-------+---------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++---------------------------------------------+
+| SECTION                                     |
++---------------------------------------------+
+| B1. Each root: cone size and sources caught |
++---------------------------------------------+
++----------+----------+-------------+-----------+------------+---------------------------------+--------------+----------------+
+| PRIORITY | TYPE     | FORM        | FAMILY    | ID_ROOT    | ROOT_LABEL                      | CONE_CLASSES | SOURCES_CAUGHT |
++----------+----------+-------------+-----------+------------+---------------------------------+--------------+----------------+
+|        0 | other    | NULL        | franchise | Q196600    | media franchise                 |           27 |            148 |
+|        0 | other    | NULL        | character | Q14514600  | group of fictional characters   |          301 |             31 |
+|        0 | other    | NULL        | character | Q1114461   | comics character                |          142 |              0 |
+|        0 | other    | NULL        | character | Q15632617  | fictional human                 |          250 |              0 |
+|        0 | other    | NULL        | character | Q15711870  | animated character              |          841 |              0 |
+|        0 | other    | NULL        | character | Q15773317  | television character            |          826 |              0 |
+|        0 | other    | NULL        | character | Q15773347  | film character                  |           54 |              0 |
+|        0 | other    | NULL        | character | Q3658341   | literary character              |          423 |              0 |
+|        0 | other    | NULL        | character | Q95074     | character                       |         7656 |              0 |
+|        1 | game     | NULL        | game      | Q7889      | video game                      |          880 |            260 |
+|        1 | game     | NULL        | game      | Q7058673   | video game series               |            6 |             81 |
+|        1 | game     | NULL        | game      | Q112144412 | esports discipline              |            1 |             16 |
+|        2 | comic    | NULL        | comic     | Q1004      | comic                           |          285 |           2071 |
+|        2 | comic    | NULL        | comic     | Q14406742  | comic book series               |           45 |           1929 |
+|        2 | comic    | manga       | comic     | Q21198342  | manga series                    |            3 |           1590 |
+|        2 | comic    | NULL        | comic     | Q213369    | webcomic                        |           15 |             94 |
+|        2 | comic    | NULL        | comic     | Q838795    | comic strip                     |            7 |             79 |
+|        2 | comic    | NULL        | comic     | Q1760610   | comic book                      |           31 |             56 |
+|        2 | comic    | NULL        | comic     | Q2831984   | comic book album                |           13 |             56 |
+|        2 | comic    | NULL        | comic     | Q7978994   | webtoon                         |            5 |             54 |
+|        2 | comic    | NULL        | comic     | Q74262765  | manhwa series                   |            1 |             36 |
+|        2 | comic    | NULL        | comic     | Q3297186   | limited series                  |            1 |             35 |
+|        2 | comic    | manga       | comic     | Q865484    | yonkoma                         |            1 |             30 |
+|        2 | comic    | NULL        | comic     | Q725377    | graphic novel                   |            4 |             28 |
+|        2 | comic    | NULL        | comic     | Q137637896 | manhua series                   |            3 |             20 |
+|        2 | comic    | NULL        | comic     | Q115378877 | comic book storyline            |            1 |             17 |
+|        3 | stage    | play        | stage     | Q116476516 | dramatic work                   |          246 |            344 |
+|        3 | stage    | NULL        | stage     | Q58483083  | dramatico-musical work          |            7 |            216 |
+|        4 | folklore | NULL        | folklore  | Q699       | fairy tale                      |           35 |             67 |
+|        4 | folklore | NULL        | folklore  | Q1221280   | folk tale                       |           62 |             37 |
+|        4 | folklore | NULL        | folklore  | Q47451145  | tale type                       |            3 |             18 |
+|        4 | folklore | NULL        | folklore  | Q4400636   | Russian folktale                |            1 |             17 |
+|        5 | screen   | NULL        | screen    | Q24856     | film series                     |           14 |             54 |
+|        5 | screen   | NULL        | screen    | Q11424     | film                            |          852 |              0 |
+|        5 | screen   | NULL        | screen    | Q5398426   | television series               |          218 |              0 |
+|        6 | literary | NULL        | literary  | Q47461344  | written work                    |        53962 |          13299 |
+|        6 | literary | NULL        | literary  | Q7725634   | literary work                   |         6116 |          11372 |
+|        6 | literary | NULL        | literary  | Q277759    | book series                     |          103 |           2808 |
+|        6 | literary | NULL        | literary  | Q1667921   | novel series                    |            6 |            671 |
+|        6 | literary | light_novel | literary  | Q104213567 | light novel series              |            1 |            443 |
+|        6 | literary | NULL        | literary  | Q571       | book                            |          898 |            228 |
+|        6 | literary | NULL        | literary  | Q3331189   | version, edition or translation |        24807 |             87 |
+|        6 | literary | NULL        | literary  | Q47068459  | children's book series          |            1 |             52 |
+|        6 | literary | NULL        | literary  | Q59126     | xiaoshuo                        |           23 |             43 |
+|        6 | literary | NULL        | literary  | Q8275050   | children's book                 |           16 |             39 |
+|        6 | literary | NULL        | literary  | Q12799318  | short novel                     |            3 |             24 |
+|        6 | literary | NULL        | literary  | Q13593966  | literary trilogy                |            2 |             20 |
+|        6 | literary | NULL        | literary  | Q867335    | literary cycle                  |            8 |             17 |
+|        6 | literary | NULL        | literary  | Q29154430  | book of the Bible               |            3 |             14 |
+|        7 | other    | NULL        | music     | Q105543609 | musical work/composition        |          884 |            269 |
+|        7 | other    | NULL        | podcast   | Q24634210  | podcast show                    |          124 |             27 |
+|        7 | other    | NULL        | music     | Q482994    | album                           |           78 |             16 |
++----------+----------+-------------+-----------+------------+---------------------------------+--------------+----------------+
++------------------------------------------------------+
+| SECTION                                              |
++------------------------------------------------------+
+| B2. Conflicts between families, the 25 most frequent |
++------------------------------------------------------+
++-------------------------------------+----------+---------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| TYPES_MATCHED                       | DECIDED  | SOURCES | EXAMPLES                                                                                                                                                                                                 |
++-------------------------------------+----------+---------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| 2:comic + 6:literary                | comic    |    2065 | Crayon Shin-chan | Blondie | Garfield | Teenage Mutant Ninja Turtles | Case Closed | Dick Tracy | Boys Over Flowers | Itazura na Kiss | One Piece | Sabrina the Teenage Witch | Tomie | Dr. Slump | 91:a |
+| 1:game + 6:literary                 | game     |     259 | Persona 3 | Monster Strike | Kanon | Air | Clannad | Arknights | Detention | Touken Ranbu | Fate/Grand Order | Kantai Collection | Ao Oni | Rage of Bahamut | Phantom of Inferno | Yakuza | Devil Kings  |
+| 3:stage + 6:literary + 7:music      | stage    |     217 | Swan Lake | The Magic Flute | The King and I | Arshin Mal Alan | Mam'zelle Nitouche | Babes in Toyland | The Sound of Music | Wicked | The Rocky Horror Show | Annie | The Gipsy Princess | The Merry Wi |
+| 3:stage + 6:literary                | stage    |     127 | Romeo and Juliet | Hamlet | Macbeth | A Doll's House | Hedda Gabler | Othello | King Lear | Pygmalion | The Tempest | Twelfth Night | Peer Gynt | Ghosts | Richard III | The Taming of the Shrew | Lysis |
+| 4:folklore + 6:literary             | folklore |      80 | Snow White | Cinderella | The Snow Queen | The Little Mermaid | Cinderella | Jack and the Beanstalk | Ali Baba and the Forty Thieves | The Beauty Sleeping in the Wood | At the Pike's Behest | Kolobok  |
+| 0:franchise + 5:screen              | other    |      50 | Tom and Jerry | Star Wars | Air Bud | Olsen Gang | Zero Woman | Looney Tunes | Q59828807 | The Pink Panther | Q3311864 | Spy Kids | The Transporter | Halloween | Our Gang | The Loud House | Gogol | Le |
+| 0:franchise + 1:game                | other    |      12 | Sonic the Hedgehog | Tomb Raider | Mario | Inazuma Eleven | Q436567 | Backyard Sports | Q7565689 | Far Cry | Q1747150 | Animal Crossing | Q390137 | Q157387                                              |
+| 6:literary + 7:music                | literary |       8 | Jeppe på bjerget | Peter and the Wolf | Patria y Vida | This Is the House That Jack Built | Robin Hood's Death | Bless the Broken Road | Nada Sōsō | Flight of the Bumblebee                             |
+| 0:franchise + 2:comic + 6:literary  | other    |       4 | Golden Kamuy | Q11277997 | My Life as Inukai-san's Dog | Saboriman Ametani Kantarou                                                                                                                      |
+| 0:franchise + 5:screen + 6:literary | other    |       4 | Back to the Future | The Dark Knight trilogy | Ocean's | The Hobbit trilogy                                                                                                                              |
+| 0:franchise + 6:literary            | other    |       4 | Little House on the Prairie | Q106518342 | Grizzly Tales for Gruesome Kids | Hui Buh                                                                                                                     |
+| 0:character + 2:comic + 6:literary  | other    |       2 | Birds of Prey | Teenage Mutant Ninja Turtles                                                                                                                                                             |
+| 0:character + 0:franchise           | other    |       1 | Alvin and the Chipmunks                                                                                                                                                                                  |
+| 0:character + 6:literary            | other    |       1 | The Fantastic Four                                                                                                                                                                                       |
+| 0:franchise + 1:game + 6:literary   | other    |       1 | Dies Irae                                                                                                                                                                                                |
+| 6:literary + 7:podcast              | literary |       1 | Le Jeu des 1000 euros                                                                                                                                                                                    |
++-------------------------------------+----------+---------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++-----------------------------------------------------------------+
+| SECTION                                                         |
++-----------------------------------------------------------------+
+| B3. Final distribution of SOURCE_WORK_TYPE and SOURCE_WORK_FORM |
++-----------------------------------------------------------------+
++----------------+-------------+---------+-------+-------------------+-------------------+
+| FINAL_TYPE     | FINAL_FORM  | SOURCES | LINKS | LINKS_FROM_MOVIES | LINKS_FROM_SERIES |
++----------------+-------------+---------+-------+-------------------+-------------------+
+| literary       |             |   10160 | 14372 |             12025 |              2347 |
+| screen         |             |    3228 |  4776 |              2457 |              2319 |
+| comic          | manga       |    1588 |  2182 |               657 |              1525 |
+| other          |             |     496 |  1015 |               662 |               353 |
+| comic          |             |     477 |   706 |               435 |               271 |
+| literary       | light_novel |     443 |   488 |                40 |               448 |
+| stage          | play        |     344 |   688 |               662 |                26 |
+| game           |             |     326 |   380 |               141 |               239 |
+| (unclassified) |             |     307 |   404 |               295 |               109 |
+| folklore       |             |      83 |   204 |               198 |                 6 |
+| (missing)      |             |       2 |     7 |                 6 |                 1 |
++----------------+-------------+---------+-------+-------------------+-------------------+
++--------------------+---------+-------+
+| OTHER_FAMILY       | SOURCES | LINKS |
++--------------------+---------+-------+
+| character (core)   |     188 |   425 |
+| franchise (cached) |     147 |   376 |
+| music (cached)     |      60 |    63 |
+| person             |      44 |    51 |
+| character (cached) |      31 |    74 |
+| podcast (cached)   |      26 |    26 |
++--------------------+---------+-------+
++---------------------------------------------------------------------+
+| SECTION                                                             |
++---------------------------------------------------------------------+
+| B4. Unclassified cached sources, their 30 most frequent P31 classes |
++---------------------------------------------------------------------+
++------------+----------------------------+---------+-------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_CLASS   | CLASS_LABEL                | SOURCES | LINKS | EXAMPLES                                                                                                                                                                                      |
++------------+----------------------------+---------+-------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Q25372     | drama                      |      10 |    10 | Q137798604 | På solsiden | Peter den Store | Yes, My Darling Daughter | Q137768780 | Q137768707 | Ehe in Dosen | Les deux Monsieur de Madame | Q137737832 | Q137646813                        |
+| Q7777570   | theatrical production      |      10 |    10 | The Image Makers | Q4006152 | Carosello Napoletano | Q3618291 | Riverdance | Oh! Edo Rocket | A Streetcar Named Desire | Pokrovskiye Vorota | Q113005630 | Q112798450                         |
+| Q21191270  | television series episode  |       8 |     8 | The Bad Batch | Space Seed | Days of Wine and Roses | Make Some Noise | Invitation to a Gunfighter | Q111678512 | Requiem for a Heavyweight | Judgment at Nuremberg                           |
+| Q116774927 | NULL                       |       7 |     8 | Pokémon Red and Blue | Pokémon Red and Green | Pokémon Gold and Silver | Pokémon Black and White | Pokémon Ruby and Sapphire | Pokémon Diamond and Pearl | Pokémon Black 2 and White 2        |
+| Q132821    | murder                     |       6 |     7 | Jacqueline Sauvage case | Heung Wo Street murder | Yngsjö murder | murder of Glory Chau and Moon Siu | Cousin murders | Q113432410                                                            |
+| Q1573906   | concert tour               |       6 |     6 | Blond Ambition World Tour | Mylo Xyloto Tour | The 2nd Law Tour | Prismatic World Tour | Soy Rebelde Tour | The Eras Tour                                                                     |
+| Q1643932   | tabletop role-playing game |       6 |    13 | Dungeons & Dragons | Sword World RPG | Vampire: The Masquerade | The Esoterrorists | Mutant Chronicles | Call of Cthulhu                                                                      |
+| Q223393    | literary genre             |       6 |     8 | news article | bylina | graphic novel | Volksmärchen | comedy | play                                                                                                                          |
+| Q134556    | single                     |       5 |     5 | Blue Jean | Oshiri Kajiri Mushi | Convoy | Asal Kau Bahagia | Sakura no Ame                                                                                                                   |
+| Q16738832  | criminal case              |       5 |     5 | Murder of Stephen Lawrence | Central Park jogger case | Hattab-Sarraud-Subra case | Worms trials | Noida double murder case                                                                   |
+| Q431289    | brand                      |       5 |     9 | Shopkins | Lego | Hot Wheels | Rubik's Cube | Playmobil                                                                                                                                       |
+| Q1144661   | amusement ride             |       4 |     8 | Pirates of the Caribbean | Dumbo the Flying Elephant | Raveleijn | The Twilight Zone Tower of Terror                                                                                          |
+| Q14623646  | fictional organization     |       4 |     6 | Suicide Squad | Ultraforce | Ankh-Morpork City Watch | Section 31                                                                                                                             |
+| Q178561    | battle                     |       4 |     6 | Charge of the Light Brigade | Battle of Saragarhi | Battle at the 12th outpost of the Moscow border detachment | Battle of Rorke's Drift                                                      |
+| Q19718870  | mythology by ethnic group  |       4 |     7 | Greek mythology | Basque mythology | Romani mythology | Norse mythology                                                                                                                       |
+| Q2334719   | legal case                 |       4 |     5 | K. M. Nanavati v. State of Maharashtra | Bhawal case | murder of Glory Chau and Moon Siu | Maxi trial of Napoli                                                                               |
+| Q4263830   | literary form              |       4 |    13 | novel | news article | graphic novel | play                                                                                                                                                   |
+| Q57663626  | toyline                    |       4 |    13 | Transformers | Shopkins | Frame Arms Girl | Sirotan                                                                                                                                           |
+| Q732577    | publication                |       4 |     4 | The South Seas | The Rebirth of Buddha | Q11325673 | The Descent of Japanese Father God Ame-no-Mioya-Gami                                                                                     |
+| Q734698    | collectible card game      |       4 |     9 | Cardfight!! Vanguard | WIXOSS | Battle Spirits Trading Card Game | Aquarian Age                                                                                                               |
+| Q110013395 | theatrical work            |       3 |     3 | My Big Gay Italian Wedding | Q6072713 | Q131679160                                                                                                                                            |
+| Q11422     | toy                        |       3 |     3 | Cap Revolution Bottleman | Robo Force | Pinypon                                                                                                                                               |
+| Q116774997 | NULL                       |       3 |     3 | Pokémon HeartGold and SoulSilver | Pokémon FireRed and LeafGreen | Pokémon Omega Ruby and Alpha Sapphire                                                                                      |
+| Q1190554   | occurrence                 |       3 |     3 | Operation Bawaria | Murder of Reagan Simmons-Hancock | PIA flight PK712 hijacking                                                                                                             |
+| Q131436    | board game                 |       3 |     6 | Cluedo | Battleship | Pictionary                                                                                                                                                              |
+| Q1388421   | social experiment          |       3 |     4 | Stanford prison experiment | The Milgram experiment | The Third Wave                                                                                                                          |
+| Q2116008   | psychological experiment   |       3 |     4 | Stanford prison experiment | The Milgram experiment | The Third Wave                                                                                                                          |
+| Q215380    | musical group              |       3 |     3 | The Temptations | N.W.A. | New Kids on the Block                                                                                                                                              |
+| Q25906438  | attempted coup d'état      |       3 |     3 | Decembrist revolt | 20 July plot | January 6 United States Capitol attack                                                                                                                     |
+| Q3464665   | television series season   |       3 |     3 | Star Trek: Discovery, season 2 | Young Hearts, season 25 | Servant of the People, season 2                                                                                                    |
++------------+----------------------------+---------+-------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++---------------+
+| SECTION       |
++---------------+
+| B5. Witnesses |
++---------------+
++-------+---------+----------------+-----------+--------------------+---------------+------------+------------+
+| KIND  | ID_WORK | TITLE          | ID_TARGET | LABEL_EN           | HOME          | FINAL_TYPE | FINAL_FORM |
++-------+---------+----------------+-----------+--------------------+---------------+------------+------------+
+| movie |     111 | Scarface       | Q23307577 | Scarface           | 7 cached_item | literary   | NULL       |
+| movie |     111 | Scarface       | Q471306   | Scarface           | 1 t2s_movie   | screen     | NULL       |
+| movie |     694 | The Shining    | Q470937   | The Shining        | 7 cached_item | literary   | NULL       |
+| movie |  329865 | Arrival        | Q7620415  | Story of Your Life | 7 cached_item | literary   | NULL       |
+| serie |  100088 | The Last of Us | Q1986744  | NULL               | 7 cached_item | game       | NULL       |
++-------+---------+----------------+-----------+--------------------+---------------+------------+------------+
++---------------------------+
+| SECTION                   |
++---------------------------+
+| C1. Agreement per keyword |
++---------------------------+
++------------+-----------------------------------------+---------------+---------------+-----------------+------------+----------+------------+----------+
+| ID_KEYWORD | NAME                                    | EXPECTED_TYPE | EXPECTED_FORM | WORKS_WITH_BOTH | AGREE_TYPE | PCT_TYPE | AGREE_FORM | PCT_FORM |
++------------+-----------------------------------------+---------------+---------------+-----------------+------------+----------+------------+----------+
+|        818 | based on novel or book                  | literary      | NULL          |            4298 |       4176 |     97.2 |       NULL |     NULL |
+|      13141 | based on manga                          | comic         | manga         |            1721 |       1547 |     89.9 |       1528 |     88.8 |
+|       9717 | based on comic                          | comic         | NULL          |             639 |        370 |     57.9 |       NULL |     NULL |
+|      10181 | based on play or musical                | stage         | NULL          |             457 |        177 |     38.7 |       NULL |     NULL |
+|     319900 | based on light novel                    | literary      | light_novel   |             434 |        426 |     98.2 |        408 |     94.0 |
+|      15101 | based on children&#039;s book           | literary      | NULL          |             277 |        255 |     92.1 |       NULL |     NULL |
+|     269769 | based on tv series                      | screen        | NULL          |             275 |        240 |     87.3 |       NULL |     NULL |
+|      41645 | based on video game                     | game          | NULL          |             272 |        217 |     79.8 |       NULL |     NULL |
+|     246466 | based on young adult novel              | literary      | NULL          |             178 |        175 |     98.3 |       NULL |     NULL |
+|     165317 | based on movie                          | screen        | NULL          |             172 |        128 |     74.4 |       NULL |     NULL |
+|     156866 | based on short story                    | literary      | NULL          |             152 |        143 |     94.1 |       NULL |     NULL |
+|      14641 | based on memoir or autobiography        | literary      | NULL          |              89 |         87 |     97.8 |       NULL |     NULL |
+|     288474 | based on webcomic or webtoon            | comic         | NULL          |              81 |         71 |     87.7 |       NULL |     NULL |
+|      18712 | based on graphic novel                  | comic         | NULL          |              75 |         68 |     90.7 |       NULL |     NULL |
+|     318933 | based on web novel                      | literary      | NULL          |              63 |         57 |     90.5 |       NULL |     NULL |
+|     179411 | based on fairy tale                     | folklore      | NULL          |              61 |         25 |     41.0 |       NULL |     NULL |
+|     222216 | based on visual novel                   | game          | NULL          |              60 |         55 |     91.7 |       NULL |     NULL |
+|      10542 | based on toy                            | other         | NULL          |              56 |         23 |     41.1 |       NULL |     NULL |
+|     185343 | based on myths, legends or folklore     | folklore      | NULL          |              46 |          2 |      4.3 |       NULL |     NULL |
+|     222243 | based on anime                          | screen        | NULL          |              43 |         20 |     46.5 |       NULL |     NULL |
+|     323477 | based on manhwa                         | comic         | NULL          |              32 |         24 |     75.0 |       NULL |     NULL |
+|     290667 | based on manhua                         | comic         | NULL          |              27 |         25 |     92.6 |       NULL |     NULL |
+|     268132 | based on short                          | screen        | NULL          |              22 |         18 |     81.8 |       NULL |     NULL |
+|     239125 | based on web series                     | screen        | NULL          |              15 |         13 |     86.7 |       NULL |     NULL |
+|     239275 | based on magazine, newspaper or article | literary      | NULL          |              10 |          8 |     80.0 |       NULL |     NULL |
++------------+-----------------------------------------+---------------+---------------+-----------------+------------+----------+------------+----------+
++----------------------------------------------+
+| SECTION                                      |
++----------------------------------------------+
+| C2. Agreement overall, and per expected type |
++----------------------------------------------+
++---------------+-------+-------+------+
+| EXPECTED_TYPE | PAIRS | AGREE | PCT  |
++---------------+-------+-------+------+
+| comic         |  2575 |  2105 | 81.7 |
+| folklore      |   107 |    27 | 25.2 |
+| game          |   332 |   272 | 81.9 |
+| literary      |  5501 |  5327 | 96.8 |
+| other         |    56 |    23 | 41.1 |
+| screen        |   527 |   419 | 79.5 |
+| stage         |   457 |   177 | 38.7 |
+| (all)         |  9555 |  8350 | 87.4 |
++---------------+-------+-------+------+
++---------------------------------------------------------------------+
+| SECTION                                                             |
++---------------------------------------------------------------------+
+| C3. Disagreements: what Wikidata says instead, the 30 most frequent |
++---------------------------------------------------------------------+
++-------------------------------------+---------------+----------------+-------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+| KEYWORD                             | EXPECTED_TYPE | FOUND_TYPES    | WORKS | EXAMPLES                                                                                                                                                 |
++-------------------------------------+---------------+----------------+-------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+| based on play or musical            | stage         | literary       |   260 | 'night, Mother | 12 Angry Men | 84 Charing Cross Road | A Few Good Men | A Flea in Her Ear | A Night at Karlstein | A Soldier's Story | A Star Is Fall   |
+| based on comic                      | comic         | other          |   202 | Adventures of Captain Marvel | Ant-Man | Ant-Man and the Wasp | Ant-Man and the Wasp: Quantumania | Aquaman | Aquaman | Aquaman | Arrow | Astronauta |   |
+| based on manga                      | comic         | screen         |   107 | 009-1: The End of the Beginning | 7O3X Fastest Finger First | A Sharply Graceful Girl | A Song to the Sun | Akuma Kun | AnoHana: The Flower We Saw Tha   |
+| based on novel or book              | literary      | screen         |    56 | 2gether: The Movie | A Christmas Story Christmas | A Town Without Seasons | Algiers | Anne of Green Gables: Road to Green Gables | Apocalypse Now | Ap   |
+| based on video game                 | game          | other          |    40 | Adventures of Sonic the Hedgehog | Animal Crossing: The Movie | Devil May Cry | Devil May Cry | Dies Irae | Far Cry | Final Fantasy: The Spirits Withi   |
+| based on manga                      | comic         | literary       |    37 | 2.43: Seiin High School Boys Volleyball Team | A Gatherer's Adventure in Isekai | A Playthrough of a Certain Dude's VRMMO Life | A Wild Last Boss Appe   |
+| based on myths, legends or folklore | folklore      | literary       |    30 | A Story of the Forest: Mavka | Adventures of the Super Monkey -Journey to the West- | Aladdin or the Wonderful Lamp | Beowulf | Beowulf & Grendel | Bl   |
+| based on fairy tale                 | folklore      | literary       |    29 | Allerleirauh | Beastly | Beauty and the Beast | Bluebeard | Das Märchen von der silbernen Brücke | Die kluge Bauerntochter | Donkey Skin | Gretel & Ha   |
+| based on manga                      | comic         | other          |    22 | Attack No.1 | Bleach | Dragon Ball Z: Battle of Gods | Dragon Ball Z: Fusion Reborn | Dragon Ball Z: The World's Strongest | Dragon Ball Z: Wrath of t   |
+| based on novel or book              | literary      | other          |    22 | Agatha Christie's Marple | All of a Sudden | Belle | Conan the Barbarian | DCI Banks | Hap and Leonard | Jack Ryan: Shadow Recruit | Kull the Conquero   |
+| based on comic                      | comic         | literary       |    21 | A Wish for Wings That Work | Archie's Weird Mysteries | Atomic Blonde | Creature Commandos | Creepshow | Hawkeye | I Was Reincarnated as the 7th Princ   |
+| based on comic                      | comic         | screen         |    18 | Batman and Robin | Batman vs. Two-Face | Kamen Rider Saber + Kikai Sentai Zenkaiger: Super Hero Chronicles | LEGO ONE PIECE | Marvel's Agent Carter |    |
+| based on toy                        | other         | (unclassified) |    18 | Barbie and the Rockers: Out of This World | Bumblebee | Cap Revolution Bottleman | Hot Wheels Let's Race | P.J. Sparkles | Sirotan | The Lego Movie |    |
+| based on movie                      | screen        | other          |    17 | Back to the Future | Conan the Adventurer | Crystal Lake | Damien | Fast & Furious Spy Racers | Godzilla: The Series | Lethal Weapon | Monarch: Legacy   |
+| based on novel or book              | literary      | comic          |    17 | A Courtesan with Flowered Skin | Bon Appétit, Your Majesty | Heartstopper | I Want to Die Alone | In/Spectre | Last Samurai Standing | Marry My Husban   |
+| based on movie                      | screen        | literary       |    16 | Duet | Friday Night Lights | Gentle Ben | Hotel «At the Dead Mountaineer» | Jumanji: Welcome to the Jungle | Legend of the BoneKnapper Dragon | Love A   |
+| based on tv series                  | screen        | comic          |    16 | Cells at Work! | Detective Conan: The Scarlet Bullet | Fullmetal Alchemist the Movie: Conqueror of Shamballa | Fuuto PI | Fuuto PI: The Portrait of Ka   |
+| based on anime                      | screen        | comic          |    15 | Astro Boy: Mighty Atom – Visitor of 100,000 Light Years, IGZA | Cells at Work! | Death Note | Demon Slayer: Kimetsu no Yaiba Infinity Castle | Detecti   |
+| based on novel or book              | literary      | (unclassified) |    12 | Crime Diaries: Night Out | Every Day a Good Day | Going Gently | Kindred: The Embraced | Locomotive Teacher | Missing You | Narciso | Narratage | Seis   |
+| based on comic                      | comic         | other + screen |    11 | Agatha All Along | Batman | Batman & Mr. Freeze: SubZero | Batman: Mask of the Phantasm | Batman: Mystery of the Batwoman | DC's Legends of Tomorrow |   |
+| based on tv series                  | screen        | other          |    10 | Lupin the Third: Bye Bye, Lady Liberty | Masters of the Universe | Monster High 2 | Monster High: The Movie | Mutant Turtles: Superman Legend | Power    |
+| based on children&#039;s book       | literary      | folklore       |     8 | Čert a Káča | Cinderella | Cinderella | Cinderella | Frozen | Princess Goldilocks | The Devil and Kate | The Little Mermaid                              |
+| based on children&#039;s book       | literary      | other          |     8 | Curious George | Paddington | Paddington 2 | Pelle Svanslös | Peter Rabbit | Peter Rabbit 2: The Runaway | The Boy from Napoli | Untitled Animated Moo   |
+| based on play or musical            | stage         | screen         |     8 | Heaven Can Wait | Natsamrat | Prima Facie | Sweet Charity | The Birdcage | Voi meitä! Anoppi tulee | Yes, Prime Minister | You Can't Take It with You    |
+| based on light novel                | literary      | comic          |     7 | Bogus Skill «Fruitmaster» ~About that time I became able to eat unlimited numbers of Skill Fruits (that kill you)~ | Bungo Stray Dogs the Movie: BEAST   |
+| based on movie                      | screen        | stage          |     6 | Kinky Boots: The Musical | Little Shop of Horrors | Newsies | Reefer Madness: The Movie Musical | The Producers | Waitress: The Musical                  |
+| based on toy                        | other         | screen         |     6 | Beyblade X | Extreme Dinosaurs | He-Man and the Masters of the Universe | My Little Pony: Equestria Girls | PAW Patrol: The Dino Movie | She-Ra: Princ   |
+| based on tv series                  | screen        | literary       |     6 | Back to the Past | Clifford's Really Big Movie | Dogtanian and the Three Muskehounds | Horrible Histories: The Movie — Rotten Romans | The After-Dinne   |
+| based on video game                 | game          | (unclassified) |     6 | Dungeons & Dragons | Dungeons & Dragons: Honor Among Thieves | Dungeons & Dragons: The Book of Vile Darkness | Dungeons & Dragons: Wrath of the Dragon   |
+| based on video game                 | game          | screen         |     6 | Doom: Annihilation | Fate/stay night [Unlimited Blade Works] | Fate/stay night: Unlimited Blade Works | Pixels | Pokémon Chronicles | TRON: Legacy       |
++-------------------------------------+---------------+----------------+-------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
++--------------------------------------+
+| SECTION                              |
++--------------------------------------+
+| D1. Character links per Wikidata tie |
++--------------------------------------+
++------+-------+-------+-------------------+-------------------+------------+
+| VIA  | LINKS | WORKS | LINKS_FROM_MOVIES | LINKS_FROM_SERIES | CHARACTERS |
++------+-------+-------+-------------------+-------------------+------------+
+| P144 |   499 |   482 |               327 |               172 |        219 |
+| P453 | 50240 |  9609 |             35808 |             14432 |      31780 |
+| P674 | 32242 |  5636 |             20696 |             11546 |      19607 |
+| NULL | 82981 | 12662 |             56831 |             26150 |      38079 |
++------+-------+-------+-------------------+-------------------+------------+
++------------------------------+
+| DISTINCT_CHARACTERS_ALL_TIES |
++------------------------------+
+|                        38079 |
++------------------------------+
++-------------------------------------------------+
+| SECTION                                         |
++-------------------------------------------------+
+| D2. Where the characters live, and their labels |
++-------------------------------------------------+
++-----------------------+------------+------------+-------+-------+
+| HOME                  | CHARACTERS | WORK_LINKS | NO_EN | NO_FR |
++-----------------------+------------+------------+-------+-------+
+| 1 core_character      |      22101 |      36906 |   756 | 14039 |
+| 2 cached_item         |       4403 |       5706 |   127 |   904 |
+| 3 core_person         |      11557 |      19572 |   158 |   746 |
+| 4 core_movie_or_serie |         16 |         17 |    16 |    16 |
+| 5 missing_everywhere  |          2 |          2 |     2 |     2 |
++-----------------------+------------+------------+-------+-------+
++---------------------------------------+
+| SECTION                               |
++---------------------------------------+
+| D3. Characters by number of T2S works |
++---------------------------------------+
++--------------+------------+
+| WORKS_BUCKET | CHARACTERS |
++--------------+------------+
+| 1            |      29874 |
+| 2-4          |       6610 |
+| 5-9          |       1167 |
+| 10+          |        428 |
++--------------+------------+
++---------------------------+
+| SECTION                   |
++---------------------------+
+| D4. Sizes to compare with |
++---------------------------+
++-------------------------+--------------------+------------------------+
+| WIKIDATA_CHARACTER_ROWS | T2S_CHARACTER_ROWS | CHARACTERS_TIED_TO_T2S |
++-------------------------+--------------------+------------------------+
+|                  125065 |                  0 |                  38079 |
++-------------------------+--------------------+------------------------+
++-------------------------------------------------------------------------+
+| SECTION                                                                 |
++-------------------------------------------------------------------------+
+| D5. The 30 characters tied to the most T2S works, and Maigret (Q830561) |
++-------------------------------------------------------------------------+
++-----------+-------------------------+--------------------------+------------------+-------+--------+--------+----------------+
+| ID_CHAR   | LABEL_EN                | LABEL_FR                 | HOME             | WORKS | MOVIES | SERIES | VIAS           |
++-----------+-------------------------+--------------------------+------------------+-------+--------+--------+----------------+
+| Q18086706 | self                    | lui/elle-même            | 2 cached_item    |   407 |    334 |     73 | P453+P674      |
+| Q6550     | Donald Duck             | Donald Duck              | 1 core_character |   183 |    182 |      1 | P674           |
+| Q11934    | Mickey Mouse            | Mickey Mouse             | 1 core_character |   155 |    151 |      4 | P453+P674      |
+| Q741321   | Woody Woodpecker        | Woody Woodpecker         | 1 core_character |   145 |    143 |      2 | P674           |
+| Q1419509  | Oswald the Lucky Rabbit | Oswald le lapin chanceux | 1 core_character |   119 |    119 |      0 | P674           |
+| Q108732   | Pluto                   | Pluto                    | 1 core_character |   116 |    115 |      1 | P674           |
+| Q4653     | Sherlock Holmes         | Sherlock Holmes          | 1 core_character |    84 |     70 |     14 | P144+P453+P674 |
+| Q3266236  | Count Dracula           | Comte Dracula            | 1 core_character |    83 |     79 |      4 | P144+P453+P674 |
+| Q11936    | Minnie Mouse            | Minnie Mouse             | 1 core_character |    82 |     79 |      3 | P453+P674      |
+| Q11947    | Pete                    | Pat Hibulaire            | 1 core_character |    77 |     76 |      1 | P674           |
+| Q111135   | Goofy                   | Dingo                    | 1 core_character |    75 |     74 |      1 | P453+P674      |
+| Q187349   | Dr. Watson              | docteur Watson           | 1 core_character |    67 |     56 |     11 | P453+P674      |
+| Q901323   | Scooby-Doo              | Scooby-Doo               | 1 core_character |    60 |     54 |      6 | P453+P674      |
+| Q59779907 | Krazy Kat               | Krazy Kat                | 1 core_character |    58 |     58 |      0 | P674           |
+| Q352      | Adolf Hitler            | NULL                     | 3 core_person    |    58 |     51 |      7 | P453+P674      |
+| Q2695156  | Batman                  | Batman                   | 1 core_character |    53 |     42 |     11 | P144+P453+P674 |
+| Q13652117 | Martin Beck             | Martin Beck              | 1 core_character |    53 |     52 |      1 | P453+P674      |
+| Q12306805 | D'Artagnan              | D'Artagnan               | 1 core_character |    52 |     46 |      6 | P453+P674      |
+| Q10269121 | Durango Kid             | Durango Kid              | 1 core_character |    51 |     51 |      0 | P453           |
+| Q936529   | Porthos                 | Porthos                  | 1 core_character |    49 |     43 |      6 | P453+P674      |
+| Q151209   | Anne of Austria         | Anne d'Autriche          | 3 core_person    |    49 |     42 |      7 | P453+P674      |
+| Q3189833  | Julius the Cat          | Julius                   | 1 core_character |    48 |     48 |      0 | P674           |
+| Q1649854  | Athos                   | Athos                    | 1 core_character |    48 |     42 |      6 | P453+P674      |
+| Q79015    | Superman                | Superman                 | 1 core_character |    45 |     34 |     11 | P144+P453+P674 |
+| Q302      | Jesus Christ            | Jésus-Christ             | 3 core_person    |    45 |     37 |      8 | P453+P674      |
+| Q1773077  | Aramis                  | Aramis                   | 1 core_character |    45 |     39 |      6 | P453+P674      |
+| Q855      | Joseph Stalin           | Joseph Staline           | 3 core_person    |    42 |     37 |      5 | P453+P674      |
+| Q2483037  | Bosko                   | Bosko                    | 1 core_character |    42 |     42 |      0 | P674           |
+| Q122634   | Robin Hood              | Robin des Bois           | 1 core_character |    42 |     30 |     12 | P144+P453+P674 |
+| Q5764991  | Sinterklaas             | Saint Nicolas            | 1 core_character |    41 |     35 |      6 | P453+P674      |
++-----------+-------------------------+--------------------------+------------------+-------+--------+--------+----------------+
++---------+---------------+---------------------+------------------+-------+--------+--------+-----------+
+| ID_CHAR | LABEL_EN      | LABEL_FR            | HOME             | WORKS | MOVIES | SERIES | VIAS      |
++---------+---------------+---------------------+------------------+-------+--------+--------+-----------+
+| Q830561 | Jules Maigret | commissaire Maigret | 1 core_character |    26 |     20 |      6 | P453+P674 |
++---------+---------------+---------------------+------------------+-------+--------+--------+-----------+

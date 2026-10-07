@@ -22,6 +22,13 @@
 --   D. Characters linked to T2S works by Wikidata (P674 on the work, P453 qualifier on
 --      a cast credit, P144 to a character): how many, for TMDB-MOVIE-PREPROCESS-012.
 --
+-- RUN 2 (after the result of 2026-10-07). Form 'musical' added for the dramatico-musical
+-- cone, ranked above 'play' (run 1 gave 'play' to Swan Lake and The Magic Flute).
+-- Roots added from part B4 of run 1: stage (drama, theatrical production, theatrical
+-- work), screen (episode, season), game (tabletop RPG, board game, card game, Pokemon
+-- classes), folklore (mythology); real events and products named in 'other'.
+-- Re-running the same day needs the runner's -f.
+--
 -- PERFORMANCE. Every join goes through an indexed temporary table or an indexed
 -- column. P453 is read from IDX_..._STATEMENT_QUALIFIER_PROPERTY, P674 and P144 from
 -- IDX_..._STATEMENT_ID_PROPERTY. The cones are built once by one recursive CTE.
@@ -203,6 +210,11 @@ INSERT INTO TMP_055_ROOT (ID_ROOT, TYPE, FORM, FAMILY, PRIORITY) VALUES
   ('Q7889',      'game',     NULL,          'game',      1),
   ('Q7058673',   'game',     NULL,          'game',      1),
   ('Q112144412', 'game',     NULL,          'game',      1),
+  ('Q1643932',   'game',     NULL,          'game',      1),   -- tabletop role-playing game (added after run 1)
+  ('Q131436',    'game',     NULL,          'game',      1),   -- board game (idem)
+  ('Q734698',    'game',     NULL,          'game',      1),   -- collectible card game (idem)
+  ('Q116774927', 'game',     NULL,          'game',      1),   -- unlabelled, the Pokemon game pairs (idem)
+  ('Q116774997', 'game',     NULL,          'game',      1),   -- unlabelled, Pokemon remakes (idem)
   -- 2, comic
   ('Q21198342',  'comic',    'manga',       'comic',     2),
   ('Q865484',    'comic',    'manga',       'comic',     2),
@@ -218,18 +230,26 @@ INSERT INTO TMP_055_ROOT (ID_ROOT, TYPE, FORM, FAMILY, PRIORITY) VALUES
   ('Q213369',    'comic',    NULL,          'comic',     2),
   ('Q74262765',  'comic',    NULL,          'comic',     2),
   ('Q137637896', 'comic',    NULL,          'comic',     2),
-  -- 3, stage
+  -- 3, stage. Form 'musical' covers every stage work with music (musical, opera,
+  -- operetta, ballet) and wins over 'play' (fixed 2026-10-07: the dramatico-musical
+  -- cone sits inside the dramatic-work cone, and Swan Lake came out as a 'play').
   ('Q116476516', 'stage',    'play',        'stage',     3),
-  ('Q58483083',  'stage',    NULL,          'stage',     3),
+  ('Q58483083',  'stage',    'musical',     'stage',     3),
+  ('Q25372',     'stage',    'play',        'stage',     3),   -- drama (added after run 1)
+  ('Q7777570',   'stage',    NULL,          'stage',     3),   -- theatrical production (idem)
+  ('Q110013395', 'stage',    NULL,          'stage',     3),   -- theatrical work (idem)
   -- 4, folklore
   ('Q699',       'folklore', NULL,          'folklore',  4),
   ('Q1221280',   'folklore', NULL,          'folklore',  4),
   ('Q47451145',  'folklore', NULL,          'folklore',  4),
   ('Q4400636',   'folklore', NULL,          'folklore',  4),
+  ('Q19718870',  'folklore', NULL,          'folklore',  4),   -- mythology by ethnic group (added after run 1)
   -- 5, screen (cached films and series; core ones are typed by their home)
   ('Q24856',     'screen',   NULL,          'screen',    5),
   ('Q11424',     'screen',   NULL,          'screen',    5),
   ('Q5398426',   'screen',   NULL,          'screen',    5),
+  ('Q21191270',  'screen',   NULL,          'screen',    5),   -- television series episode (added after run 1)
+  ('Q3464665',   'screen',   NULL,          'screen',    5),   -- television series season (idem)
   -- 6, literary
   ('Q104213567', 'literary', 'light_novel', 'literary',  6),
   ('Q7725634',   'literary', NULL,          'literary',  6),
@@ -248,7 +268,18 @@ INSERT INTO TMP_055_ROOT (ID_ROOT, TYPE, FORM, FAMILY, PRIORITY) VALUES
   -- 7, works outside the list
   ('Q105543609', 'other',    NULL,          'music',     7),
   ('Q482994',    'other',    NULL,          'music',     7),
-  ('Q24634210',  'other',    NULL,          'podcast',   7);
+  ('Q24634210',  'other',    NULL,          'podcast',   7),
+  -- 7, real events and products, measured as unclassified in run 1: named only so
+  -- the breakdown of 'other' says what they are.
+  ('Q132821',    'other',    NULL,          'event',     7),   -- murder
+  ('Q16738832',  'other',    NULL,          'event',     7),   -- criminal case
+  ('Q2334719',   'other',    NULL,          'event',     7),   -- legal case
+  ('Q178561',    'other',    NULL,          'event',     7),   -- battle
+  ('Q25906438',  'other',    NULL,          'event',     7),   -- attempted coup d'etat
+  ('Q1190554',   'other',    NULL,          'event',     7),   -- occurrence
+  ('Q431289',    'other',    NULL,          'product',   7),   -- brand
+  ('Q11422',     'other',    NULL,          'product',   7),   -- toy
+  ('Q57663626',  'other',    NULL,          'product',   7);   -- toyline
 
 -- The cones, every root at once. The CAST of the anchor is not decorative: without
 -- it MariaDB types the recursive column on the literal's length (error 1406).
@@ -328,7 +359,10 @@ GROUP BY ID_TARGET;
 
 UPDATE TMP_055_DECIDED d
 SET d.TYPE   = (SELECT MIN(m.TYPE)   FROM TMP_055_MATCH m WHERE m.ID_TARGET = d.ID_TARGET AND m.PRIORITY = d.PRIO),
-    d.FORM   = (SELECT MAX(m.FORM)   FROM TMP_055_MATCH m WHERE m.ID_TARGET = d.ID_TARGET AND m.PRIORITY = d.PRIO),
+    -- Form ranking inside the winning type: 'musical' beats 'play' (an opera is also a
+    -- dramatic work), 'manga' and 'light_novel' have no rival in their type.
+    d.FORM   = (SELECT CASE WHEN SUM(m.FORM = 'musical') > 0 THEN 'musical' ELSE MAX(m.FORM) END
+                FROM TMP_055_MATCH m WHERE m.ID_TARGET = d.ID_TARGET AND m.PRIORITY = d.PRIO),
     d.FAMILY = (SELECT MIN(m.FAMILY) FROM TMP_055_MATCH m WHERE m.ID_TARGET = d.ID_TARGET AND m.PRIORITY = d.PRIO);
 
 -- Final type of every source: by home for core entities, by cone for cached items.
