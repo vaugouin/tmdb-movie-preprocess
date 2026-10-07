@@ -1,0 +1,287 @@
+-- test-055-topics-and-cached-characters.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-07 13:35:22
+--
++---------------------------------------------------------------+
+| SECTION                                                       |
++---------------------------------------------------------------+
+| E1. Every "based on ..." keyword: topic or not, and its reach |
++---------------------------------------------------------------+
++------------+----------------------------------------------------------------------------------------------+--------------------+-----------------+----------+---------------+--------------+--------------+-------------+-------------+
+| ID_KEYWORD | NAME                                                                                         | USED_FOR_T2S_TOPIC | USE_FOR_TAGGING | ID_TOPIC | TOPIC_DELETED | TOPIC_MOVIES | TOPIC_SERIES | TMDB_MOVIES | TMDB_SERIES |
++------------+----------------------------------------------------------------------------------------------+--------------------+-----------------+----------+---------------+--------------+--------------+-------------+-------------+
+|        818 | based on novel or book                                                                       |                  1 |               1 |    17945 |             0 |         6433 |         2177 |        8550 |        3563 |
+|       9672 | based on true story                                                                          |                  1 |               1 |    18014 |             0 |         2428 |          307 |        3425 |         463 |
+|      13141 | based on manga                                                                               |                  1 |               1 |    18095 |             0 |          695 |         1500 |        1368 |        2236 |
+|      10181 | based on play or musical                                                                     |                  1 |               1 |    18963 |             0 |         1384 |           48 |        2387 |          81 |
+|     156866 | based on short story                                                                         |                  1 |               1 |    19099 |             0 |          459 |           44 |        1409 |          83 |
+|       9717 | based on comic                                                                               |                  1 |               1 |    18933 |             0 |          728 |          400 |         941 |         495 |
+|      15101 | based on children&#039;s book                                                                |                  1 |               1 |    19060 |             0 |          415 |          115 |         719 |         181 |
+|      41645 | based on video game                                                                          |                  1 |               1 |    19086 |             0 |          229 |          224 |         464 |         405 |
+|     269769 | based on tv series                                                                           |                  1 |               1 |    19185 |             0 |          439 |          108 |         630 |         198 |
+|     319900 | based on light novel                                                                         |                  1 |            NULL |    32020 |             0 |           49 |          420 |          84 |         456 |
+|     318933 | based on web novel                                                                           |                  1 |            NULL |    31989 |             0 |            9 |          120 |          27 |         512 |
+|     165317 | based on movie                                                                               |                  1 |            NULL |    24491 |             0 |          137 |          214 |         207 |         259 |
+|     288474 | based on webcomic or webtoon                                                                 |                  1 |            NULL |    31207 |             0 |           55 |          192 |          89 |         358 |
+|     185343 | based on myths, legends or folklore                                                          |                  1 |               1 |    19119 |             0 |          154 |           23 |         368 |          58 |
+|     328926 | based on real person                                                                         |                  1 |            NULL |    32368 |             0 |          166 |           37 |         283 |          64 |
+|      10542 | based on toy                                                                                 |                  1 |            NULL |    22196 |             0 |          103 |           82 |         142 |         137 |
+|      14641 | based on memoir or autobiography                                                             |                  1 |               1 |    19041 |             0 |          159 |           32 |         214 |          39 |
+|     179411 | based on fairy tale                                                                          |                  1 |               1 |    19583 |             0 |          155 |           12 |         229 |          19 |
+|      41011 | based on song, poem or rhyme                                                                 |                  1 |            NULL |    23241 |             0 |          107 |            5 |         224 |          12 |
+|     246466 | based on young adult novel                                                                   |                  1 |            NULL |    29661 |             0 |          172 |           36 |         192 |          38 |
+|     268132 | based on short                                                                               |                  1 |            NULL |    30536 |             0 |          103 |           15 |         208 |          17 |
+|     222243 | based on anime                                                                               |                  1 |            NULL |    28213 |             0 |           71 |           34 |         145 |          54 |
+|      18712 | based on graphic novel                                                                       |                  1 |            NULL |    23023 |             0 |           87 |           40 |         130 |          49 |
+|     290667 | based on manhua                                                                              |                  1 |            NULL |    31254 |             0 |            9 |           37 |          19 |         142 |
+|     222216 | based on visual novel                                                                        |                  1 |            NULL |    28210 |             0 |           14 |           63 |          35 |         116 |
+|      10244 | based on cartoon                                                                             |                  1 |            NULL |    22115 |             0 |           69 |           25 |          89 |          32 |
+|     323477 | based on manhwa                                                                              |                  1 |            NULL |    32124 |             0 |            5 |           51 |          17 |          86 |
+|     239125 | based on web series                                                                          |                  1 |            NULL |    29301 |             0 |           29 |           20 |          63 |          36 |
+|     239275 | based on magazine, newspaper or article                                                      |                  1 |            NULL |    29314 |             0 |           50 |           14 |          66 |          22 |
+|     364484 | based on a true story                                                                        |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |          66 |           3 |
+|     269666 | based on podcast                                                                             |                  1 |            NULL |    30570 |             0 |            5 |           24 |          26 |          37 |
+|     263521 | based on radio drama                                                                         |                  1 |            NULL |    30400 |             0 |           23 |            5 |          52 |           7 |
+|     189140 | based on opera                                                                               |                  1 |            NULL |    25888 |             0 |           25 |            2 |          53 |           3 |
+|     252342 | based on card game                                                                           |                  1 |            NULL |    29935 |             0 |            4 |           20 |           9 |          34 |
+|     331911 | based on twitter thread                                                                      |                  1 |            NULL |    32433 |             0 |           17 |            0 |          22 |           0 |
+|     369908 | based on true events                                                                         |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |          17 |           5 |
+|     333822 | based on comic strip                                                                         |                  1 |            NULL |    32472 |             0 |            6 |            3 |          15 |           6 |
+|     326245 | based on youtube show                                                                        |                  1 |            NULL |    32305 |             0 |            7 |            1 |          17 |           2 |
+|     337985 | based on mobile game                                                                         |                  1 |            NULL |    32558 |             0 |            1 |            5 |           3 |          15 |
+|     279987 | based on theme park ride                                                                     |                  1 |            NULL |    30885 |             0 |           11 |            0 |          16 |           0 |
+|     363862 | based on a stage play                                                                        |                  1 |            NULL |    32987 |             0 |            7 |            0 |          13 |           0 |
+|     344283 | based on board game                                                                          |                  1 |            NULL |    32669 |             0 |            3 |            1 |           9 |           4 |
+|     344373 | based on story                                                                               |                  1 |            NULL |    32671 |             0 |            7 |            1 |           8 |           3 |
+|     339007 | based on legends                                                                             |                  1 |            NULL |    32582 |             0 |            4 |            2 |           7 |           4 |
+|     368262 | based on game                                                                                |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |          10 |           1 |
+|     341832 | based on stories                                                                             |                  1 |            NULL |    32628 |             0 |            5 |            0 |           7 |           3 |
+|     384872 | based on fanfiction                                                                          |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |          10 |           0 |
+|     334467 | based on donghua                                                                             |                  1 |            NULL |    32483 |             0 |            0 |            2 |           1 |           9 |
+|     360324 | based on a play                                                                              |                  1 |            NULL |    32945 |             0 |            5 |            0 |          10 |           0 |
+|     377237 | based on true events                                                                         |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           7 |           3 |
+|     356190 | based on a true story                                                                        |                  1 |            NULL |     NULL |          NULL |         NULL |         NULL |           7 |           1 |
+|     348023 | based on documentary                                                                         |                  1 |            NULL |    32738 |             0 |            5 |            0 |           8 |           0 |
+|     381461 | based on true events                                                                         |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           6 |           1 |
+|     359979 | based on real events                                                                         |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           6 |           1 |
+|     356909 | based on real events                                                                         |                  1 |            NULL |    32892 |             0 |            1 |            3 |           4 |           3 |
+|     331913 | based on viral tiktok                                                                        |                  1 |            NULL |    32434 |             0 |            3 |            0 |           7 |           0 |
+|     343984 | based on essay                                                                               |                  1 |            NULL |    32665 |             0 |            1 |            2 |           3 |           4 |
+|     361233 | based on a true story                                                                        |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           5 |           1 |
+|     381232 | based on novel                                                                               |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           3 |           2 |
+|     379300 | based on role playing game                                                                   |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           4 |           1 |
+|     363819 | based on album                                                                               |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           4 |           0 |
+|     375951 | based on novel                                                                               |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           3 |           1 |
+|     377254 | based on real events                                                                         |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           2 |           2 |
+|     375067 | based on true events                                                                         |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           3 |           0 |
+|     359462 | based on manuscript                                                                          |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           2 |
+|     362821 | based on wattpad story                                                                       |                  1 |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           2 |
+|     360040 | based on a true story                                                                        |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           3 |           0 |
+|     370801 | based on novel                                                                               |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           3 |           0 |
+|     377508 | based on urban legend                                                                        |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           3 |           0 |
+|     352168 | based on manfra                                                                              |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           3 |
+|     379861 | based on historical events                                                                   |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           3 |           0 |
+|     338698 | based on manto story                                                                         |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           2 |           0 |
+|     378636 | based on multimedia project                                                                  |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           1 |
+|     343602 | based on doujinshi                                                                           |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           2 |
+|     362822 | based on webtoon comic                                                                       |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           1 |
+|     372603 | based on web seires                                                                          |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           2 |
+|     349865 | based on arcade game                                                                         |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           1 |
+|     371644 | based on rakugo                                                                              |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           1 |
+|     371686 | based on a novel                                                                             |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           1 |
+|     375328 | based on a painting                                                                          |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           0 |
+|     358948 | based on picture book                                                                        |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           1 |
+|     365389 | based on theatre                                                                             |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           0 |
+|     362358 | based on screenplay                                                                          |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           0 |
+|     361352 | based on a book                                                                              |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           0 |
+|     367505 | based on novella                                                                             |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           0 |
+|     385205 | based on real incidents                                                                      |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           0 |
+|     380094 | based on miniseries                                                                          |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           1 |
+|     385223 | based on picture book                                                                        |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           1 |
+|     378824 | based on musician                                                                            |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           1 |           0 |
+|     364542 | based on picture book                                                                        |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           1 |
+|     366600 | based on film                                                                                |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
+|     374603 | based on re                                                                                  |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
+|     359251 | based on tv ser                                                                              |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
+|     377176 | based on a webcomic                                                                          |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
+|     372613 | based on original concept                                                                    |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
+|     382346 | based on a book                                                                              |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
+|     368799 | based on play or musical, 1940s, filmed play, live theatre, filmed theater, national theatre |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
+|     380115 | based on a play                                                                              |               NULL |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
+|     354275 | based on scratch                                                                             |                  0 |            NULL |     NULL |          NULL |         NULL |         NULL |           0 |           0 |
++------------+----------------------------------------------------------------------------------------------+--------------------+-----------------+----------+---------------+--------------+--------------+-------------+-------------+
++---------------------------------------------------------------+
+| SECTION                                                       |
++---------------------------------------------------------------+
+| E2. Summary: how many "based on ..." keywords are live topics |
++---------------------------------------------------------------+
++-------------------+------------+-------------+
+| BASED_ON_KEYWORDS | QUALIFYING | LIVE_TOPICS |
++-------------------+------------+-------------+
+|                99 |         51 |          49 |
++-------------------+------------+-------------+
++---------------------------------------------------+
+| SECTION                                           |
++---------------------------------------------------+
+| E3. Marlowe and Corday, as topics and as keywords |
++---------------------------------------------------+
++------------------------------------+
+| SECTION                            |
++------------------------------------+
+| E4. T2S topics that are characters |
++------------------------------------+
++--------------+----------+--------+-------------+-------------+
+| TOPIC_SOURCE | MATCH_BY | TOPICS | MOVIE_LINKS | SERIE_LINKS |
++--------------+----------+--------+-------------+-------------+
+| keyword      | name     |   1123 |       67572 |       12553 |
+| keyword      | qid      |    106 |        4097 |        1166 |
++--------------+----------+--------+-------------+-------------+
++----------+--------------------+--------------+----------+------------+-------------+-------------+
+| ID_TOPIC | TOPIC_NAME         | TOPIC_SOURCE | MATCH_BY | ID_CHAR    | MOVIE_COUNT | SERIE_COUNT |
++----------+--------------------+--------------+----------+------------+-------------+-------------+
+|    18929 | love               | keyword      | name     | Q55001144  |        1731 |         271 |
+|    18738 | detective          | keyword      | qid      | Q842782    |         854 |         510 |
+|    18986 | school             | keyword      | name     | Q3953199   |         575 |         654 |
+|    19112 | ghost              | keyword      | name     | Q128296899 |         888 |         184 |
+|    19656 | japan              | keyword      | name     | Q3815165   |         849 |         194 |
+|    19064 | dog                | keyword      | name     | Q1211818   |         828 |         121 |
+|    19079 | death              | keyword      | name     | Q106776647 |         739 |         200 |
+|    18705 | suicide            | keyword      | name     | Q2535242   |         859 |          72 |
+|    18768 | monster            | keyword      | name     | Q124000343 |         689 |         238 |
+|    19662 | doctor             | keyword      | name     | Q104720606 |         622 |         261 |
+|    19864 | spy                | keyword      | name     | Q134720064 |         686 |         157 |
+|    18841 | vampire            | keyword      | name     | Q130222385 |         668 |         172 |
+|    18702 | holiday            | keyword      | name     | Q3545344   |         792 |          20 |
+|    18987 | lawyer             | keyword      | name     | Q104720616 |         475 |         273 |
+|    19009 | zombie             | keyword      | name     | Q114353682 |         656 |          65 |
+|    18991 | religion           | keyword      | name     | Q65666268  |         570 |         140 |
+|    22416 | female protagonist | keyword      | name     | Q112619249 |         496 |         202 |
+|    18973 | teacher            | keyword      | name     | Q110265405 |         508 |         135 |
+|    17954 | nazi               | keyword      | name     | Q63890645  |         585 |          48 |
+|    18726 | prostitute         | keyword      | name     | Q55027430  |         614 |          14 |
+|    19057 | demon              | keyword      | qid      | Q177413    |         420 |         201 |
+|    19698 | france             | keyword      | name     | Q3750916   |         506 |          87 |
+|    18965 | singer             | keyword      | name     | Q55002575  |         487 |          72 |
+|    19023 | orphan             | keyword      | name     | Q6880301   |         456 |         103 |
+|    17941 | africa             | keyword      | name     | Q130221074 |         503 |          37 |
+|    18984 | teenage girl       | keyword      | name     | Q42309892  |         467 |          65 |
+|    18734 | witch              | keyword      | name     | Q108944553 |         401 |         110 |
+|    18824 | horse              | keyword      | name     | Q114353569 |         460 |          36 |
+|    19036 | robot              | keyword      | name     | Q4540179   |         320 |         162 |
+|    22000 | flashback          | keyword      | name     | Q5457588   |         404 |          78 |
++----------+--------------------+--------------+----------+------------+-------------+-------------+
++-----------------------------------------------+
+| SECTION                                       |
++-----------------------------------------------+
+| F1. Cache-only characters: count, reach, ties |
++-----------------------------------------------+
++----------------------------------------+
+| SECTION                                |
++----------------------------------------+
+| F2. Their 40 most frequent P31 classes |
++----------------------------------------+
++------------+----------------------------------------+------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_CLASS   | CLASS_LABEL                            | CHARACTERS | WORK_LINKS | EXAMPLES                                                                                                                                                                                                       |
++------------+----------------------------------------+------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Q5         | human                                  |       3386 |       3682 | Heinrich Müller | Vyacheslav Menzhinsky | Anna I of Russia | Mateo Vázquez de Leca | Adolf Opálka | Karel Čurda | Mickey Cohen | Vladimir Bonch-Bruyevich | Antonio Pérez | Josef Bühler | Jang Nok-su |       |
+| Q14514600  | group of fictional characters          |        144 |        197 | Justice League | Trus, Balbes and Byvaly | Wile E. Coyote and the Road Runner | Ralph Wolf and Sam Sheepdog | Hemulen | Teen Titans | Brides of Dracula | Chip 'n' Dale | The Weasels | Nerdlucks | Wing       |
+| Q12308941  | male given name                        |         72 |         77 | Luca | Peter | Gordon | Joe | Basuki | Dilan | Ludovico | Dennis | Kevin | Fredrik | Q4267021 | Vittorio | Carlos | Arnold | Mike | Nico | Stéphane | Tom | Erwan | Carl | Severino | Ron | Murdoch | Ca       |
+| Q11879590  | female given name                      |         60 |         64 | Stella | Annie | Kiara | Lucy | Edith | Şule | Polina | Aylin | Birgül | Su-mi | Corinna | Petra | Macy | Regina | Alice | Isabelle | Q6028525 | Daniela | Emma | Eleanora | Margaret | Velda | Georgia        |
+| Q28640     | profession                             |         52 |         78 | supporting actor | presenter | bartender | extra | teacher | taxi driver | guard | majordomo | narrator | psychiatrist | doorkeeper | waiter | prostitute | dub actor | association football referee | b       |
+| Q12737077  | occupation                             |         40 |         51 | physician | teacher | hero | narrator | competition judge | prostitute | head teacher | murderer | gamemaster | shopkeeper | Kapo | miller | student driver | landlord | dancer | commissioner | student       |
+| Q13002315  | legendary figure                       |         35 |         75 | Igraine | Hrothgar | Beowulf | Sagramore | Wealhþeow | Morgause | Agravain | Hung Hei-gun | Amleth | Gorlois | Fisher King | Pellinore | Gerutha | Gwenddydd | Otger Cataló | Hygelac | Horsa | Balto |        |
+| Q21070568  | human whose existence is disputed      |         33 |         64 | Hrothgar | Beowulf | Sir Ector | Vortigern | Wealhþeow | Ambrosius Aurelianus | Morgause | Yermak Timofeyevich | Gorlois | Fisher King | Pellinore | Semiramis | Yudhiṣṭhira | Alberto da Giussano | Sta       |
+| Q4164871   | position                               |         33 |         45 | physician | television presenter | teacher | guard | editor-in-chief | centurion | psychiatrist | head teacher | program host | shopkeeper | salesperson | Earl of Moray | sheriff | commissioner | prec       |
+| Q16705943  | fictional couple                       |         27 |         29 | Howard and Harold McBride | Glen and Annie Greenwood | Q59393118 | Q59393094 | Q59393028 | Q59392967 | Q59392959 | Q59392952 | Q59392946 | Q59392938 | Q59392935 | Q59392932 | Q59392927 | Q59392922 | Q       |
+| Q3409032   | unisex given name                      |         22 |         24 | Q632104 | Sascha | Tiger | Christy | Kelly | Ami | Nico | Stéphane | Chris | Ashley | Dee | Pierre | Sami | Frankie | Cleo | Lilian | Hunter | Dana | Ginger | Gaby | Sandy | Alex                             |
+| Q4167410   | Wikimedia disambiguation page          |         20 |         21 | Storm Boy | Perrito | Ukba | Espantalho | Hunk | Elanora | Aharon | The American | Cenerentola | Gabby | Hickory | Huxley | Lucas | Drake | Bug | Zeke | Maria | Mike | Chelli | Cuban                         |
+| Q21190845  | fictional duo                          |         18 |         28 | Mason and Phil | Tom and Jerry | Pertsa ja Kilu | Krys and Veselchak U | Timon and Pumbaa | Knothead and Splinter | Hoops & Yoyo | Heckle and Jeckle | Tiger and Talbot | Mermaid Man and Barnacle Boy |       |
+| Q108300140 | occupation group according to ISCO-08  |         11 |         18 | physician | bartender | lawyer | waiter | bank teller | shopkeeper | legislator | actor | manager | journalist | pharmacist                                                                                    |
+| Q355567    | noble title                            |         10 |         10 | Basileus | Earl of Moray | Duke of Norfolk | queen regnant | queen | Earl of Surrey | Earl of Derby | king | dvoryanin | knight                                                                                |
+| Q1130279   | hypocorism                             |          9 |         12 | Annie | Joe | Mike | Ron | Nate | Josh | Johnny | Marc | Sandy                                                                                                                                                 |
+| Q215380    | musical group                          |          9 |         12 | The Wiggles | Morfonica | The Residents | The Fat Boys | Apulanta | Bloodstone | Kiss | IRis | Whodini                                                                                                         |
+| Q1707847   | role                                   |          8 |        417 | self | competition judge | narrator | The Banker | woman | Dungeon Master | marshal                                                                                                                            |
+| Q21191150  | fictional group of siblings            |          8 |         13 | Huey, Dewey, and Louie | Stepford Cuckoos | Ugly sisters | The Willie Brothers | Tweedledum and Tweedledee | Sam and David Camden | The Daltons                                                                |
+| Q101352    | family name                            |          7 |          7 | Naryshkin | Trinity | Villan | Drill | Portero | Ayshe | Hendrix                                                                                                                                               |
+| Q20643955  | human biblical figure                  |          7 |          8 | Achinoam | Cleopas | Hosea | John the Evangelist | Jeroboam I | Anna | Merab                                                                                                                                   |
+| Q56019     | military rank                          |          7 |          8 | centurion | Major | general | Mantri | marshal | colonel | knight                                                                                                                                              |
+| Q99662445  | fictional extraterrestrial species     |          7 |          7 | Dalek | Xenomorph | Skibidi Toilets | Nature's Mockery | Root | Gardener | Woodcrawler                                                                                                                         |
+| Q109682310 | narrative role                         |          6 |         12 | main character | antagonist | main antagonist | sidekick | henchperson | protagonist                                                                                                                           |
+| Q15702752  | fictional species of animal            |          6 |          7 | Goomba | Dry Bones | Yoshi | Chain Chomp | Woodcrawler | Toad                                                                                                                                                  |
+| Q63032896  | Wikimedia list of fictional characters |          6 |          7 | list of Charlie's Angels characters | list of ReBoot characters | list of Drawn Together characters | list of Dark Shadows characters | list of Indiana Jones characters | list of The Marvelous Mrs. Ma       |
+| Q15831596  | class of fictional entities            |          5 |          5 | stormtrooper | Spiny | Leviathan | Snifit | Angel                                                                                                                                                              |
+| Q202444    | given name                             |          5 |          5 | Tellis | Kojo | Myriam | Jérôme | Winni                                                                                                                                                                        |
+| Q21192438  | fictional species                      |          5 |          5 | Luma | Bob-omb | Spiny | Snifit | Bullet Bill                                                                                                                                                                  |
+| Q26401003  | individual animal                      |          5 |          5 | Balto | Buddy | Punxsutawney Phil | Togo | Cocaine Bear                                                                                                                                                        |
+| Q6619719   | fictional musical ensemble             |          5 |          8 | The California Raisins | Impaled Rektum | The Hex Girls | Spinal Tap | Steel Dragon                                                                                                                            |
+| Q7725634   | literary work                          |          5 |          5 | Sand Monkeys | The Killer Angels | Q1674659 | The Reluctant Dragon | Goldilocks and the Three Bears                                                                                                            |
+| Q15331236  | fictional family                       |          4 |          7 | The Addams Family | The Casagrandes | Thénardiers | The Daltons                                                                                                                                                |
+| Q16334295  | group of humans                        |          4 |          4 | Balibo Five | Alamo defenders | parishioner | student                                                                                                                                                          |
+| Q171318    | kinship                                |          4 |         12 | mother | father | grandmother | uncle                                                                                                                                                                          |
+| Q24286894  | fictional humanoid species             |          4 |          4 | Zygon | Speakermen | TV Men | Cameramen                                                                                                                                                                        |
+| Q636497    | stock character                        |          4 |          4 | sidekick | henchperson | superhero | prince charming                                                                                                                                                           |
+| Q104439876 | fictional trio                         |          3 |          7 | Huey, Dewey, and Louie | Flora, Fauna and Merryweather | Fergus, Farkle and Felicia                                                                                                                            |
+| Q11488158  | corporate title                        |          3 |          5 | editor-in-chief | head teacher | vice president                                                                                                                                                                |
+| Q139966976 | fictional twins                        |          3 |          3 | Raccoon Twins | Patty and Selma | Timmy and Tommy Tibble                                                                                                                                                       |
++------------+----------------------------------------+------------+------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++-------------+
+| WITHOUT_P31 |
++-------------+
+|          60 |
++-------------+
++-------------------------------------------------------------+
+| SECTION                                                     |
++-------------------------------------------------------------+
+| F3. The 40 cache-only characters tied to the most T2S works |
++-------------------------------------------------------------+
++------------+------------------------------------+-------+-----------+--------------------------------------------------------------------------------------------------------------------------+
+| ID_CHAR    | LABEL_EN                           | WORKS | VIAS      | P31_CLASSES                                                                                                              |
++------------+------------------------------------+-------+-----------+--------------------------------------------------------------------------------------------------------------------------+
+| Q18086706  | self                               |   407 | P453+P674 | role                                                                                                                     |
+| Q11696     | President of the United States     |    11 | P453      | elective office                                                                                                          |
+| Q675705    | Igraine                            |    11 | P453+P674 | legendary figure                                                                                                         |
+| Q735744    | Justice League                     |    10 | P674      | group of fictional characters | superhero team                                                                           |
+| Q1765879   | leading actor                      |     9 | P453      | NULL                                                                                                                     |
+| Q4464511   | Trus, Balbes and Byvaly            |     9 | P674      | group of fictional characters                                                                                            |
+| Q1353836   | Hrothgar                           |     8 | P453+P674 | human whose existence is disputed | legendary figure                                                                     |
+| Q7560      | mother                             |     7 | P453      | kinship                                                                                                                  |
+| Q822524    | Wile E. Coyote and the Road Runner |     7 | P674      | group of fictional characters                                                                                            |
+| Q1131749   | Ralph Wolf and Sam Sheepdog        |     7 | P674      | group of fictional characters                                                                                            |
+| Q1281177   | Beowulf                            |     7 | P453+P674 | human whose existence is disputed | legendary figure                                                                     |
+| Q1416106   | supporting actor                   |     7 | P453+P674 | profession                                                                                                               |
+| Q58030     | Heinrich Müller                    |     6 | P453      | human                                                                                                                    |
+| Q241969    | Vyacheslav Menzhinsky              |     6 | P453      | human                                                                                                                    |
+| Q422902    | Hemulen                            |     6 | P674      | group of fictional characters                                                                                            |
+| Q12317360  | main character                     |     6 | P453      | narrative role | Wikibase reason for preferred rank                                                                      |
+| Q11965     | Huey, Dewey, and Louie             |     5 | P674      | fictional group of siblings | fictional trio | group of brothers | Q109289331 | triplets                                 |
+| Q160165    | Anna I of Russia                   |     5 | P453      | human                                                                                                                    |
+| Q3143085   | Sagramore                          |     5 | P453+P674 | legendary figure                                                                                                         |
+| Q2186      | Romulus                            |     4 | P453+P674 | legendary human figure                                                                                                   |
+| Q39631     | physician                          |     4 | P453      | ambiguous Wikidata item | health profession | medical profession | occupation | occupation group according to ISCO-08 |  |
+| Q191796    | cameo appearance                   |     4 | P453      | NULL                                                                                                                     |
+| Q326585    | Vortigern                          |     4 | P453+P674 | human whose existence is disputed                                                                                        |
+| Q616178    | Väinämöinen                        |     4 | P453      | demigod                                                                                                                  |
+| Q971238    | Sir Ector                          |     4 | P453+P674 | human whose existence is disputed                                                                                        |
+| Q1282960   | Vladimir Bonch-Bruyevich           |     4 | P453      | human                                                                                                                    |
+| Q1371363   | Mickey Cohen                       |     4 | P453      | human                                                                                                                    |
+| Q1409039   | The Wiggles                        |     4 | P674      | musical group                                                                                                            |
+| Q2116944   | Wealhþeow                          |     4 | P453+P674 | human whose existence is disputed | legendary figure                                                                     |
+| Q2297760   | Karel Čurda                        |     4 | P453      | human                                                                                                                    |
+| Q2697962   | Adolf Opálka                       |     4 | P453      | human                                                                                                                    |
+| Q3817916   | The Addams Family                  |     4 | P674      | fictional family                                                                                                         |
+| Q5939327   | Mateo Vázquez de Leca              |     4 | P453      | human                                                                                                                    |
+| Q13590141  | presenter                          |     4 | P453      | profession                                                                                                               |
+| Q125464463 | Mason and Phil                     |     4 | P674      | fictional duo                                                                                                            |
+| Q7565      | father                             |     3 | P453      | kinship                                                                                                                  |
+| Q7569      | child                              |     3 | P453      | class of human | population group                                                                                        |
+| Q18434     | Léon Blum                          |     3 | P453      | human                                                                                                                    |
+| Q19546     | Pope                               |     3 | P453      | Roman Catholic episcopal title                                                                                           |
+| Q23810     | Alfred Nobel                       |     3 | P453      | human                                                                                                                    |
++------------+------------------------------------+-------+-----------+--------------------------------------------------------------------------------------------------------------------------+
+
+-- ---------------------------------------------------------------------
+-- mariadb stderr. The statements after each error below were still run
+-- (--force), so the results above are complete except for those.
+-- ---------------------------------------------------------------------
+ERROR 1064 (42000) at line 179: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'BOTH,
+       SUM(LABEL_EN IS NULL) AS NO_EN
+FROM TMP_055_CACHED_CHAR' at line 3
