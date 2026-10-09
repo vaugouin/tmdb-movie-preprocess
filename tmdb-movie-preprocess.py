@@ -7678,6 +7678,7 @@ ORDER BY COMPTE DESC
                           f"{arrsourceworkcounts.get('deleted', 0)} left the perimeter and stay as DELETED = 1), "
                           f"{arrsourceworkcounts.get('movie', 0)} movie links, "
                           f"{arrsourceworkcounts.get('serie', 0)} serie links, "
+                          f"{arrsourceworkcounts.get('unhooked', 0)} T2S hops dropped (source not a film or series), "
                           f"{arrsourceworkcounts.get('other_by_default', 0)} typed 'other' by default, "
                           f"{arrsourceworkcounts.get('without_name', 0)} without a name")
                     for strsourceworktype, lngsourceworktypecount in arrsourceworkcounts.get("types", {}).items():
@@ -7688,6 +7689,7 @@ ORDER BY COMPTE DESC
                                                       ("deleted", "Source works kept as DELETED = 1 by"),
                                                       ("movie", "Movie-source links rebuilt by"),
                                                       ("serie", "Serie-source links rebuilt by"),
+                                                      ("unhooked", "Sources whose T2S hop was dropped, not a film or series, by"),
                                                       ("other_by_default", "Cached sources no cone typed, left 'other' by"),
                                                       ("without_name", "Source works without any name after")):
                         cp.f_setservervariable("strtmdbmoviepreprocesssourcework" + strkey.replace("_", "") + "count", str(arrsourceworkcounts.get(strkey, 0)), strsourceworkdesc + " the source-work rebuild (process 73)", 0)

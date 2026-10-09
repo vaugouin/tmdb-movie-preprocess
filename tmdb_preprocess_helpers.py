@@ -2727,9 +2727,48 @@ def f_buildsourceworktables():
             "                   OR EXISTS (SELECT 1 FROM T_WC_WIKIDATA_SERIE ws WHERE ws.ID_WIKIDATA = s.ID_WIKIDATA)),\n"
             "  s.IS_PERSON_OR_CHARACTER = (EXISTS (SELECT 1 FROM T_WC_WIKIDATA_PERSON wp WHERE wp.ID_WIKIDATA = s.ID_WIKIDATA)\n"
             "                           OR EXISTS (SELECT 1 FROM T_WC_WIKIDATA_CHARACTER wc WHERE wc.ID_WIKIDATA = s.ID_WIKIDATA))"))
+        # The type: the smallest cone rank among the source's P31 classes. Computed BEFORE
+        # the names and the year, because it decides whether the T2S hop is kept.
+        _f_sourceworkstep(cursor, "0d. UPDATE the cone rank", (
+            "UPDATE tmp_source_work s SET s.CONE_RANK = (\n"
+            "    SELECT MIN(c.CONE_RANK)\n"
+            "    FROM T_WC_WIKIDATA_STATEMENT st\n"
+            "    INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+            "    INNER JOIN `" + STR_SOURCE_WORK_CLASS_TABLE + "` c ON c.ID_CLASS = iv.ID_ITEM\n"
+            "    WHERE st.ID_WIKIDATA = s.ID_WIKIDATA AND st.ID_PROPERTY = 'P31'\n"
+            "      AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated'))"))
+        # A T2S hop only for a source that IS a film or a series (fix of 2026-10-09).
+        # Measured that day (doc/sql/test-055-diagnostics-20261009.txt): about 70 sources
+        # had a T2S sheet while their own classes said manga, novel or play, and Wikidata
+        # did not hold them as films or series. The T2S work carries the source's Q-id by
+        # a matching error upstream (anime series on the manga's Q-id, National Theatre
+        # Live recordings on the play's, the 2026 "Heart of Darkness" on Conrad's novel).
+        # Trusting the hop typed the novel 'screen' with the year 2026. The hop is
+        # therefore kept only when the source is a core film or series, or when its own
+        # classes reach the screen cone, or reach no cone at all; otherwise the classes
+        # decide the type and P577 the year, and the source keeps no T2S sheet. The
+        # upstream error itself is TMDB-MOVIE-PREPROCESS-056.
+        lngscreenrank = next(r for r, (t, f, _) in enumerate(SOURCE_WORK_TYPE_CONES) if t == "screen")
+        arrresult["unhooked"] = _f_sourceworkstep(cursor, "0e. UPDATE drop the T2S hop of sources that are not films or series", (
+            "UPDATE tmp_source_work s SET s.ID_MOVIE = NULL, s.ID_SERIE = NULL\n"
+            "WHERE (s.ID_MOVIE IS NOT NULL OR s.ID_SERIE IS NOT NULL)\n"
+            "  AND s.IS_CORE_SCREEN = 0\n"
+            f"  AND s.CONE_RANK IS NOT NULL AND s.CONE_RANK <> {lngscreenrank}"))
         # Names: the T2S title first for a T2S work (the name the base already shows),
-        # then the Wikidata labels, wherever the entity lives.
-        _f_sourceworkstep(cursor, "0d. UPDATE names and description", (
+        # then the English label wherever the entity lives, then a fallback in an ordered
+        # list of languages (fix of 2026-10-09: 1,718 of the 1,743 unnamed sources had a
+        # label in another language, but the first key of LABELS_JSON gave Chinese for Jane
+        # Eyre and Arabic for Street Fighter), and only then any language at all.
+        arrlabelfallback = ("en-gb", "en-us", "en-ca", "fr", "de", "es", "it", "pt", "nl",
+                            "sv", "nb", "da", "fi", "pl", "cs", "ca")
+        strfallback = ",\n".join(
+            f"      JSON_UNQUOTE(JSON_EXTRACT({a}.LABELS_JSON, '$.\"{l}\"'))"
+            for a in ("wi", "wm", "ws") for l in arrlabelfallback)
+        strfirstkey = ",\n".join(
+            f"      JSON_UNQUOTE(JSON_EXTRACT({a}.LABELS_JSON, CONCAT('$.\"', "
+            f"JSON_UNQUOTE(JSON_EXTRACT(JSON_KEYS({a}.LABELS_JSON), '$[0]')), '\"')))"
+            for a in ("wi", "wm", "ws"))
+        _f_sourceworkstep(cursor, "0f. UPDATE names and description", (
             "UPDATE tmp_source_work s\n"
             "LEFT JOIN T_WC_T2S_MOVIE tm ON tm.ID_MOVIE = s.ID_MOVIE\n"
             "LEFT JOIN T_WC_T2S_SERIE ts ON ts.ID_SERIE = s.ID_SERIE\n"
@@ -2743,7 +2782,8 @@ def f_buildsourceworktables():
             "      JSON_UNQUOTE(JSON_EXTRACT(wm.LABELS_JSON, '$.en')), NULLIF(wm.LABEL_EN, ''),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(ws.LABELS_JSON, '$.en')), NULLIF(ws.LABEL_EN, ''),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wp.LABELS_JSON, '$.en')), NULLIF(wp.LABEL_EN, ''),\n"
-            "      JSON_UNQUOTE(JSON_EXTRACT(wc.LABELS_JSON, '$.en')), NULLIF(wc.LABEL_EN, '')), 250),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wc.LABELS_JSON, '$.en')), NULLIF(wc.LABEL_EN, ''),\n"
+            + strfallback + ",\n" + strfirstkey + "), 250),\n"
             "    s.SOURCE_NAME_FR = LEFT(COALESCE(NULLIF(tm.MOVIE_TITLE_FR, ''), NULLIF(ts.SERIE_TITLE_FR, ''),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.fr')),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wm.LABELS_JSON, '$.fr')),\n"
@@ -2757,7 +2797,7 @@ def f_buildsourceworktables():
             "      JSON_UNQUOTE(JSON_EXTRACT(wp.DESCRIPTIONS_JSON, '$.en')), NULLIF(wp.DESCRIPTION_EN, ''),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wc.DESCRIPTIONS_JSON, '$.en')), NULLIF(wc.DESCRIPTION_EN, ''))"))
         # The year: the T2S year for a T2S work, else the earliest live P577.
-        _f_sourceworkstep(cursor, "0e. UPDATE the year", (
+        _f_sourceworkstep(cursor, "0g. UPDATE the year", (
             "UPDATE tmp_source_work s\n"
             "LEFT JOIN T_WC_T2S_MOVIE tm ON tm.ID_MOVIE = s.ID_MOVIE\n"
             "LEFT JOIN T_WC_T2S_SERIE ts ON ts.ID_SERIE = s.ID_SERIE\n"
@@ -2768,15 +2808,6 @@ def f_buildsourceworktables():
             "    WHERE st.ID_WIKIDATA = s.ID_WIKIDATA AND st.ID_PROPERTY = 'P577'\n"
             "      AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
             "      AND tv.YEAR_VALUE BETWEEN -5000 AND 2200))"))
-        # The type: the smallest cone rank among the source's P31 classes.
-        _f_sourceworkstep(cursor, "0f. UPDATE the cone rank", (
-            "UPDATE tmp_source_work s SET s.CONE_RANK = (\n"
-            "    SELECT MIN(c.CONE_RANK)\n"
-            "    FROM T_WC_WIKIDATA_STATEMENT st\n"
-            "    INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
-            "    INNER JOIN `" + STR_SOURCE_WORK_CLASS_TABLE + "` c ON c.ID_CLASS = iv.ID_ITEM\n"
-            "    WHERE st.ID_WIKIDATA = s.ID_WIKIDATA AND st.ID_PROPERTY = 'P31'\n"
-            "      AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated'))"))
         connection.commit()
 
         # The type and form as SQL CASE expressions generated from the cone list, so the

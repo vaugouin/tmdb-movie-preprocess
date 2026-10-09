@@ -1,0 +1,194 @@
+-- test-055-diagnostics.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-09 17:28:15
+--
++-------------------------------------------------------------------------------+
+| SECTION                                                                       |
++-------------------------------------------------------------------------------+
+| 1a. Sources with a T2S sheet, by the cone their own P31 falls in (8 = screen) |
++-------------------------------------------------------------------------------+
++-----------+---------+---------+-----------------------+
+| P31_SAYS  | FORM    | SOURCES | IN_CORE_FILM_OR_SERIE |
++-----------+---------+---------+-----------------------+
+| screen    |         |    2664 |                  2659 |
+| (no cone) |         |      95 |                    94 |
+| comic     | manga   |      55 |                    14 |
+| literary  |         |      23 |                     2 |
+| other     |         |      21 |                    17 |
+| comic     |         |       3 |                     1 |
+| stage     | musical |       2 |                     1 |
+| stage     | play    |       2 |                     1 |
+| game      |         |       1 |                     0 |
++-----------+---------+---------+-----------------------+
++---------------------------------------+
+| SECTION                               |
++---------------------------------------+
+| 1b. The suspects, the 40 most adapted |
++---------------------------------------+
++----------------+-------------+------------------------------------------------+---------------------------------+---------------------------------------------+----------+------------------------------------------------+--------------+----------+------------------------------+----------------+-------------+-------------+
+| ID_SOURCE_WORK | ID_WIKIDATA | SOURCE_WORK_NAME                               | WIKIDATA_LABEL                  | P31_CLASSES                                 | ID_MOVIE | MOVIE_TITLE                                    | RELEASE_YEAR | ID_SERIE | SERIE_TITLE                  | FIRST_AIR_YEAR | MOVIE_COUNT | SERIE_COUNT |
++----------------+-------------+------------------------------------------------+---------------------------------+---------------------------------------------+----------+------------------------------------------------+--------------+----------+------------------------------+----------------+-------------+-------------+
+|          14969 | Q714064     | City Hunter                                    | City Hunter                     | manga series                                |     NULL | NULL                                           |         NULL |    36046 | City Hunter                  |           1987 |          13 |           1 |
+|           6747 | Q189509     | National Theatre Live: The Jungle Book         | The Jungle Book                 | literary work                               |  1759634 | National Theatre Live: The Jungle Book         |         2027 |     NULL | NULL                         |           NULL |          10 |           2 |
+|            628 | Q1066781    | Charley nénje                                  | Charley's Aunt                  | literary work                               |   365725 | Charley nénje                                  |         1986 |     NULL | NULL                         |           NULL |           5 |           0 |
+|          11436 | Q432319     | Speed Racer                                    | Speed Racer                     | manga series                                |     NULL | NULL                                           |         NULL |    30986 | Speed Racer                  |           1967 |           2 |           3 |
+|           6531 | Q182469     | Chihayafuru                                    | Chihayafuru                     | manga series                                |     NULL | NULL                                           |         NULL |    45247 | Chihayafuru                  |           2011 |           3 |           1 |
+|          14212 | Q647486     | Captain Tsubasa                                | Captain Tsubasa                 | manga series                                |     NULL | NULL                                           |         NULL |    25707 | Captain Tsubasa              |           1983 |           0 |           4 |
+|           5697 | Q164883     | Initial D                                      | Initial D                       | manga series                                |     NULL | NULL                                           |         NULL |    40424 | Initial D                    |           1998 |           3 |           0 |
+|          13270 | Q56778881   | Solomon's Perjury                              | Solomon's Perjury               | literary work                               |     NULL | NULL                                           |         NULL |   135145 | Solomon's Perjury            |           2021 |           2 |           1 |
+|          13439 | Q586013     | Peacemaker Kurogane                            | Peacemaker Kurogane             | manga series                                |     NULL | NULL                                           |         NULL |    21788 | Peacemaker Kurogane          |           2003 |           2 |           1 |
+|          13440 | Q586025     | Attack on Titan: Junior High                   | Attack on Titan                 | manga series                                |     NULL | NULL                                           |         NULL |    63510 | Attack on Titan: Junior High |           2015 |           1 |           2 |
+|          16593 | Q857823     | Fate/Zero                                      | Fate/stay night                 | video game                                  |     NULL | NULL                                           |         NULL |    45845 | Fate/Zero                    |           2011 |           1 |           2 |
+|            257 | Q1046959    | Nodame Cantabile                               | Nodame Cantabile                | manga series                                |     NULL | NULL                                           |         NULL |    34142 | Nodame Cantabile             |           2006 |           0 |           2 |
+|            609 | Q106575051  | Trillion Game                                  | Trillion Game                   | manga series                                |     NULL | NULL                                           |         NULL |   229302 | Trillion Game                |           2023 |           1 |           1 |
+|            810 | Q1077402    | Cutie Honey                                    | Cutie Honey                     | conflation | media franchise | manga series |     NULL | NULL                                           |         NULL |    68411 | Cutie Honey                  |           1973 |           1 |           1 |
+|           3909 | Q129778     | Heart of Darkness                              | Heart of Darkness               | literary work                               |   588801 | Heart of Darkness                              |         2026 |     NULL | NULL                         |           NULL |           2 |           0 |
+|           6703 | Q18796      | Fairy Tail                                     | Fairy Tail                      | manga series                                |     NULL | NULL                                           |         NULL |    46261 | Fairy Tail                   |           2009 |           2 |           0 |
+|          10145 | Q327773     | Ouran High School Host Club                    | Ouran High School Host Club     | manga series                                |     NULL | NULL                                           |         NULL |     1043 | Ouran High School Host Club  |           2006 |           1 |           1 |
+|          14793 | Q699631     | The Rose of Versailles                         | The Rose of Versailles          | manga series                                |     NULL | NULL                                           |         NULL |    32676 | The Rose of Versailles       |           1979 |           2 |           0 |
+|          14989 | Q715804     | Cat's Eye                                      | Cat's Eye                       | manga series                                |     NULL | NULL                                           |         NULL |    34114 | Cat's Eye                    |           1983 |           1 |           1 |
+|            148 | Q10355641   | Pânico Jovem Pan                               | Pânico                          | radio program                               |     NULL | NULL                                           |         NULL |   222764 | Pânico Jovem Pan             |           2015 |           0 |           1 |
+|            260 | Q104709894  | My Tiny Senpai                                 | My Tiny Senpai                  | manga series                                |     NULL | NULL                                           |         NULL |   277217 | My Tiny Senpai               |           2025 |           0 |           1 |
+|           1553 | Q113023222  | National Theatre Live: Prima Facie             | Prima Facie                     | literary work                               |   963568 | National Theatre Live: Prima Facie             |         2022 |     NULL | NULL                         |           NULL |           1 |           0 |
+|           1688 | Q113539815  | Mecha-ude                                      | Mecha-ude                       | original net animation                      |  1215860 | Mecha-ude                                      |         2018 |     NULL | NULL                         |           NULL |           0 |           1 |
+|           1858 | Q1143654    | Mazinger Z                                     | Mazinger Z                      | media franchise                             |     NULL | NULL                                           |         NULL |    19253 | Mazinger Z                   |           1972 |           1 |           0 |
+|           2925 | Q120336527  | Fermat's Cuisine                               | Fermat Kitchen                  | manga series                                |     NULL | NULL                                           |         NULL |   233750 | Fermat's Cuisine             |           2023 |           0 |           1 |
+|           2935 | Q1203945    | 009-1                                          | 009-1                           | manga series                                |     NULL | NULL                                           |         NULL |    34835 | 009-1                        |           2006 |           1 |           0 |
+|           2992 | Q1209267    | Kaiketsu Zorori                                | Kaiketsu Zorori                 | novel series                                |     NULL | NULL                                           |         NULL |    45535 | Kaiketsu Zorori              |           2004 |           0 |           1 |
+|           4228 | Q1328934    | National Theatre Live: War Horse               | War Horse                       | literary work                               |   257425 | National Theatre Live: War Horse               |         2014 |     NULL | NULL                         |           NULL |           1 |           0 |
+|           4652 | Q1374090    | Area 88                                        | Area 88                         | manga series                                |     NULL | NULL                                           |         NULL |    34823 | Area 88                      |           2004 |           1 |           0 |
+|           5168 | Q15052532   | The Far Country                                | The Far Country                 | literary work                               |     NULL | NULL                                           |         NULL |    22413 | The Far Country              |           1987 |           0 |           1 |
+|           5340 | Q15634672   | Servamp                                        | Servamp                         | manga series                                |     NULL | NULL                                           |         NULL |    67710 | Servamp                      |           2016 |           1 |           0 |
+|           5692 | Q1646944    | National Theatre at Home: Suddenly Last Summer | Suddenly, Last Summer           | literary work                               |  1767794 | National Theatre at Home: Suddenly Last Summer |         2027 |     NULL | NULL                         |           NULL |           1 |           0 |
+|           5808 | Q1670019    | Kids on the Slope                              | Kids on the Slope               | manga series                                |     NULL | NULL                                           |         NULL |    42557 | Kids on the Slope            |           2012 |           1 |           0 |
+|           6199 | Q174874     | Tootuff                                        | Titeuf                          | comic book series                           |     NULL | NULL                                           |         NULL |    66610 | Tootuff                      |           2001 |           1 |           0 |
+|           6360 | Q1784016    | Name That Tune                                 | Name That Tune                  | conflation | radio game show | game show    |     NULL | NULL                                           |         NULL |   114603 | Name That Tune               |           2021 |           0 |           1 |
+|           7000 | Q19855532   | Ya She                                         | Silence house                   | novel series | book series                  |     NULL | NULL                                           |         NULL |   273190 | Ya She                       |           2024 |           0 |           1 |
+|           7122 | Q2004363    | Princess Knight                                | Princess Knight                 | manga series                                |     NULL | NULL                                           |         NULL |    34864 | Princess Knight              |           1967 |           1 |           0 |
+|           7264 | Q20631862   | Ramen Loving Girl                              | Ms. Koizumi Loves Ramen Noodles | manga series                                |     NULL | NULL                                           |         NULL |    66680 | Ramen Loving Girl            |           2015 |           0 |           1 |
+|           7647 | Q219610     | Shaman King                                    | Shaman King                     | manga series                                |     NULL | NULL                                           |         NULL |    40143 | Shaman King                  |           2001 |           0 |           1 |
+|           7678 | Q22083380   | Naomi and Kanako                               | Naomi to Kanako                 | literary work                               |     NULL | NULL                                           |         NULL |    68787 | Naomi and Kanako             |           2016 |           0 |           1 |
++----------------+-------------+------------------------------------------------+---------------------------------+---------------------------------------------+----------+------------------------------------------------+--------------+----------+------------------------------+----------------+-------------+-------------+
++-----------------------------------------------------------+
+| SECTION                                                   |
++-----------------------------------------------------------+
+| 1c. T2S works whose Q-id is not a Wikidata film or series |
++-----------------------------------------------------------+
++-------+--------------+-------------------------+----------------------+
+| KIND  | T2S_WITH_QID | QID_NOT_A_FILM_OR_SERIE | QID_IS_A_CACHED_ITEM |
++-------+--------------+-------------------------+----------------------+
+| movie |       275000 |                    1082 |                 1607 |
+| serie |        55766 |                     764 |                 2154 |
++-------+--------------+-------------------------+----------------------+
++----------------------------------------------------------------+
+| SECTION                                                        |
++----------------------------------------------------------------+
+| 1d. T2S films pointing to a literary item, the 30 most popular |
++----------------------------------------------------------------+
++----------+---------------------------------------------------------+--------------+-------------+--------------------------------------------+-----------+
+| ID_MOVIE | MOVIE_TITLE                                             | RELEASE_YEAR | ID_WIKIDATA | WIKIDATA_LABEL                             | BEST_RANK |
++----------+---------------------------------------------------------+--------------+-------------+--------------------------------------------+-----------+
+|  1474048 | LUPIN THE IIIRD: Zenigata and the Two Lupins            |         2025 | Q134885840  | Lupin the Third: Zenigata and the 2 Lupins |        10 |
+|  1309400 | The Children of the Resistance                          |         2026 | Q109043201  | NULL                                       |         3 |
+|   846580 | Le Lac                                                  |         2026 | Q3223868    | Le Lac                                     |        10 |
+|  1737925 | Oh, Mary!                                               |         NULL | Q125881442  | Oh, Mary!                                  |        10 |
+|   756229 | The Beast                                               |         2021 | Q109177363  | La Bestia                                  |        10 |
+|   963568 | National Theatre Live: Prima Facie                      |         2022 | Q113023222  | Prima Facie                                |        10 |
+|  1230393 | Monsters 103 Mercies Dragon Damnation                   |         2024 | Q124040202  | Monsters: 103 Mercies Dragon Damnation     |        10 |
+|  1759634 | National Theatre Live: The Jungle Book                  |         2027 | Q189509     | The Jungle Book                            |        10 |
+|     3632 | Flash Gordon                                            |         1936 | Q2667789    | Flash Gordon                               |         0 |
+|  1598661 | National Theatre Live: The Playboy of the Western World |         2026 | Q451517     | The Playboy of the Western World           |         5 |
+|   974188 | The Time Capsule                                        |         2022 | Q7769301    | The Time Capsule                           |        10 |
+|   297755 | L♡DK                                                    |         2014 | Q9026236    | L DK                                       |         2 |
+|  1205648 | No One Will Know                                        |         2025 | Q1810133    | Le Roi Soleil                              |         4 |
+|   365725 | Charley nénje                                           |         1986 | Q1066781    | Charley's Aunt                             |        10 |
+|    43964 | The Beast to Die                                        |         1980 | Q7716076    | The Beast to Die                           |        10 |
+|    24154 | Miyori's Forest                                         |         2009 | Q1096677    | Miyori no Mori                             |         2 |
+|  1507573 | National Theatre Live: The Fifth Step                   |         2025 | Q105226860  | The Fifth Step                             |        10 |
+|  1638171 | Suffs                                                   |         2026 | Q111949099  | Suffs                                      |         4 |
+|   183431 | Lock Up Your Daughters                                  |         1980 | Q12216250   | Keep Your Daughters Locked In              |        10 |
+|   749411 | Victor                                                  |         2019 | Q539581     | Victor                                     |        10 |
+|   773935 | Spirit Riding Free: Ride Along Adventure                |         2020 | Q104622584  | Spirit Riding Free: Ride Along Adventure   |         1 |
+|   191507 | Princess Minerva                                        |         1995 | Q3823700    | Princess Minerva                           |         1 |
+|   966479 | Flower Shop Curtain                                     |         1959 | Q11615018   | Hana noren                                 |        10 |
+|   553301 | Your Name                                               |         NULL | Q27016930   | Your Name                                  |        10 |
+|  1005793 | Jane                                                    |         NULL | Q1682564    | Jane                                       |        10 |
+|   620500 | The Oresteia                                            |         1983 | Q249769     | Oresteia                                   |         5 |
+|   518090 | Ginny                                                   |         2016 | Q1525067    | Ginny                                      |        10 |
+|  1719809 | National Theatre at Home: Summerfolk                    |         2026 | Q7637578    | Summerfolk                                 |        10 |
+|  1215860 | Mecha-ude                                               |         2018 | Q113539815  | Mecha-ude                                  |        10 |
+|   954041 | Slice                                                   |         2020 | Q113685785  | Horizon: An American Saga                  |         0 |
++----------+---------------------------------------------------------+--------------+-------------+--------------------------------------------+-----------+
++-----------------------------------------------------+
+| SECTION                                             |
++-----------------------------------------------------+
+| 2a. Sources without a name: what the item row holds |
++-----------------------------------------------------+
++---------------------------------------+---------+-------------+-------------+
+| CASE_                                 | SOURCES | MOVIE_LINKS | SERIE_LINKS |
++---------------------------------------+---------+-------------+-------------+
+| 1 no item row                         |      25 |          15 |          16 |
+| 3 item row, labels in other languages |    1718 |        1556 |         319 |
++---------------------------------------+---------+-------------+-------------+
++-------------------------------------------------------+
+| SECTION                                               |
++-------------------------------------------------------+
+| 2b. First available label language, when there is one |
++-------------------------------------------------------+
++----------------+---------+
+| FIRST_LANGUAGE | SOURCES |
++----------------+---------+
+| fr             |     215 |
+| de             |     205 |
+| ja             |     205 |
+| nb             |     131 |
+| ru             |      96 |
+| sv             |      95 |
+| es             |      85 |
+| cs             |      67 |
+| it             |      46 |
+| pl             |      46 |
+| nl             |      44 |
+| fi             |      44 |
+| et             |      41 |
+| tr             |      41 |
+| ca             |      39 |
++----------------+---------+
++------------------------------------------+
+| SECTION                                  |
++------------------------------------------+
+| 2c. Unnamed sources, the 30 most adapted |
++------------------------------------------+
++----------------+-------------+------------------+-------------+-------------+-----------------+---------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------+
+| ID_SOURCE_WORK | ID_WIKIDATA | SOURCE_WORK_TYPE | MOVIE_COUNT | SERIE_COUNT | LABEL_LANGUAGES | FALLBACK_LABEL                        | ADAPTED_MOVIES                                                                                                                                 | ADAPTED_SERIES                                   |
++----------------+-------------+------------------+-------------+-------------+-----------------+---------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------+
+|           6543 | Q182961     | literary         |           6 |           3 |              78 | 简·爱                                 | Jane Eyre                                                                                                                                      | Jane Eyre                                        |
+|           6979 | Q1982608    | screen           |           6 |           0 |            NULL | NULL                                  | Kamen Rider #1 | Kamen Rider vs. Ambassador Hell | Kamen Rider vs. Shocker | Kamen Rider: THE FIRST | Kamen Rider: THE NEXT | Shin Kamen Rider | NULL                                             |
+|           9235 | Q288035     | game             |           5 |           0 |              14 | ستريت فايتر                           | Street Fighter | Street Fighter Alpha: The Movie | Street Fighter II: The Animated Movie | Street Fighter: The Legend of Chun-Li               | NULL                                             |
+|            665 | Q10686489   | literary         |           5 |           0 |               4 | Swedenhielms                          | Familien Swedenhielm | Swedenhielms                                                                                                            | NULL                                             |
+|          17428 | Q99179974   | literary         |           3 |           1 |               2 | 仕掛人・藤枝梅安                      | Baian the Assassin | Baian the Assassin, M.D.: Part 1 | Baian the Assassin, M.D.: Part 2                                                       | Professional Killers                             |
+|          10786 | Q3795630    | literary         |           4 |           0 |               3 | Il romanzo di un giovane povero       | Il Romanzo di un Giovane Povero | The Story of a Poor Young Man                                                                                | NULL                                             |
+|           9450 | Q30134079   | literary         |           4 |           0 |               1 | Das Schweigen im Walde                | Das Schweigen im Walde | Silence of the Forest                                                                                                 | NULL                                             |
+|           9230 | Q28797050   | literary         |           3 |           0 |               7 | Цветик-семицветик                     | The Flower with Seven Colors | The Flower with Seven Colours | The Last Petal                                                                  | NULL                                             |
+|          13588 | Q59828807   | other            |           1 |           2 |              11 | Woody Woodpecker                      | Woody Woodpecker                                                                                                                               | The New Woody Woodpecker Show | Woody Woodpecker |
+|           1059 | Q1095715    | literary         |           3 |           0 |               5 | Ida regénye                           | Ida regénye | Romance of Ida                                                                                                                   | NULL                                             |
+|           9601 | Q30887885   | literary         |           2 |           1 |               3 | Алые погоны                           | Scarlet Straps | The Honor of Comrade                                                                                                          | Scarlet Straps                                   |
+|           5809 | Q16702908   | literary         |           2 |           1 |               5 | Судьба барабанщика                    | The Drummer's Fate                                                                                                                             | The Drummer's Fate                               |
+|          10162 | Q3280834    | comic            |           2 |           1 |               4 | Makinavaja, el último choriso         | ¡Semos peligrosos! (Uséase Makinavaja 2) | Makinavaja, el último choriso                                                                       | Makinavaja: La Serie                             |
+|          13746 | Q6084029    | literary         |           2 |           1 |               1 | Yılanların Öcü                        | Revenge of the Snakes                                                                                                                          | Yılanların Öcü                                   |
+|           2754 | Q1195717    | literary         |           2 |           1 |               4 | Der Marinedolch                       | The Cutlass                                                                                                                                    | Kortik                                           |
+|           1219 | Q110914332  | literary         |           3 |           0 |               1 | Hokuspokus                            | Hocuspocus | Hokuspokus                                                                                                                        | NULL                                             |
+|           1495 | Q11278023   | literary         |           3 |           0 |               4 | 濹東綺譚                              | Gentle Lewd Woman: Wet Tongue Nectar | The Strange Tale of Oyuki | The Twilight Story                                                          | NULL                                             |
+|           7390 | Q20916969   | literary         |           3 |           0 |               2 | Tukkijoella                           | Tukkijoella                                                                                                                                    | NULL                                             |
+|          10496 | Q3548383    | literary         |           2 |           0 |               6 | Un bon petit diable                   | A Good Little Devil                                                                                                                            | NULL                                             |
+|           4101 | Q131419103  | literary         |           2 |           0 |               2 | Hanende Melek                         | Devlerin Ölümü | Melek The Singer                                                                                                              | NULL                                             |
+|            518 | Q10602957   | literary         |           2 |           0 |               4 | Norrtullsligan                        | The Norrtull Gang | Wanted                                                                                                                     | NULL                                             |
+|           3847 | Q12812580   | literary         |           2 |           0 |               1 | Yaşar Ne Yaşar Ne Yaşamaz             | Yaşar Ne Yaşar Ne Yaşamaz | Yaşar: Neither Alive Nor Dead                                                                                      | NULL                                             |
+|          17415 | Q989006     | literary         |           2 |           0 |               1 | Elnémult harangok                     | Silent Bells                                                                                                                                   | NULL                                             |
+|          13583 | Q5980916    | literary         |           2 |           0 |               2 | Los habitantes de la casa deshabitada | Fantasmas en la casa | Los habitantes de la casa deshabitada                                                                                   | NULL                                             |
+|           6673 | Q18679605   | literary         |           1 |           1 |               2 | Tuliaiset Moskovasta                  | The Look of a Killer                                                                                                                           | The Look of a Killer                             |
+|           6929 | Q19651605   | literary         |           2 |           0 |               1 | A tanítónő                            | A tanítónö | The School-Mistress                                                                                                               | NULL                                             |
+|           6418 | Q18003147   | literary         |           2 |           0 |               1 | Bak høkerens disk                     | Godvakker-Maren | Kjære Maren                                                                                                                  | NULL                                             |
+|           2583 | Q11873652   | literary         |           2 |           0 |               1 | Kuriton sukupolvi                     | Kuriton sukupolvi                                                                                                                              | NULL                                             |
+|          11287 | Q4190963    | literary         |           2 |           0 |               2 | Зелёный фургон                        | The Green Van                                                                                                                                  | NULL                                             |
+|           1560 | Q113079578  | literary         |           2 |           0 |               2 | Den vesle jenta og den store tyven    | Kamilla and the Thief | Kamilla and the Thief 2                                                                                                | NULL                                             |
++----------------+-------------+------------------+-------------+-------------+-----------------+---------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------+
