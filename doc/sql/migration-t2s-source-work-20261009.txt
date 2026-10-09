@@ -1,0 +1,8 @@
+-- migration-t2s-source-work.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-09 16:08:59
+--
++-------------------------------------------------+--------------+
+| STATUS                                          | TABLES_FOUND |
++-------------------------------------------------+--------------+
+| migration-t2s-source-work: three tables present |            3 |
++-------------------------------------------------+--------------+

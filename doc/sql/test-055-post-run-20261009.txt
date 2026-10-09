@@ -1,0 +1,196 @@
+-- test-055-post-run.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-09 16:22:28
+--
++------------+
+| SECTION    |
++------------+
+| A. Volumes |
++------------+
++---------+---------+--------------+--------------+---------------------+---------------------+-----------+--------+--------+
+| DELETED | SOURCES | WITHOUT_NAME | FR_EQUALS_EN | SOURCE_IS_T2S_MOVIE | SOURCE_IS_T2S_SERIE | WITH_YEAR | MIN_ID | MAX_ID |
++---------+---------+--------------+--------------+---------------------+---------------------+-----------+--------+--------+
+|       0 |   17464 |         1743 |         9673 |                1357 |                1510 |     12389 |      1 |  17464 |
++---------+---------+--------------+--------------+---------------------+---------------------+-----------+--------+--------+
++-------------+----------------------+-------------+----------------------+
+| MOVIE_LINKS | MOVIES_WITH_A_SOURCE | SERIE_LINKS | SERIES_WITH_A_SOURCE |
++-------------+----------------------+-------------+----------------------+
+|       17582 |                16773 |        7652 |                 7281 |
++-------------+----------------------+-------------+----------------------+
++-------------------------------------+
+| SECTION                             |
++-------------------------------------+
+| B. Integrity, every count must be 0 |
++-------------------------------------+
++--------------------------+--------------------------+------------------------+------------------------+-----------------+-----------------+-----------------+--------------------------+
+| MOVIE_LINK_ORPHAN_SOURCE | SERIE_LINK_ORPHAN_SOURCE | MOVIE_LINK_ORPHAN_WORK | SERIE_LINK_ORPHAN_WORK | WRONG_MOVIE_HOP | WRONG_SERIE_HOP | MOVIE_SELF_LINK | LIVE_SOURCE_WITHOUT_LINK |
++--------------------------+--------------------------+------------------------+------------------------+-----------------+-----------------+-----------------+--------------------------+
+|                        0 |                        0 |                      0 |                      0 |               0 |               0 |               0 |                        0 |
++--------------------------+--------------------------+------------------------+------------------------+-----------------+-----------------+-----------------+--------------------------+
++-------------------------+
+| MOVIE_P144_WITHOUT_LINK |
++-------------------------+
+|                       0 |
++-------------------------+
++-----------------------------------------------+
+| SECTION                                       |
++-----------------------------------------------+
+| C. Closed vocabularies, every count must be 0 |
++-----------------------------------------------+
++------------------+------------------+--------------------+
+| TYPE_OUT_OF_LIST | FORM_OUT_OF_LIST | FORM_TYPE_MISMATCH |
++------------------+------------------+--------------------+
+|                0 |                0 |                  0 |
++------------------+------------------+--------------------+
++----------------------------------+
+| SECTION                          |
++----------------------------------+
+| D. Distribution by type and form |
++----------------------------------+
++------------------+------------------+---------+-------------+-------------+
+| SOURCE_WORK_TYPE | SOURCE_WORK_FORM | SOURCES | MOVIE_LINKS | SERIE_LINKS |
++------------------+------------------+---------+-------------+-------------+
+| literary         |                  |   10150 |       12015 |        2345 |
+| screen           |                  |    3244 |        2474 |        2329 |
+| comic            | manga            |    1591 |         658 |        1527 |
+| other            |                  |     738 |         907 |         425 |
+| comic            |                  |     477 |         435 |         271 |
+| literary         | light_novel      |     443 |          40 |         448 |
+| game             |                  |     350 |         152 |         268 |
+| stage            | musical          |     216 |         265 |           5 |
+| stage            | play             |     152 |         420 |          23 |
+| folklore         |                  |      87 |         201 |          10 |
+| stage            |                  |      16 |          15 |           1 |
++------------------+------------------+---------+-------------+-------------+
++-----------+------------------+------------------+---------+
+| CONE_RANK | SOURCE_WORK_TYPE | SOURCE_WORK_FORM | CLASSES |
++-----------+------------------+------------------+---------+
+|         0 | other            |                  |    7927 |
+|         1 | game             |                  |     992 |
+|         2 | comic            | manga            |       4 |
+|         3 | comic            |                  |     281 |
+|         4 | stage            | musical          |       7 |
+|         5 | stage            | play             |     561 |
+|         6 | stage            |                  |      13 |
+|         7 | folklore         |                  |      94 |
+|         8 | screen           |                  |    1051 |
+|         9 | literary         | light_novel      |       1 |
+|        10 | literary         |                  |   75315 |
++-----------+------------------+------------------+---------+
++--------------+
+| SECTION      |
++--------------+
+| E. Witnesses |
++--------------+
++-------+---------+----------------+----------------+--------------------+------------------------+------------------+------------------+------------------+-----------------+-----------------+
+| KIND  | ID_WORK | TITLE          | ID_SOURCE_WORK | SOURCE_WORK_NAME   | SOURCE_WORK_NAME_FR    | SOURCE_WORK_TYPE | SOURCE_WORK_FORM | SOURCE_WORK_YEAR | SOURCE_ID_MOVIE | SOURCE_ID_SERIE |
++-------+---------+----------------+----------------+--------------------+------------------------+------------------+------------------+------------------+-----------------+-----------------+
+| movie |     111 | Scarface       |           7931 | Scarface           | Scarface               | literary         | NULL             |             1930 |            NULL |            NULL |
+| movie |     111 | Scarface       |          11891 | Scarface           | Scarface               | screen           | NULL             |             1932 |             877 |            NULL |
+| movie |     694 | The Shining    |          11886 | The Shining        | Shining                | literary         | NULL             |             1977 |            NULL |            NULL |
+| movie |  329865 | Arrival        |          15477 | Story of Your Life | L’Histoire de ta vie   | literary         | NULL             |             1998 |            NULL |            NULL |
+| serie |  100088 | The Last of Us |           7009 | NULL               | NULL                   | game             | NULL             |             2013 |            NULL |            NULL |
++-------+---------+----------------+----------------+--------------------+------------------------+------------------+------------------+------------------+-----------------+-----------------+
++----------------+-------------+----------------------+-------------------------+------------------+------------------+------------------+-------------+-------------+
+| ID_SOURCE_WORK | ID_WIKIDATA | SOURCE_WORK_NAME     | SOURCE_WORK_NAME_FR     | SOURCE_WORK_TYPE | SOURCE_WORK_FORM | SOURCE_WORK_YEAR | MOVIE_COUNT | SERIE_COUNT |
++----------------+-------------+----------------------+-------------------------+------------------+------------------+------------------+-------------+-------------+
+|          11237 | Q41542      | Dracula              | Dracula                 | literary         | NULL             |             1897 |          30 |           3 |
+|           7358 | Q208460     | Nineteen Eighty-Four | 1984                    | literary         | NULL             |             1949 |           4 |           0 |
+|           3909 | Q129778     | Heart of Darkness    | Au cœur des ténèbres    | screen           | NULL             |             2026 |           2 |           0 |
++----------------+-------------+----------------------+-------------------------+------------------+------------------+------------------+-------------+-------------+
++-----------------------------------------------------------------------+
+| SECTION                                                               |
++-----------------------------------------------------------------------+
+| F. The ten evaluation questions of FASTAPI-TEXT2SQL-320, as plain SQL |
++-----------------------------------------------------------------------+
++-----------------------------+----------+-------------+--------------+
+| Q                           | ID_MOVIE | MOVIE_TITLE | RELEASE_YEAR |
++-----------------------------+----------+-------------+--------------+
+| Q1 remakes of Scarface 1932 |      111 | Scarface    |         1983 |
++-----------------------------+----------+-------------+--------------+
++------------------------+----------+-------------------------------+---------------------------------+
+| Q                      | ID_SERIE | SERIE_TITLE                   | SOURCE_WORK_NAME                |
++------------------------+----------+-------------------------------+---------------------------------+
+| Q3 series from a movie |   236235 | The Gentlemen                 | The Gentlemen                   |
+| Q3 series from a movie |    60622 | Fargo                         | Fargo                           |
+| Q3 series from a movie |    63247 | Westworld                     | Westworld                       |
+| Q3 series from a movie |     1823 | The Love Boat                 | The Love Boat                   |
+| Q3 series from a movie |     4629 | Stargate SG-1                 | Stargate                        |
+| Q3 series from a movie |       95 | Buffy the Vampire Slayer      | Buffy the Vampire Slayer        |
+| Q3 series from a movie |    34524 | Teen Wolf                     | Teen Wolf                       |
+| Q3 series from a movie |    66025 | Animal Kingdom                | Animal Kingdom                  |
+| Q3 series from a movie |   103516 | Star Trek: Strange New Worlds | Star Trek: The Cage             |
+| Q3 series from a movie |      494 | Alice                         | Alice Doesn't Live Here Anymore |
+| Q3 series from a movie |    83631 | What We Do in the Shadows     | What We Do in the Shadows       |
+| Q3 series from a movie |   110492 | Peacemaker                    | The Suicide Squad               |
+| Q3 series from a movie |    46786 | Bates Motel                   | Psycho                          |
+| Q3 series from a movie |    21762 | Parenthood                    | Parenthood                      |
+| Q3 series from a movie |    86831 | Love, Death & Robots          | Heavy Metal                     |
++------------------------+----------+-------------------------------+---------------------------------+
++----------------------------------------+-----------------------------------------------------------------------------+-------------+---------------------------------------------------------+---------------+
+| Q                                      | MOVIE_TITLE                                                                 | IMDB_RATING | SERIE_TITLE                                             | SOURCE_RATING |
++----------------------------------------+-----------------------------------------------------------------------------+-------------+---------------------------------------------------------+---------------+
+| Q4 movie rated above its source series | Kolačić reunion, Minutu po minutu                                           |         8.8 | SKAM                                                    |           8.5 |
+| Q4 movie rated above its source series | Pinky and the Brain: A Pinky and the Brain Christmas                        |         8.5 | Pinky and the Brain                                     |           7.8 |
+| Q4 movie rated above its source series | Geats Extra: Kamen Rider Tycoon meets Kamen Rider Shinobi                   |         8.4 | Kamen Rider Geats                                       |             8 |
+| Q4 movie rated above its source series | The Fairly OddParents: Channel Chasers                                      |         8.4 | The Fairly OddParents                                   |           7.2 |
+| Q4 movie rated above its source series | My Big Big Friend: The Movie                                                |         8.4 | My Big Big Friend                                       |           7.3 |
+| Q4 movie rated above its source series | Adult Swim Brain Trust                                                      |         8.3 | Space Ghost Coast to Coast                              |           7.9 |
+| Q4 movie rated above its source series | Revue Starlight: Rondo Rondo Rondo                                          |         8.3 | Revue Starlight                                         |           7.3 |
+| Q4 movie rated above its source series | Maho Girls Precure! the Movie: The Miraculous Transformation! Cure Mofurun! |         8.3 | Witchy Precure!                                         |           7.7 |
+| Q4 movie rated above its source series | Lupinranger vs Patranger vs Kyuranger                                       |         8.2 | Kaitou Sentai Lupinranger vs. Keisatsu Sentai Patranger |           7.8 |
+| Q4 movie rated above its source series | Lupinranger vs Patranger vs Kyuranger                                       |         8.2 | Uchuu Sentai Kyuranger                                  |           7.2 |
+| Q4 movie rated above its source series | The Legend of Hei 2                                                         |         8.1 | The Legend of Luo Xiaohei                               |             8 |
+| Q4 movie rated above its source series | Mashin Sentai Kiramager Spin-Off: Yodonna                                   |         8.1 | Mashin Sentai Kiramager                                 |           7.4 |
+| Q4 movie rated above its source series | Geats Extra: Kamen Rider PunkJack                                           |         8.1 | Kamen Rider Geats                                       |             8 |
+| Q4 movie rated above its source series | VGHS: The Movie                                                             |           8 | Video Game High School                                  |           7.6 |
+| Q4 movie rated above its source series | Seijuu Sentai Gingaman vs Megaranger                                        |           8 | Denji Sentai Megaranger                                 |           7.8 |
++----------------------------------------+-----------------------------------------------------------------------------+-------------+---------------------------------------------------------+---------------+
++-----------------+-----------------------------------------+------------------+-------------+-------------+-------------+
+| Q               | SOURCE_WORK_NAME                        | SOURCE_WORK_TYPE | MOVIE_COUNT | SERIE_COUNT | ADAPTATIONS |
++-----------------+-----------------------------------------+------------------+-------------+-------------+-------------+
+| Q5 most adapted | The Three Musketeers                    | literary         |          60 |           9 |          69 |
+| Q5 most adapted | A Christmas Carol                       | literary         |          67 |           1 |          68 |
+| Q5 most adapted | The Count of Monte Cristo               | literary         |          27 |          15 |          42 |
+| Q5 most adapted | Lupin III                               | other            |          38 |           1 |          39 |
+| Q5 most adapted | Scooby-Doo                              | other            |          34 |           0 |          34 |
+| Q5 most adapted | Dracula                                 | literary         |          30 |           3 |          33 |
+| Q5 most adapted | Crayon Shin-chan                        | comic            |          31 |           1 |          32 |
+| Q5 most adapted | Romeo and Juliet                        | stage            |          28 |           3 |          31 |
+| Q5 most adapted | Batman                                  | other            |          25 |           6 |          31 |
+| Q5 most adapted | Frankenstein; or, The Modern Prometheus | literary         |          29 |           2 |          31 |
+| Q5 most adapted | Treasure Island                         | literary         |          24 |           7 |          31 |
+| Q5 most adapted | Superman                                | other            |          21 |           9 |          30 |
+| Q5 most adapted | Blondie                                 | comic            |          28 |           2 |          30 |
+| Q5 most adapted | Journey to the West                     | literary         |          19 |          10 |          29 |
+| Q5 most adapted | The Adventures of Pinocchio             | literary         |          24 |           5 |          29 |
++-----------------+-----------------------------------------+------------------+-------------+-------------+-------------+
++-------------------------+--------+--------+
+| Q                       | MOVIES | SERIES |
++-------------------------+--------+--------+
+| Q6 based on video games |    145 |    244 |
++-------------------------+--------+--------+
++-----------------------+------------------------------------------------+--------------+------------------------------------------------+
+| Q                     | MOVIE_TITLE                                    | RELEASE_YEAR | SOURCE_WORK_NAME                               |
++-----------------------+------------------------------------------------+--------------+------------------------------------------------+
+| Q7 based on a musical | Wicked: For Good                               |         2025 | Wicked                                         |
+| Q7 based on a musical | Sleeping Beauty                                |         1959 | The Sleeping Beauty                            |
+| Q7 based on a musical | Wicked                                         |         2024 | Wicked                                         |
+| Q7 based on a musical | The Sound of Music                             |         1965 | The Sound of Music                             |
+| Q7 based on a musical | Mean Girls                                     |         2024 | Mean Girls                                     |
+| Q7 based on a musical | Grease                                         |         1978 | Grease                                         |
+| Q7 based on a musical | Oliver & Company                               |         1988 | Les Misérables                                 |
+| Q7 based on a musical | Into the Woods                                 |         2014 | Into the Woods                                 |
+| Q7 based on a musical | Sweeney Todd: The Demon Barber of Fleet Street |         2007 | Sweeney Todd: The Demon Barber of Fleet Street |
+| Q7 based on a musical | Les Misérables                                 |         2012 | Les Misérables                                 |
+| Q7 based on a musical | The Nutcracker and the Four Realms             |         2018 | The Nutcracker                                 |
+| Q7 based on a musical | The Phantom of the Opera                       |         2004 | The Phantom of the Opera                       |
+| Q7 based on a musical | The Rocky Horror Picture Show                  |         1975 | The Rocky Horror Show                          |
+| Q7 based on a musical | West Side Story                                |         2021 | West Side Story                                |
+| Q7 based on a musical | Little Shop of Horrors                         |         1986 | Little Shop of Horrors                         |
++-----------------------+------------------------------------------------+--------------+------------------------------------------------+
++---------------------------------------+-------------------+--------------+
+| Q                                     | MOVIE_TITLE       | RELEASE_YEAR |
++---------------------------------------+-------------------+--------------+
+| Q8 adapted from Au coeur des tenebres | Heart of Darkness |         1994 |
+| Q8 adapted from Au coeur des tenebres | Apocalypse Now    |         1979 |
++---------------------------------------+-------------------+--------------+
