@@ -2452,3 +2452,473 @@ def f_buildlocationtables():
         return arrresult
     finally:
         cursor.close()
+
+
+# ===========================================================================
+# T2S_SOURCE_WORK : "based on" (Wikidata P144), Process 73
+# TMDB-MOVIE-PREPROCESS-055, shape decided 2026-10-07 and 2026-10-09.
+# ===========================================================================
+#
+# The cones that type a source work, in PRIORITY ORDER. The rank of an entry is its
+# index: a class reached by several cones keeps the first one (INSERT IGNORE on the
+# class key), and a source carrying several classes takes its smallest rank. The rank
+# therefore encodes both the type priority and, inside a type, the form precedence
+# ('musical' before 'play': an opera is also a dramatic work).
+#
+# Every root is a P31 class MEASURED on the sources (doc/sql/test-055-*.sql, runs of
+# 2026-10-07), plus Q95074 (CHARACTER_ROOTS of wikidata-crawler), Q11424 (film) and
+# Q5398426 (television series). Deliberately NOT roots: Q17537576 "creative work" and
+# Q1190554 "occurrence", top classes whose cones (2.6 million classes for the second)
+# would decide nothing. Rule from that run: read a cone's size before adding a root.
+#
+# Order, measured on run 2: what is not a work first (character, franchise: 'other',
+# decision of 2026-10-07), then game, comic, stage, folklore, screen, and literary
+# LAST, because "written work" (53,962 classes) and "literary work" (6,116) are the
+# broadest cones and would otherwise swallow manga, plays and visual novels. A cached
+# source no cone catches goes to 'other' (112 sources on run 2: real events, brands,
+# toys, bands).
+SOURCE_WORK_TYPE_CONES = (
+    ("other", None, ("Q95074",       # character
+                     "Q15632617",    # fictional human
+                     "Q15773347",    # film character
+                     "Q1114461",     # comics character
+                     "Q15773317",    # television character
+                     "Q15711870",    # animated character
+                     "Q3658341",     # literary character
+                     "Q14514600",    # group of fictional characters
+                     "Q196600")),    # media franchise
+    ("game", None, ("Q7889",         # video game
+                    "Q7058673",      # video game series
+                    "Q112144412",    # esports discipline
+                    "Q1643932",      # tabletop role-playing game
+                    "Q131436",       # board game
+                    "Q734698",       # collectible card game
+                    "Q116774927",    # (unlabelled) the Pokemon game pairs
+                    "Q116774997")),  # (unlabelled) Pokemon remakes
+    ("comic", "manga", ("Q21198342",   # manga series
+                        "Q865484")),   # yonkoma
+    ("comic", None, ("Q14406742",    # comic book series
+                     "Q838795",      # comic strip
+                     "Q1004",        # comic
+                     "Q1760610",     # comic book
+                     "Q2831984",     # comic book album
+                     "Q725377",      # graphic novel
+                     "Q3297186",     # limited series
+                     "Q115378877",   # comic book storyline
+                     "Q7978994",     # webtoon
+                     "Q213369",      # webcomic
+                     "Q74262765",    # manhwa series
+                     "Q137637896")), # manhua series
+    ("stage", "musical", ("Q58483083",)),  # dramatico-musical work (musical, opera, ballet)
+    ("stage", "play", ("Q116476516",   # dramatic work
+                       "Q25372")),     # drama
+    ("stage", None, ("Q7777570",     # theatrical production
+                     "Q110013395")), # theatrical work
+    ("folklore", None, ("Q699",      # fairy tale
+                        "Q1221280",  # folk tale
+                        "Q47451145", # tale type
+                        "Q4400636",  # Russian folktale
+                        "Q19718870")),  # mythology by ethnic group
+    ("screen", None, ("Q24856",      # film series
+                      "Q11424",      # film
+                      "Q5398426",    # television series
+                      "Q21191270",   # television series episode
+                      "Q3464665")),  # television series season
+    ("literary", "light_novel", ("Q104213567",)),  # light novel series
+    ("literary", None, ("Q7725634",  # literary work
+                        "Q47461344", # written work
+                        "Q571",      # book
+                        "Q277759",   # book series
+                        "Q1667921",  # novel series
+                        "Q13593966", # literary trilogy
+                        "Q867335",   # literary cycle
+                        "Q12799318", # short novel
+                        "Q59126",    # xiaoshuo
+                        "Q8275050",  # children's book
+                        "Q47068459", # children's book series
+                        "Q3331189",  # version, edition or translation
+                        "Q29154430")),  # book of the Bible
+)
+# 'novel' / 'short_story' come from P7937 (form of creative work) once wikidata-crawler
+# caches it for items (WIKIDATA-CRAWLER-021, code shipped 2026-10-09). The mapping of its
+# values is NOT written here: the form classes are to be measured on the first run that
+# carries P7937, not named from memory.
+
+STR_SOURCE_WORK_CLASS_TABLE = "T_WC_T2S_SOURCE_WORK_CLASS"
+
+
+def f_buildsourceworkclasstable():
+    """Materialise the P279 cones of SOURCE_WORK_TYPE_CONES, one row per class.
+
+    Same mechanism as f_buildlocationclasstable(): the transitive closure is walked
+    once per pass, not once per row, and the priority is resolved at construction
+    (INSERT IGNORE on the class key, first cone wins). CONE_RANK carries the index of
+    the winning cone, so a source with several classes picks MIN(CONE_RANK).
+
+    The CAST of the anchor is not decorative: without it MariaDB types the recursive
+    column on the literal's length and rejects its own Q-ids with error 1406.
+
+    Returns the number of classes per cone rank.
+    """
+    connection = cp.connectioncp
+    cursor = connection.cursor()
+    arrcounts = {}
+    try:
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS `" + STR_SOURCE_WORK_CLASS_TABLE + "` ("
+            "`ID_CLASS` VARCHAR(50) NOT NULL,"
+            "`CONE_RANK` INT NOT NULL,"
+            "`SOURCE_WORK_TYPE` VARCHAR(20) NOT NULL,"
+            "`SOURCE_WORK_FORM` VARCHAR(20) NULL,"
+            "`DAT_CREAT` DATETIME DEFAULT CURRENT_TIMESTAMP,"
+            "PRIMARY KEY (`ID_CLASS`),"
+            "KEY `CONE_RANK` (`CONE_RANK`)"
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        )
+        cursor.execute("TRUNCATE TABLE `" + STR_SOURCE_WORK_CLASS_TABLE + "`")
+        for lngrank, (strtype, strform, arrroots) in enumerate(SOURCE_WORK_TYPE_CONES):
+            strroots = " UNION ALL ".join(
+                "SELECT '" + strroot + "' AS qid" for strroot in arrroots
+            )
+            cursor.execute(
+                "INSERT IGNORE INTO `" + STR_SOURCE_WORK_CLASS_TABLE + "` "
+                "(ID_CLASS, CONE_RANK, SOURCE_WORK_TYPE, SOURCE_WORK_FORM) "
+                "WITH RECURSIVE cone_source_work (qid) AS ( "
+                "SELECT CAST(r.qid AS CHAR(50)) COLLATE utf8mb4_unicode_ci AS qid "
+                "FROM (" + strroots + ") AS r "
+                "UNION "
+                "SELECT sc.ID_CHILD FROM T_WC_WIKIDATA_SUBCLASS sc "
+                "JOIN cone_source_work c ON c.qid = sc.ID_PARENT WHERE sc.DELETED = 0 "
+                ") SELECT qid, %s, %s, %s FROM cone_source_work",
+                (lngrank, strtype, strform),
+            )
+            connection.commit()
+            cursor.execute(
+                "SELECT COUNT(*) AS COMPTE FROM `" + STR_SOURCE_WORK_CLASS_TABLE + "` "
+                "WHERE CONE_RANK = %s", (lngrank,)
+            )
+            strlabel = f"{lngrank}:{strtype}" + (f"/{strform}" if strform else "")
+            arrcounts[strlabel] = int(cursor.fetchone()["COMPTE"])
+        return arrcounts
+    finally:
+        cursor.close()
+
+
+# The driving filter: a live P144 statement. 17,454 distinct sources for 25,222 links
+# from T2S works on 2026-10-07.
+STR_SOURCE_WORK_P144_FILTER = (
+    "st.ID_PROPERTY = 'P144'\n"
+    "  AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+    "  AND COALESCE(st.DELETED, 0) = 0\n"
+)
+
+
+def _f_sourceworkstep(cursor, strstep, strsql):
+    """Run one step of the source-work rebuild, NAMING it first (lesson of process 72,
+    2026-09-12: a rebuild that fails without saying which statement is a rebuild to
+    diagnose from zero). Returns the row count."""
+    print(f"73:   {strstep} ...", flush=True)
+    cursor.execute(strsql)
+    return cursor.rowcount
+
+
+def f_sourceworkassociationsql(strmajor):
+    """Fill one link table, film or series. The two queries come from one template so
+    that a correction cannot reach one and miss the other.
+
+    A work is never linked to itself (a source row pointing back to the same T2S work):
+    Wikidata holds a few such loops, and they would read as "X is based on X".
+    """
+    strid = "ID_" + strmajor
+    return (
+        f"INSERT IGNORE INTO T_WC_T2S_{strmajor}_SOURCE_WORK_BUILD\n"
+        f"    ({strid}, ID_SOURCE_WORK, DELETED, DAT_CREAT, TIM_UPDATED)\n"
+        f"SELECT DISTINCT w.{strid}, sw.ID_SOURCE_WORK, 0, CURDATE(), NOW()\n"
+        "FROM T_WC_WIKIDATA_STATEMENT st\n"
+        "INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+        f"INNER JOIN T_WC_T2S_{strmajor} w ON w.ID_WIKIDATA = st.ID_WIKIDATA\n"
+        "INNER JOIN T_WC_T2S_SOURCE_WORK_BUILD sw ON sw.ID_WIKIDATA = iv.ID_ITEM AND sw.DELETED = 0\n"
+        "WHERE " + STR_SOURCE_WORK_P144_FILTER +
+        f"  AND NOT (sw.{strid} <=> w.{strid})\n"
+    )
+
+
+def _f_readwithoutlocking(cursor, strtag):
+    """READ COMMITTED for this session when no binary log needs the source rows locked.
+
+    Same reasoning as process 72 (2026-09-12): an INSERT ... SELECT on
+    T_WC_WIKIDATA_STATEMENT takes shared locks on the source under REPEATABLE READ and
+    collides with a wikidata-crawler load. READ COMMITTED is safe only without a binary
+    log to replay (or with binlog_format = ROW), so the condition is checked at run time
+    rather than assumed, and the decision is printed.
+    """
+    try:
+        cursor.execute("SELECT @@GLOBAL.log_bin AS LOGBIN, @@GLOBAL.binlog_format AS FORMAT")
+        arrbinlog = cursor.fetchone()
+        blnbinlog = int(arrbinlog["LOGBIN"] or 0) == 1
+        strbinlogformat = (arrbinlog["FORMAT"] or "").upper()
+        if (not blnbinlog) or strbinlogformat == "ROW":
+            cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            print(f"{strtag}: READ COMMITTED, the INSERT ... SELECT will not lock the Wikidata source rows.")
+        else:
+            print(f"{strtag}: left in REPEATABLE READ (binlog_format = {strbinlogformat}): "
+                  "do NOT run during a wikidata-crawler load.")
+    except Exception as isolationerror:
+        print(f"{strtag}: isolation left at default ({type(isolationerror).__name__}: {isolationerror}).")
+
+
+def f_buildsourceworktables():
+    """Rebuild T_WC_T2S_SOURCE_WORK and its two link tables, in full, in SQL only.
+
+    Same pattern as f_buildlocationtables(), on the same reasoning: about 17,500 sources
+    and 25,000 links, small enough for a full rebuild in _BUILD tables swapped by one
+    atomic RENAME, so the served tables are never empty.
+
+    THE SHAPE (method A, 2026-10-09). The left side, the work studied, is carried by the
+    link table (MOVIE or SERIE). The right side is always a SOURCE_WORK row; when the
+    source is itself a T2S film or series, the row points to it by ID_MOVIE / ID_SERIE.
+
+    ID_SOURCE_WORK IS STABLE, in three inserts as for ID_LOCATION (fix of 2026-09-13):
+    a known source keeps its id; a source that left the perimeter stays with
+    DELETED = 1 so that its number is never given again; a new one gets a number above
+    the previous maximum.
+
+    Returns a dictionary of counts, for the telemetry and the acceptance.
+    """
+    connection = cp.connectioncp
+    cursor = connection.cursor()
+    arrresult = {}
+    try:
+        cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
+        _f_readwithoutlocking(cursor, "73")
+
+        # --- 0. The perimeter, and everything known about each source ---------
+        # Materialised once in a temporary table, the driving query being the costly
+        # part. Names, year and home are resolved by one UPDATE per question rather than
+        # in a single join, whose duplicates (two T2S films sharing a Q-id) would break
+        # the unique key of the build table.
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_source_work")
+        cursor.execute(
+            "CREATE TEMPORARY TABLE tmp_source_work ("
+            " ID_WIKIDATA VARCHAR(20) NOT NULL PRIMARY KEY,"
+            " ID_MOVIE INT NULL, ID_SERIE INT NULL,"
+            " IS_CORE_SCREEN TINYINT NOT NULL DEFAULT 0,"
+            " IS_PERSON_OR_CHARACTER TINYINT NOT NULL DEFAULT 0,"
+            " SOURCE_NAME VARCHAR(250) NULL, SOURCE_NAME_FR VARCHAR(250) NULL,"
+            " OVERVIEW MEDIUMTEXT NULL, SOURCE_YEAR INT NULL, CONE_RANK INT NULL"
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")
+        arrresult["perimeter"] = _f_sourceworkstep(cursor, "0a. INSERT the perimeter (tmp_source_work)", (
+            "INSERT IGNORE INTO tmp_source_work (ID_WIKIDATA)\n"
+            "SELECT DISTINCT iv.ID_ITEM\n"
+            "FROM T_WC_WIKIDATA_STATEMENT st\n"
+            "INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+            "WHERE " + STR_SOURCE_WORK_P144_FILTER +
+            "  AND iv.ID_ITEM IS NOT NULL AND iv.ID_ITEM <> ''\n"
+            "  AND ( EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = st.ID_WIKIDATA)\n"
+            "     OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = st.ID_WIKIDATA) )"))
+        connection.commit()
+        _f_sourceworkstep(cursor, "0b. UPDATE the T2S hops (ID_MOVIE, ID_SERIE)", (
+            "UPDATE tmp_source_work s SET\n"
+            "  s.ID_MOVIE = (SELECT MIN(m.ID_MOVIE) FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = s.ID_WIKIDATA),\n"
+            "  s.ID_SERIE = (SELECT MIN(se.ID_SERIE) FROM T_WC_T2S_SERIE se WHERE se.ID_WIKIDATA = s.ID_WIKIDATA)"))
+        _f_sourceworkstep(cursor, "0c. UPDATE the homes (core film or series, person, character)", (
+            "UPDATE tmp_source_work s SET\n"
+            "  s.IS_CORE_SCREEN = (EXISTS (SELECT 1 FROM T_WC_WIKIDATA_MOVIE wm WHERE wm.ID_WIKIDATA = s.ID_WIKIDATA)\n"
+            "                   OR EXISTS (SELECT 1 FROM T_WC_WIKIDATA_SERIE ws WHERE ws.ID_WIKIDATA = s.ID_WIKIDATA)),\n"
+            "  s.IS_PERSON_OR_CHARACTER = (EXISTS (SELECT 1 FROM T_WC_WIKIDATA_PERSON wp WHERE wp.ID_WIKIDATA = s.ID_WIKIDATA)\n"
+            "                           OR EXISTS (SELECT 1 FROM T_WC_WIKIDATA_CHARACTER wc WHERE wc.ID_WIKIDATA = s.ID_WIKIDATA))"))
+        # Names: the T2S title first for a T2S work (the name the base already shows),
+        # then the Wikidata labels, wherever the entity lives.
+        _f_sourceworkstep(cursor, "0d. UPDATE names and description", (
+            "UPDATE tmp_source_work s\n"
+            "LEFT JOIN T_WC_T2S_MOVIE tm ON tm.ID_MOVIE = s.ID_MOVIE\n"
+            "LEFT JOIN T_WC_T2S_SERIE ts ON ts.ID_SERIE = s.ID_SERIE\n"
+            "LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = s.ID_WIKIDATA\n"
+            "LEFT JOIN T_WC_WIKIDATA_MOVIE wm ON wm.ID_WIKIDATA = s.ID_WIKIDATA\n"
+            "LEFT JOIN T_WC_WIKIDATA_SERIE ws ON ws.ID_WIKIDATA = s.ID_WIKIDATA\n"
+            "LEFT JOIN T_WC_WIKIDATA_PERSON wp ON wp.ID_WIKIDATA = s.ID_WIKIDATA\n"
+            "LEFT JOIN T_WC_WIKIDATA_CHARACTER wc ON wc.ID_WIKIDATA = s.ID_WIKIDATA\n"
+            "SET s.SOURCE_NAME = LEFT(COALESCE(NULLIF(tm.MOVIE_TITLE, ''), NULLIF(ts.SERIE_TITLE, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.en')), NULLIF(wi.LABEL_EN, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wm.LABELS_JSON, '$.en')), NULLIF(wm.LABEL_EN, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(ws.LABELS_JSON, '$.en')), NULLIF(ws.LABEL_EN, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wp.LABELS_JSON, '$.en')), NULLIF(wp.LABEL_EN, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wc.LABELS_JSON, '$.en')), NULLIF(wc.LABEL_EN, '')), 250),\n"
+            "    s.SOURCE_NAME_FR = LEFT(COALESCE(NULLIF(tm.MOVIE_TITLE_FR, ''), NULLIF(ts.SERIE_TITLE_FR, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.fr')),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wm.LABELS_JSON, '$.fr')),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(ws.LABELS_JSON, '$.fr')),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wp.LABELS_JSON, '$.fr')),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wc.LABELS_JSON, '$.fr'))), 250),\n"
+            "    s.OVERVIEW = COALESCE(\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wi.DESCRIPTIONS_JSON, '$.en')), NULLIF(wi.DESCRIPTION_EN, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wm.DESCRIPTIONS_JSON, '$.en')), NULLIF(wm.DESCRIPTION_EN, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(ws.DESCRIPTIONS_JSON, '$.en')), NULLIF(ws.DESCRIPTION_EN, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wp.DESCRIPTIONS_JSON, '$.en')), NULLIF(wp.DESCRIPTION_EN, ''),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wc.DESCRIPTIONS_JSON, '$.en')), NULLIF(wc.DESCRIPTION_EN, ''))"))
+        # The year: the T2S year for a T2S work, else the earliest live P577.
+        _f_sourceworkstep(cursor, "0e. UPDATE the year", (
+            "UPDATE tmp_source_work s\n"
+            "LEFT JOIN T_WC_T2S_MOVIE tm ON tm.ID_MOVIE = s.ID_MOVIE\n"
+            "LEFT JOIN T_WC_T2S_SERIE ts ON ts.ID_SERIE = s.ID_SERIE\n"
+            "SET s.SOURCE_YEAR = COALESCE(tm.RELEASE_YEAR, ts.FIRST_AIR_YEAR, (\n"
+            "    SELECT MIN(tv.YEAR_VALUE)\n"
+            "    FROM T_WC_WIKIDATA_STATEMENT st\n"
+            "    INNER JOIN T_WC_WIKIDATA_TIME_VALUE tv ON tv.ID_STATEMENT = st.ID_STATEMENT\n"
+            "    WHERE st.ID_WIKIDATA = s.ID_WIKIDATA AND st.ID_PROPERTY = 'P577'\n"
+            "      AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+            "      AND tv.YEAR_VALUE BETWEEN -5000 AND 2200))"))
+        # The type: the smallest cone rank among the source's P31 classes.
+        _f_sourceworkstep(cursor, "0f. UPDATE the cone rank", (
+            "UPDATE tmp_source_work s SET s.CONE_RANK = (\n"
+            "    SELECT MIN(c.CONE_RANK)\n"
+            "    FROM T_WC_WIKIDATA_STATEMENT st\n"
+            "    INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+            "    INNER JOIN `" + STR_SOURCE_WORK_CLASS_TABLE + "` c ON c.ID_CLASS = iv.ID_ITEM\n"
+            "    WHERE st.ID_WIKIDATA = s.ID_WIKIDATA AND st.ID_PROPERTY = 'P31'\n"
+            "      AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated'))"))
+        connection.commit()
+
+        # The type and form as SQL CASE expressions generated from the cone list, so the
+        # mapping rank -> (type, form) lives in one place. Precedence: a film or series
+        # (T2S or core) is 'screen' whatever its classes; a person or a core character is
+        # 'other'; then the cone; nothing caught gives 'other'.
+        strtypecase = " ".join(f"WHEN {r} THEN '{t}'" for r, (t, f, _) in enumerate(SOURCE_WORK_TYPE_CONES))
+        strformcase = " ".join(f"WHEN {r} THEN '{f}'" for r, (t, f, _) in enumerate(SOURCE_WORK_TYPE_CONES) if f)
+        strscreen = "s.ID_MOVIE IS NOT NULL OR s.ID_SERIE IS NOT NULL OR s.IS_CORE_SCREEN = 1"
+        strtypeexpr = (
+            "CASE WHEN " + strscreen + " THEN 'screen'\n"
+            "     WHEN s.IS_PERSON_OR_CHARACTER = 1 THEN 'other'\n"
+            "     ELSE COALESCE(CASE s.CONE_RANK " + strtypecase + " END, 'other') END")
+        strformexpr = (
+            "CASE WHEN " + strscreen + " OR s.IS_PERSON_OR_CHARACTER = 1 THEN NULL\n"
+            "     ELSE CASE s.CONE_RANK " + strformcase + " ELSE NULL END END")
+
+        # --- 1. The entity, in three inserts so that ID_SOURCE_WORK never moves ---
+        _f_sourceworkstep(cursor, "1a. DROP T_WC_T2S_SOURCE_WORK_BUILD",
+                          "DROP TABLE IF EXISTS T_WC_T2S_SOURCE_WORK_BUILD")
+        _f_sourceworkstep(cursor, "1b. CREATE T_WC_T2S_SOURCE_WORK_BUILD",
+                          "CREATE TABLE T_WC_T2S_SOURCE_WORK_BUILD LIKE T_WC_T2S_SOURCE_WORK")
+        connection.commit()
+        strcolumns = ("ID_WIKIDATA, SOURCE_WORK_NAME, SOURCE_WORK_NAME_FR, OVERVIEW, SOURCE_WORK_TYPE,\n"
+                      "     SOURCE_WORK_FORM, SOURCE_WORK_YEAR, ID_MOVIE, ID_SERIE, SOURCE_WORK_SOURCE, DELETED,\n"
+                      "     TIM_UPDATED")
+        strvalues = ("s.ID_WIKIDATA, s.SOURCE_NAME, COALESCE(s.SOURCE_NAME_FR, s.SOURCE_NAME), s.OVERVIEW,\n"
+                     "       " + strtypeexpr + ",\n"
+                     "       " + strformexpr + ",\n"
+                     "       s.SOURCE_YEAR, s.ID_MOVIE, s.ID_SERIE, 'wikidata', 0, NOW()")
+        # (i) known sources keep their id, creation date and images. The images are
+        # rewritten by process 71; carrying them over avoids a night without images when
+        # this process runs alone, in the source-works scope.
+        arrresult["kept"] = _f_sourceworkstep(cursor, "1c-i. INSERT the known sources (ID_SOURCE_WORK kept)", (
+            "INSERT INTO T_WC_T2S_SOURCE_WORK_BUILD\n"
+            "    (ID_SOURCE_WORK, " + strcolumns + ", DAT_CREAT,\n"
+            "     WIKIPEDIA_MAIN_IMAGE_URL, WIKIPEDIA_MAIN_IMAGE_URL_FR, WIKIPEDIA_IMAGE_PATH)\n"
+            "SELECT old.ID_SOURCE_WORK, " + strvalues + ", COALESCE(old.DAT_CREAT, CURDATE()),\n"
+            "       old.WIKIPEDIA_MAIN_IMAGE_URL, old.WIKIPEDIA_MAIN_IMAGE_URL_FR, old.WIKIPEDIA_IMAGE_PATH\n"
+            "FROM tmp_source_work s\n"
+            "INNER JOIN T_WC_T2S_SOURCE_WORK old ON old.ID_WIKIDATA = s.ID_WIKIDATA"))
+        connection.commit()
+        # (ii) sources that left the perimeter stay, DELETED = 1: their number is never
+        # given again, and a consumer reads "deleted" rather than nothing. Columns are
+        # named, never positional, so a column added later cannot shift them silently.
+        strallcolumns = ("ID_SOURCE_WORK, ID_WIKIDATA, SOURCE_WORK_NAME, SOURCE_WORK_NAME_FR, OVERVIEW,\n"
+                         "     SOURCE_WORK_TYPE, SOURCE_WORK_FORM, SOURCE_WORK_YEAR, ID_MOVIE, ID_SERIE,\n"
+                         "     SOURCE_WORK_SOURCE, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT, ID_OWNER, ID_USER_UPDATED,\n"
+                         "     POSTER_PATH, WIKIPEDIA_IMAGE_PATH, IMDB_RATING, IMDB_RATING_WEIGHTED, POPULARITY,\n"
+                         "     TIM_WIKIDATA_COMPLETED, WIKIPEDIA_MAIN_IMAGE_URL, WIKIPEDIA_MAIN_IMAGE_URL_FR")
+        arrresult["deleted"] = _f_sourceworkstep(cursor, "1c-ii. INSERT the sources that left the perimeter (DELETED = 1)", (
+            "INSERT INTO T_WC_T2S_SOURCE_WORK_BUILD\n"
+            "    (" + strallcolumns + ", DELETED, TIM_UPDATED, MOVIE_COUNT, SERIE_COUNT)\n"
+            "SELECT " + ", ".join("old." + c.strip() for c in strallcolumns.split(",")) + ",\n"
+            "       1, CASE WHEN old.DELETED = 1 THEN old.TIM_UPDATED ELSE NOW() END, 0, 0\n"
+            "FROM T_WC_T2S_SOURCE_WORK old\n"
+            "WHERE NOT EXISTS (SELECT 1 FROM tmp_source_work s WHERE s.ID_WIKIDATA = old.ID_WIKIDATA)"))
+        connection.commit()
+        # (iii) new sources get a number above every number ever given: CREATE ... LIKE
+        # does not carry the counter, and no row is ever removed, so MAX is the true high.
+        cursor.execute("SELECT COALESCE(MAX(ID_SOURCE_WORK), 0) AS M FROM T_WC_T2S_SOURCE_WORK")
+        lngnextid = int(cursor.fetchone()["M"]) + 1
+        _f_sourceworkstep(cursor, f"1c-iii-0. ALTER AUTO_INCREMENT = {lngnextid}",
+                          f"ALTER TABLE T_WC_T2S_SOURCE_WORK_BUILD AUTO_INCREMENT = {lngnextid}")
+        arrresult["new"] = _f_sourceworkstep(cursor, "1c-iii. INSERT the new sources (ID_SOURCE_WORK assigned)", (
+            "INSERT INTO T_WC_T2S_SOURCE_WORK_BUILD\n"
+            "    (" + strcolumns + ", DAT_CREAT)\n"
+            "SELECT " + strvalues + ", CURDATE()\n"
+            "FROM tmp_source_work s\n"
+            "LEFT JOIN T_WC_T2S_SOURCE_WORK old ON old.ID_WIKIDATA = s.ID_WIKIDATA\n"
+            "WHERE old.ID_SOURCE_WORK IS NULL"))
+        connection.commit()
+        arrresult["sources"] = arrresult["kept"] + arrresult["new"]
+        cursor.execute("SELECT COUNT(*) AS C FROM tmp_source_work s\n"
+                       "WHERE NOT (" + strscreen + ") AND s.IS_PERSON_OR_CHARACTER = 0 AND s.CONE_RANK IS NULL")
+        arrresult["other_by_default"] = int(cursor.fetchone()["C"])
+        cursor.execute("SELECT COUNT(*) AS C FROM tmp_source_work WHERE SOURCE_NAME IS NULL")
+        arrresult["without_name"] = int(cursor.fetchone()["C"])
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_source_work")
+        print(f"73:   1c. {arrresult['kept']} sources kept, {arrresult['new']} new (from {lngnextid}), "
+              f"{arrresult['deleted']} left the perimeter kept as DELETED = 1")
+
+        # --- 2. The two link tables --------------------------------------------
+        for strmajor in ("MOVIE", "SERIE"):
+            strtable = "T_WC_T2S_" + strmajor + "_SOURCE_WORK"
+            _f_sourceworkstep(cursor, "2a. DROP " + strtable + "_BUILD",
+                              "DROP TABLE IF EXISTS " + strtable + "_BUILD")
+            _f_sourceworkstep(cursor, "2b. CREATE " + strtable + "_BUILD",
+                              "CREATE TABLE " + strtable + "_BUILD LIKE " + strtable)
+            connection.commit()
+            arrresult[strmajor.lower()] = _f_sourceworkstep(
+                cursor, "2c. INSERT " + strtable + "_BUILD", f_sourceworkassociationsql(strmajor))
+            connection.commit()
+
+        # --- 3. Counts and aggregates --------------------------------------------
+        _f_sourceworkstep(cursor, "3a. UPDATE the counts", (
+            "UPDATE T_WC_T2S_SOURCE_WORK_BUILD sw SET\n"
+            "  sw.MOVIE_COUNT = (SELECT COUNT(DISTINCT ms.ID_MOVIE) FROM T_WC_T2S_MOVIE_SOURCE_WORK_BUILD ms\n"
+            "                    WHERE ms.ID_SOURCE_WORK = sw.ID_SOURCE_WORK),\n"
+            "  sw.SERIE_COUNT = (SELECT COUNT(DISTINCT ss.ID_SERIE) FROM T_WC_T2S_SERIE_SOURCE_WORK_BUILD ss\n"
+            "                    WHERE ss.ID_SOURCE_WORK = sw.ID_SOURCE_WORK)\n"
+            "WHERE sw.DELETED = 0"))
+        connection.commit()
+        # A source that is a T2S work keeps its own rating and popularity; any other takes
+        # the average over its adapted films, the convention of collections and locations.
+        # NULL rather than zero when nothing is rated: a zero would sort as a bad rating
+        # when it means no measure.
+        strratingsql = ""
+        for strcolumn in ("IMDB_RATING", "IMDB_RATING_WEIGHTED", "POPULARITY"):
+            strratingsql += (
+                ("" if not strratingsql else ",\n    ") +
+                f"sw.{strcolumn} = COALESCE(NULLIF(tm.{strcolumn}, 0), NULLIF(ts.{strcolumn}, 0),\n"
+                f"      (SELECT AVG(m.{strcolumn}) FROM T_WC_T2S_MOVIE_SOURCE_WORK_BUILD ms\n"
+                "       JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ms.ID_MOVIE\n"
+                f"       WHERE ms.ID_SOURCE_WORK = sw.ID_SOURCE_WORK AND m.{strcolumn} > 0))")
+        _f_sourceworkstep(cursor, "3b. UPDATE ratings and popularity", (
+            "UPDATE T_WC_T2S_SOURCE_WORK_BUILD sw\n"
+            "LEFT JOIN T_WC_T2S_MOVIE tm ON tm.ID_MOVIE = sw.ID_MOVIE\n"
+            "LEFT JOIN T_WC_T2S_SERIE ts ON ts.ID_SERIE = sw.ID_SERIE\n"
+            "SET " + strratingsql + "\n"
+            "WHERE sw.DELETED = 0"))
+        connection.commit()
+        cursor.execute("SELECT SOURCE_WORK_TYPE AS T, COALESCE(SOURCE_WORK_FORM, '') AS F, COUNT(*) AS C\n"
+                       "FROM T_WC_T2S_SOURCE_WORK_BUILD WHERE DELETED = 0 GROUP BY T, F ORDER BY C DESC")
+        arrresult["types"] = {(row["T"] + ("/" + row["F"] if row["F"] else "")): int(row["C"])
+                              for row in cursor.fetchall()}
+
+        # --- 4. The swap, one atomic RENAME of the three tables ------------------
+        # The step most exposed to a metadata lock: a session with an open transaction on
+        # one of the served tables (a phpMyAdmin tab) is enough to fail it in 1205. If the
+        # pass dies here, look for that transaction rather than replaying.
+        arrtables = ("T_WC_T2S_SOURCE_WORK", "T_WC_T2S_MOVIE_SOURCE_WORK", "T_WC_T2S_SERIE_SOURCE_WORK")
+        for strtable in arrtables:
+            cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
+        connection.commit()
+        _f_sourceworkstep(cursor, "4. RENAME the three tables", (
+            "RENAME TABLE\n" + ",\n".join(
+                f"  {t} TO {t}_OLD,\n  {t}_BUILD TO {t}" for t in arrtables)))
+        connection.commit()
+        for strtable in arrtables:
+            cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
+        connection.commit()
+        return arrresult
+    finally:
+        cursor.close()

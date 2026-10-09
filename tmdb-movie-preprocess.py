@@ -34,6 +34,8 @@ from tmdb_preprocess_helpers import (
     f_awardconeguard,
     f_buildlocationclasstable,
     f_buildlocationtables,
+    f_buildsourceworkclasstable,
+    f_buildsourceworktables,
     f_awarddrivingsql,
     f_awardlinksql,
     f_persondrivingsql,
@@ -131,7 +133,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 73: 'T2S_SOURCE_WORK', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -179,6 +181,11 @@ try:
             # leur, sans quoi WIKIPEDIA_MAIN_IMAGE_URL reste NULL et se lit comme une
             # absence d'image alors que c'est une absence de passage.
             arrprocessscopelocations = {72: 'T2S_LOCATION'}
+            # "Based on" only (Process 73, TMDB-MOVIE-PREPROCESS-055): rebuild T2S_SOURCE_WORK
+            # and its two link tables from the Wikidata P144 statements, on demand. Same
+            # caveat as locations: the image columns are written by process 71, not here.
+            # Run with TMDB_PREPROCESS_SCOPE=source-works.
+            arrprocessscopesourceworks = {73: 'T2S_SOURCE_WORK'}
             # Process 64 alone, for the first backfill and for reruns on demand
             # (TMDB-MOVIE-PREPROCESS-049). In main it sits between 1 and 2.
             arrprocessscopewikidatacolour = {64: 'WIKIDATA_COLOR'}
@@ -201,6 +208,8 @@ try:
                 arrprocessscope = arrprocessscopeneighbours
             elif strprocessscope in ("locations", "location"):
                 arrprocessscope = arrprocessscopelocations
+            elif strprocessscope in ("source-works", "source-work", "based-on"):
+                arrprocessscope = arrprocessscopesourceworks
             elif strprocessscope in ("wikidata-colour", "wikidata-color"):
                 arrprocessscope = arrprocessscopewikidatacolour
             elif strprocessscope in ("genre-alias", "genres-aliases"):
@@ -218,7 +227,7 @@ try:
             # il restait un piege pour le prochain lecteur et un precedent a ne pas suivre.
             # Un forcage ponctuel se fait par la variable d'environnement, jamais par une
             # date en dur qui survit a son jour.
-            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations | wikidata-colour | genre-alias)", 0)
+            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations | source-works | wikidata-colour | genre-alias)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
@@ -7631,6 +7640,60 @@ ORDER BY COMPTE DESC
                     tellocation.set_processed(arrlocationcounts.get("lieux", 0))
                     tellocation.finish()
 
+                elif intindex == 73:
+                    #----------------------------------------------------
+                    # T2S_SOURCE_WORK : "based on" (Wikidata P144)
+                    # (TMDB-MOVIE-PREPROCESS-055, shape decided 2026-10-07 and 2026-10-09).
+                    #
+                    # A film or a series "based on" a novel, a manga, a play, a game, or
+                    # another film. The left side (the work studied) is carried by the link
+                    # table, MOVIE or SERIE; the right side is always a SOURCE_WORK row, which
+                    # points to its T2S sheet by ID_MOVIE / ID_SERIE when the source is itself
+                    # a T2S work. One join, always the same, the kind is a filter.
+                    #
+                    # Same pattern as process 72: full rebuild in _BUILD tables, one atomic
+                    # RENAME, ID_SOURCE_WORK kept stable, failure isolated so that the rest of
+                    # the pipeline (70, 71) still runs. PLACE: after T2S_MOVIE and T2S_SERIE,
+                    # whose ids it reads, and before 71, which fills the image columns.
+                    print("T2S_SOURCE_WORK processing")
+                    telsourcework = EntityTelemetry("source_work", 73, "source_work", kind="copy")
+                    telsourcework.begin()
+                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Building the source-work class cones","Current sub process in the TMDb database movie preprocess",0)
+                    arrsourceworkcounts = {}
+                    try:
+                        arrsourceworkcones = f_buildsourceworkclasstable()
+                        for strconelabel, lngconecount in arrsourceworkcones.items():
+                            print(f"73: cone {strconelabel}: {lngconecount} classes")
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Rebuilding T2S_SOURCE_WORK and its associations","Current sub process in the TMDb database movie preprocess",0)
+                        arrsourceworkcounts = f_buildsourceworktables()
+                        cp.f_setservervariable("strtmdbmoviepreprocesssourceworkerror", "", "Last error of the source-work rebuild (process 73), empty when it succeeded", 0)
+                    except Exception as sourceworkerror:
+                        strsourceworkerror = f"{type(sourceworkerror).__name__}: {sourceworkerror}"
+                        print(f"73: FAILED, the served tables are unchanged: {strsourceworkerror}")
+                        print("73: the rest of the pipeline continues. Re-run with TMDB_PREPROCESS_SCOPE=source-works once wikidata-crawler is idle.")
+                        cp.f_setservervariable("strtmdbmoviepreprocesssourceworkerror", strsourceworkerror, "Last error of the source-work rebuild (process 73), empty when it succeeded", 0)
+                    print(f"73: {arrsourceworkcounts.get('sources', 0)} sources "
+                          f"({arrsourceworkcounts.get('kept', 0)} kept their ID_SOURCE_WORK, "
+                          f"{arrsourceworkcounts.get('new', 0)} new, "
+                          f"{arrsourceworkcounts.get('deleted', 0)} left the perimeter and stay as DELETED = 1), "
+                          f"{arrsourceworkcounts.get('movie', 0)} movie links, "
+                          f"{arrsourceworkcounts.get('serie', 0)} serie links, "
+                          f"{arrsourceworkcounts.get('other_by_default', 0)} typed 'other' by default, "
+                          f"{arrsourceworkcounts.get('without_name', 0)} without a name")
+                    for strsourceworktype, lngsourceworktypecount in arrsourceworkcounts.get("types", {}).items():
+                        print(f"73: type {strsourceworktype}: {lngsourceworktypecount}")
+                    for strkey, strsourceworkdesc in (("sources", "Source works rebuilt by"),
+                                                      ("kept", "Source works that kept their ID_SOURCE_WORK in"),
+                                                      ("new", "New source works created by"),
+                                                      ("deleted", "Source works kept as DELETED = 1 by"),
+                                                      ("movie", "Movie-source links rebuilt by"),
+                                                      ("serie", "Serie-source links rebuilt by"),
+                                                      ("other_by_default", "Cached sources no cone typed, left 'other' by"),
+                                                      ("without_name", "Source works without any name after")):
+                        cp.f_setservervariable("strtmdbmoviepreprocesssourcework" + strkey.replace("_", "") + "count", str(arrsourceworkcounts.get(strkey, 0)), strsourceworkdesc + " the source-work rebuild (process 73)", 0)
+                    telsourcework.set_processed(arrsourceworkcounts.get("sources", 0))
+                    telsourcework.finish()
+
                 elif intindex == 64:
                     #----------------------------------------------------
                     # WIKIDATA_COLOR : les flags couleur depuis Wikidata P462 quand la
@@ -7848,7 +7911,7 @@ ORDER BY COMPTE DESC
                     print("T2S_WIKIPEDIA_MAIN_IMAGE processing")
                     start_time = time.time()
                     cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Copy Wikipedia main image into T2S","Current sub process in the TMDb database preprocess",0)
-                    arrwikipediaimageentities = ["MOVIE","SERIE","PERSON","SEASON","EPISODE","CHARACTER","ITEM","AWARD","NOMINATION","DEATH","GROUP","MOVEMENT","COLLECTION","LIST","TOPIC","TECHNICAL","LOCATION"]
+                    arrwikipediaimageentities = ["MOVIE","SERIE","PERSON","SEASON","EPISODE","CHARACTER","ITEM","AWARD","NOMINATION","DEATH","GROUP","MOVEMENT","COLLECTION","LIST","TOPIC","TECHNICAL","LOCATION","SOURCE_WORK"]
                     arrwikipediaimagelangs = [("en","WIKIPEDIA_MAIN_IMAGE_URL"),("fr","WIKIPEDIA_MAIN_IMAGE_URL_FR")]
                     lngwikipediaimagerowstotal = 0
                     lngwikipediaimageskipped = 0
