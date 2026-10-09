@@ -2758,16 +2758,24 @@ def f_buildsourceworktables():
         # then the English label wherever the entity lives, then a fallback in an ordered
         # list of languages (fix of 2026-10-09: 1,718 of the 1,743 unnamed sources had a
         # label in another language, but the first key of LABELS_JSON gave Chinese for Jane
-        # Eyre and Arabic for Street Fighter), and only then any language at all.
-        arrlabelfallback = ("en-gb", "en-us", "en-ca", "fr", "de", "es", "it", "pt", "nl",
-                            "sv", "nb", "da", "fi", "pl", "cs", "ca")
+        # Eyre and Arabic for Street Fighter).
+        #
+        # LATIN-SCRIPT LANGUAGES ONLY, and no "any language" step (second fix of
+        # 2026-10-09). The first version ended on the first key of LABELS_JSON, which
+        # named The Last of Us game in Persian, in English and French alike. A name the
+        # user cannot read is worse than an honest NULL: the count of unnamed sources is
+        # printed by the pass, and the real gap (cached items with dozens of labels but
+        # neither en nor fr) is WIKIDATA-CRAWLER-026.
+        # 'mul' comes first: Wikidata's multilingual default label, used for names that
+        # are the same across languages; an item labelled in 'mul' may carry no 'en' at
+        # all. Same in the French name, right after 'fr'.
+        arrlabelfallback = ("mul", "en-gb", "en-us", "en-ca", "fr", "de", "es", "it", "pt", "nl",
+                            "sv", "nb", "nn", "da", "fi", "is", "pl", "cs", "sk", "sl", "hr",
+                            "ro", "hu", "et", "lv", "lt", "ca", "gl", "eu", "ga", "cy", "sq",
+                            "tr", "id", "ms", "vi", "tl", "sw", "af", "eo", "la")
         strfallback = ",\n".join(
             f"      JSON_UNQUOTE(JSON_EXTRACT({a}.LABELS_JSON, '$.\"{l}\"'))"
             for a in ("wi", "wm", "ws") for l in arrlabelfallback)
-        strfirstkey = ",\n".join(
-            f"      JSON_UNQUOTE(JSON_EXTRACT({a}.LABELS_JSON, CONCAT('$.\"', "
-            f"JSON_UNQUOTE(JSON_EXTRACT(JSON_KEYS({a}.LABELS_JSON), '$[0]')), '\"')))"
-            for a in ("wi", "wm", "ws"))
         _f_sourceworkstep(cursor, "0f. UPDATE names and description", (
             "UPDATE tmp_source_work s\n"
             "LEFT JOIN T_WC_T2S_MOVIE tm ON tm.ID_MOVIE = s.ID_MOVIE\n"
@@ -2783,13 +2791,16 @@ def f_buildsourceworktables():
             "      JSON_UNQUOTE(JSON_EXTRACT(ws.LABELS_JSON, '$.en')), NULLIF(ws.LABEL_EN, ''),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wp.LABELS_JSON, '$.en')), NULLIF(wp.LABEL_EN, ''),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wc.LABELS_JSON, '$.en')), NULLIF(wc.LABEL_EN, ''),\n"
-            + strfallback + ",\n" + strfirstkey + "), 250),\n"
+            + strfallback + "), 250),\n"
             "    s.SOURCE_NAME_FR = LEFT(COALESCE(NULLIF(tm.MOVIE_TITLE_FR, ''), NULLIF(ts.SERIE_TITLE_FR, ''),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.fr')),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wm.LABELS_JSON, '$.fr')),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(ws.LABELS_JSON, '$.fr')),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wp.LABELS_JSON, '$.fr')),\n"
-            "      JSON_UNQUOTE(JSON_EXTRACT(wc.LABELS_JSON, '$.fr'))), 250),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wc.LABELS_JSON, '$.fr')),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.mul')),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(wm.LABELS_JSON, '$.mul')),\n"
+            "      JSON_UNQUOTE(JSON_EXTRACT(ws.LABELS_JSON, '$.mul'))), 250),\n"
             "    s.OVERVIEW = COALESCE(\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wi.DESCRIPTIONS_JSON, '$.en')), NULLIF(wi.DESCRIPTION_EN, ''),\n"
             "      JSON_UNQUOTE(JSON_EXTRACT(wm.DESCRIPTIONS_JSON, '$.en')), NULLIF(wm.DESCRIPTION_EN, ''),\n"

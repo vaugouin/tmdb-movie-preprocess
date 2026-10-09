@@ -1,5 +1,5 @@
 -- test-055-post-run.sql
--- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-09 16:22:28
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-09 19:53:30
 --
 +------------+
 | SECTION    |
@@ -9,7 +9,7 @@
 +---------+---------+--------------+--------------+---------------------+---------------------+-----------+--------+--------+
 | DELETED | SOURCES | WITHOUT_NAME | FR_EQUALS_EN | SOURCE_IS_T2S_MOVIE | SOURCE_IS_T2S_SERIE | WITH_YEAR | MIN_ID | MAX_ID |
 +---------+---------+--------------+--------------+---------------------+---------------------+-----------+--------+--------+
-|       0 |   17464 |         1743 |         9673 |                1357 |                1510 |     12389 |      1 |  17464 |
+|       0 |   17464 |            2 |        11425 |                1340 |                1456 |     12334 |      1 |  17464 |
 +---------+---------+--------------+--------------+---------------------+---------------------+-----------+--------+--------+
 +-------------+----------------------+-------------+----------------------+
 | MOVIE_LINKS | MOVIES_WITH_A_SOURCE | SERIE_LINKS | SERIES_WITH_A_SOURCE |
@@ -49,15 +49,15 @@
 +------------------+------------------+---------+-------------+-------------+
 | SOURCE_WORK_TYPE | SOURCE_WORK_FORM | SOURCES | MOVIE_LINKS | SERIE_LINKS |
 +------------------+------------------+---------+-------------+-------------+
-| literary         |                  |   10150 |       12015 |        2345 |
-| screen           |                  |    3244 |        2474 |        2329 |
-| comic            | manga            |    1591 |         658 |        1527 |
-| other            |                  |     738 |         907 |         425 |
-| comic            |                  |     477 |         435 |         271 |
+| literary         |                  |   10171 |       12043 |        2356 |
+| screen           |                  |    3173 |        2391 |        2285 |
+| comic            | manga            |    1632 |         706 |        1555 |
+| other            |                  |     742 |         910 |         427 |
+| comic            |                  |     479 |         436 |         272 |
 | literary         | light_novel      |     443 |          40 |         448 |
-| game             |                  |     350 |         152 |         268 |
-| stage            | musical          |     216 |         265 |           5 |
-| stage            | play             |     152 |         420 |          23 |
+| game             |                  |     351 |         153 |         270 |
+| stage            | musical          |     217 |         266 |           5 |
+| stage            | play             |     153 |         421 |          23 |
 | folklore         |                  |      87 |         201 |          10 |
 | stage            |                  |      16 |          15 |           1 |
 +------------------+------------------+---------+-------------+-------------+
@@ -81,21 +81,21 @@
 +--------------+
 | E. Witnesses |
 +--------------+
-+-------+---------+----------------+----------------+--------------------+------------------------+------------------+------------------+------------------+-----------------+-----------------+
-| KIND  | ID_WORK | TITLE          | ID_SOURCE_WORK | SOURCE_WORK_NAME   | SOURCE_WORK_NAME_FR    | SOURCE_WORK_TYPE | SOURCE_WORK_FORM | SOURCE_WORK_YEAR | SOURCE_ID_MOVIE | SOURCE_ID_SERIE |
-+-------+---------+----------------+----------------+--------------------+------------------------+------------------+------------------+------------------+-----------------+-----------------+
-| movie |     111 | Scarface       |           7931 | Scarface           | Scarface               | literary         | NULL             |             1930 |            NULL |            NULL |
-| movie |     111 | Scarface       |          11891 | Scarface           | Scarface               | screen           | NULL             |             1932 |             877 |            NULL |
-| movie |     694 | The Shining    |          11886 | The Shining        | Shining                | literary         | NULL             |             1977 |            NULL |            NULL |
-| movie |  329865 | Arrival        |          15477 | Story of Your Life | L’Histoire de ta vie   | literary         | NULL             |             1998 |            NULL |            NULL |
-| serie |  100088 | The Last of Us |           7009 | NULL               | NULL                   | game             | NULL             |             2013 |            NULL |            NULL |
-+-------+---------+----------------+----------------+--------------------+------------------------+------------------+------------------+------------------+-----------------+-----------------+
++-------+---------+----------------+----------------+---------------------------------------+---------------------------------------+------------------+------------------+------------------+-----------------+-----------------+
+| KIND  | ID_WORK | TITLE          | ID_SOURCE_WORK | SOURCE_WORK_NAME                      | SOURCE_WORK_NAME_FR                   | SOURCE_WORK_TYPE | SOURCE_WORK_FORM | SOURCE_WORK_YEAR | SOURCE_ID_MOVIE | SOURCE_ID_SERIE |
++-------+---------+----------------+----------------+---------------------------------------+---------------------------------------+------------------+------------------+------------------+-----------------+-----------------+
+| movie |     111 | Scarface       |           7931 | Scarface                              | Scarface                              | literary         | NULL             |             1930 |            NULL |            NULL |
+| movie |     111 | Scarface       |          11891 | Scarface                              | Scarface                              | screen           | NULL             |             1932 |             877 |            NULL |
+| movie |     694 | The Shining    |          11886 | The Shining                           | Shining                               | literary         | NULL             |             1977 |            NULL |            NULL |
+| movie |  329865 | Arrival        |          15477 | Story of Your Life                    | L’Histoire de ta vie                  | literary         | NULL             |             1998 |            NULL |            NULL |
+| serie |  100088 | The Last of Us |           7009 | آخرین بازمانده از ما                  | آخرین بازمانده از ما                  | game             | NULL             |             2013 |            NULL |            NULL |
++-------+---------+----------------+----------------+---------------------------------------+---------------------------------------+------------------+------------------+------------------+-----------------+-----------------+
 +----------------+-------------+----------------------+-------------------------+------------------+------------------+------------------+-------------+-------------+
 | ID_SOURCE_WORK | ID_WIKIDATA | SOURCE_WORK_NAME     | SOURCE_WORK_NAME_FR     | SOURCE_WORK_TYPE | SOURCE_WORK_FORM | SOURCE_WORK_YEAR | MOVIE_COUNT | SERIE_COUNT |
 +----------------+-------------+----------------------+-------------------------+------------------+------------------+------------------+-------------+-------------+
 |          11237 | Q41542      | Dracula              | Dracula                 | literary         | NULL             |             1897 |          30 |           3 |
 |           7358 | Q208460     | Nineteen Eighty-Four | 1984                    | literary         | NULL             |             1949 |           4 |           0 |
-|           3909 | Q129778     | Heart of Darkness    | Au cœur des ténèbres    | screen           | NULL             |             2026 |           2 |           0 |
+|           3909 | Q129778     | Heart of Darkness    | Au cœur des ténèbres    | literary         | NULL             |             1899 |           2 |           0 |
 +----------------+-------------+----------------------+-------------------------+------------------+------------------+------------------+-------------+-------------+
 +-----------------------------------------------------------------------+
 | SECTION                                                               |
@@ -131,19 +131,19 @@
 +----------------------------------------+-----------------------------------------------------------------------------+-------------+---------------------------------------------------------+---------------+
 | Q4 movie rated above its source series | Kolačić reunion, Minutu po minutu                                           |         8.8 | SKAM                                                    |           8.5 |
 | Q4 movie rated above its source series | Pinky and the Brain: A Pinky and the Brain Christmas                        |         8.5 | Pinky and the Brain                                     |           7.8 |
-| Q4 movie rated above its source series | Geats Extra: Kamen Rider Tycoon meets Kamen Rider Shinobi                   |         8.4 | Kamen Rider Geats                                       |             8 |
 | Q4 movie rated above its source series | The Fairly OddParents: Channel Chasers                                      |         8.4 | The Fairly OddParents                                   |           7.2 |
+| Q4 movie rated above its source series | Geats Extra: Kamen Rider Tycoon meets Kamen Rider Shinobi                   |         8.4 | Kamen Rider Geats                                       |             8 |
 | Q4 movie rated above its source series | My Big Big Friend: The Movie                                                |         8.4 | My Big Big Friend                                       |           7.3 |
-| Q4 movie rated above its source series | Adult Swim Brain Trust                                                      |         8.3 | Space Ghost Coast to Coast                              |           7.9 |
 | Q4 movie rated above its source series | Revue Starlight: Rondo Rondo Rondo                                          |         8.3 | Revue Starlight                                         |           7.3 |
 | Q4 movie rated above its source series | Maho Girls Precure! the Movie: The Miraculous Transformation! Cure Mofurun! |         8.3 | Witchy Precure!                                         |           7.7 |
+| Q4 movie rated above its source series | Adult Swim Brain Trust                                                      |         8.3 | Space Ghost Coast to Coast                              |           7.9 |
 | Q4 movie rated above its source series | Lupinranger vs Patranger vs Kyuranger                                       |         8.2 | Kaitou Sentai Lupinranger vs. Keisatsu Sentai Patranger |           7.8 |
 | Q4 movie rated above its source series | Lupinranger vs Patranger vs Kyuranger                                       |         8.2 | Uchuu Sentai Kyuranger                                  |           7.2 |
 | Q4 movie rated above its source series | The Legend of Hei 2                                                         |         8.1 | The Legend of Luo Xiaohei                               |             8 |
 | Q4 movie rated above its source series | Mashin Sentai Kiramager Spin-Off: Yodonna                                   |         8.1 | Mashin Sentai Kiramager                                 |           7.4 |
 | Q4 movie rated above its source series | Geats Extra: Kamen Rider PunkJack                                           |         8.1 | Kamen Rider Geats                                       |             8 |
-| Q4 movie rated above its source series | VGHS: The Movie                                                             |           8 | Video Game High School                                  |           7.6 |
 | Q4 movie rated above its source series | Seijuu Sentai Gingaman vs Megaranger                                        |           8 | Denji Sentai Megaranger                                 |           7.8 |
+| Q4 movie rated above its source series | Seijuu Sentai Gingaman vs Megaranger                                        |           8 | Seijuu Sentai Gingaman                                  |           7.4 |
 +----------------------------------------+-----------------------------------------------------------------------------+-------------+---------------------------------------------------------+---------------+
 +-----------------+-----------------------------------------+------------------+-------------+-------------+-------------+
 | Q               | SOURCE_WORK_NAME                        | SOURCE_WORK_TYPE | MOVIE_COUNT | SERIE_COUNT | ADAPTATIONS |
@@ -167,7 +167,7 @@
 +-------------------------+--------+--------+
 | Q                       | MOVIES | SERIES |
 +-------------------------+--------+--------+
-| Q6 based on video games |    145 |    244 |
+| Q6 based on video games |    146 |    246 |
 +-------------------------+--------+--------+
 +-----------------------+------------------------------------------------+--------------+------------------------------------------------+
 | Q                     | MOVIE_TITLE                                    | RELEASE_YEAR | SOURCE_WORK_NAME                               |
