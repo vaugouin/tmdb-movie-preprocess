@@ -2964,3 +2964,324 @@ def f_buildsourceworktables():
         return arrresult
     finally:
         cursor.close()
+
+
+
+# ============================================================================
+# Process 74, T2S_GROUP_WORK: a group's works (TMDB-MOVIE-PREPROCESS-059)
+# ============================================================================
+#
+# A group (process 43) holds members and nothing else. This process attaches films and
+# series to it, in T_WC_T2S_GROUP_MOVIE and T_WC_T2S_GROUP_SERIE, from two signals:
+#   - the members' credits: how many distinct members are credited on the work
+#     (MEMBER_COUNT), and that count over the group's PERSON_COUNT (MEMBER_SHARE);
+#   - the group's own Wikidata item credited on the work (IS_GROUP_CREDITED): The
+#     Beatles as P175 performer of "A Hard Day's Night", Monty Python as P161 cast
+#     member of "Life of Brian".
+#
+# THE RULE (decided by Philippe on 2026-10-11). A work attaches when the group itself
+# is credited, OR when at least INT_GROUP_WORK_MIN_MEMBERS members are credited AND
+# they are at least DBL_GROUP_WORK_MIN_SHARE of the group. Only attached rows are
+# stored, with their counts, so the API can tighten the rule without a rebuild (it
+# cannot loosen it, the rows below the threshold are not kept).
+#
+# THE GROUP FAMILIES. Only P463 (member of) and the custom groups. P108 (employer: a
+# studio, a newspaper, a university) and P54 (sports team) make groups where two
+# members sharing a film is coincidence; they are left out on purpose. The values are
+# the ones process 43 writes in GROUP_SOURCE: 'P463', 'P108', 'P54', 'custom'.
+#
+# SERIES. A series' aggregate cast (T_WC_T2S_PERSON_SERIE) is known to hold the latest
+# season only (TMDB-CRAWLER-033), so the season and episode credits are rolled up to
+# their series (T_WC_T2S_PERSON_SEASON and T_WC_T2S_PERSON_EPISODE both carry ID_SERIE).
+#
+# SET-BASED, IN SQL ONLY. Temporary tables per major (scope, member credits, group
+# credits, result, rank), then one upsert and one delete on the served table. No _BUILD
+# and RENAME here: the table has no business id to keep stable (ID_ROW is a row
+# number, the key is the pair), and an upsert keeps TIM_UPDATED meaningful.
+
+INT_GROUP_WORK_MIN_MEMBERS = 2
+DBL_GROUP_WORK_MIN_SHARE = 0.4
+
+# The GROUP_SOURCE values kept, as process 43 writes them.
+ARR_GROUP_WORK_SOURCES = ("P463", "custom")
+
+# The Wikidata properties that credit an item on a work. P161 cast member, P175
+# performer, P58 screenwriter, P86 composer, P170 creator, P162 producer, P57
+# director, P725 voice actor.
+ARR_GROUP_WORK_CREDIT_PROPERTIES = ("P161", "P175", "P58", "P86", "P170", "P162", "P57", "P725")
+
+# One entry per major: the served table, the work id column, the TMDb table that
+# carries ID_WIKIDATA, the T2S table that decides presence, its date column, and the
+# member credit tables rolled up to the work.
+ARR_GROUP_WORK_MAJORS = {
+    "movie": {
+        "target": "T_WC_T2S_GROUP_MOVIE",
+        "id": "ID_MOVIE",
+        "tmdb": "T_WC_TMDB_MOVIE",
+        "t2s": "T_WC_T2S_MOVIE",
+        "date": "DAT_RELEASE",
+        "credits": ("T_WC_T2S_PERSON_MOVIE",),
+    },
+    "serie": {
+        "target": "T_WC_T2S_GROUP_SERIE",
+        "id": "ID_SERIE",
+        "tmdb": "T_WC_TMDB_SERIE",
+        "t2s": "T_WC_T2S_SERIE",
+        "date": "DAT_FIRST_AIR",
+        "credits": ("T_WC_T2S_PERSON_SERIE", "T_WC_T2S_PERSON_SEASON", "T_WC_T2S_PERSON_EPISODE"),
+    },
+}
+
+
+def _f_groupworkstep(cursor, strstep, strsql, params=None):
+    """Run one step of the group-work pass, NAMING it first (lesson of process 72:
+    a failure that does not say which statement failed is diagnosed from zero).
+    Returns the row count."""
+    print(f"74:   {strstep} ...", flush=True)
+    cursor.execute(strsql, params)
+    return cursor.rowcount
+
+
+def _f_groupworkcount(cursor, strsql):
+    """One COUNT(*) AS COMPTE, as an int."""
+    cursor.execute(strsql)
+    arrrow = cursor.fetchone()
+    return int((arrrow or {}).get("COMPTE") or 0)
+
+
+def f_buildgroupworktables():
+    """Rebuild T_WC_T2S_GROUP_MOVIE and T_WC_T2S_GROUP_SERIE from the members' credits
+    and the group's own Wikidata credits. Set-based, idempotent, safe to re-run.
+
+    Returns a dictionary of counts for the telemetry: 'groups' (groups in scope), and
+    per major ('movie', 'serie') a dictionary with 'rows', 'created', 'updated',
+    'deleted', 'credited' (IS_GROUP_CREDITED = 1 rows) and the step counts.
+    """
+    connection = cp.connectioncp
+    cursor = connection.cursor()
+    arrresult = {}
+    strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+    strtoday = strnow[:10]
+    strsources = ", ".join(f"'{s}'" for s in ARR_GROUP_WORK_SOURCES)
+    strproperties = ", ".join(f"'{p}'" for p in ARR_GROUP_WORK_CREDIT_PROPERTIES)
+    strtablecharset = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    try:
+        cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
+        # The group-credit step reads T_WC_WIKIDATA_STATEMENT in an INSERT ... SELECT:
+        # same reasoning as processes 72 and 73.
+        _f_readwithoutlocking(cursor, "74")
+
+        # --- 0. The groups in scope ------------------------------------------------
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_group_work_scope")
+        cursor.execute(
+            "CREATE TEMPORARY TABLE tmp_group_work_scope ("
+            " ID_GROUP INT NOT NULL PRIMARY KEY,"
+            " ID_WIKIDATA VARCHAR(20) NULL,"
+            " PERSON_COUNT INT NOT NULL,"
+            " KEY ID_WIKIDATA (ID_WIKIDATA)"
+            ") " + strtablecharset)
+        arrresult["groups"] = _f_groupworkstep(cursor, "0. INSERT the groups in scope (tmp_group_work_scope)", (
+            "INSERT IGNORE INTO tmp_group_work_scope (ID_GROUP, ID_WIKIDATA, PERSON_COUNT)\n"
+            "SELECT g.ID_GROUP, g.ID_WIKIDATA, g.PERSON_COUNT\n"
+            "FROM `T_WC_T2S_GROUP` g\n"
+            f"WHERE g.GROUP_SOURCE IN ({strsources})\n"
+            "  AND COALESCE(g.DELETED, 0) = 0\n"
+            "  AND g.PERSON_COUNT >= 2"))
+        connection.commit()
+
+        for strmajor, arrmajor in ARR_GROUP_WORK_MAJORS.items():
+            strtarget = arrmajor["target"]
+            strid = arrmajor["id"]
+            strtmdb = arrmajor["tmdb"]
+            strt2s = arrmajor["t2s"]
+            strdate = arrmajor["date"]
+            arrcounts = {}
+            cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess", f"Group works: {strmajor}", "Current sub process in the TMDb database movie preprocess", 0)
+
+            # --- 1. The member credits, one row per (group, work, member, kind) ----
+            # Driven from the small scope table, then PERSON_GROUP by ID_GROUP, then
+            # the credit table by its ID_PERSON index (STRAIGHT_JOIN pins that order).
+            cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_group_work_credit")
+            cursor.execute(
+                "CREATE TEMPORARY TABLE tmp_group_work_credit ("
+                " ID_GROUP INT NOT NULL, ID_WORK INT NOT NULL, ID_PERSON INT NOT NULL,"
+                " CREDIT_TYPE VARCHAR(10) NOT NULL,"
+                " PRIMARY KEY (ID_GROUP, ID_WORK, ID_PERSON, CREDIT_TYPE)"
+                ") " + strtablecharset)
+            for strcredittable in arrmajor["credits"]:
+                arrcounts["credits_" + strcredittable] = _f_groupworkstep(cursor, f"1. INSERT the member credits from {strcredittable}", (
+                    "INSERT IGNORE INTO tmp_group_work_credit (ID_GROUP, ID_WORK, ID_PERSON, CREDIT_TYPE)\n"
+                    f"SELECT g.ID_GROUP, c.{strid}, c.ID_PERSON, COALESCE(c.CREDIT_TYPE, '')\n"
+                    "FROM tmp_group_work_scope g\n"
+                    "STRAIGHT_JOIN T_WC_T2S_PERSON_GROUP pg ON pg.ID_GROUP = g.ID_GROUP\n"
+                    f"STRAIGHT_JOIN {strcredittable} c ON c.ID_PERSON = pg.ID_PERSON\n"
+                    "WHERE COALESCE(pg.DELETED, 0) = 0\n"
+                    "  AND COALESCE(c.DELETED, 0) = 0"))
+                connection.commit()
+
+            # --- 2. The group's own item credited on the work (Wikidata V2) --------
+            # Driven from the group's Q-id: ITEM_VALUE by its ID_ITEM index, then the
+            # statement by its primary key, then the work by ID_WIKIDATA (join plan of
+            # groups-multi-repo-management.md section 9.17: the selective side drives).
+            # Custom groups carry ID_CUSTOM_LIST in ID_WIKIDATA, not a Q-id: the REGEXP
+            # leaves them out of this step, and they attach by their members only.
+            cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_group_work_credited")
+            cursor.execute(
+                "CREATE TEMPORARY TABLE tmp_group_work_credited ("
+                " ID_GROUP INT NOT NULL, ID_WORK INT NOT NULL,"
+                " PRIMARY KEY (ID_GROUP, ID_WORK)"
+                ") " + strtablecharset)
+            arrcounts["credited_pairs"] = _f_groupworkstep(cursor, "2. INSERT the works crediting the group's own item", (
+                "INSERT IGNORE INTO tmp_group_work_credited (ID_GROUP, ID_WORK)\n"
+                f"SELECT g.ID_GROUP, w.{strid}\n"
+                "FROM tmp_group_work_scope g\n"
+                "STRAIGHT_JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_ITEM = g.ID_WIKIDATA\n"
+                "STRAIGHT_JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_STATEMENT = iv.ID_STATEMENT\n"
+                f"STRAIGHT_JOIN {strtmdb} w ON w.ID_WIKIDATA = st.ID_WIKIDATA\n"
+                f"STRAIGHT_JOIN {strt2s} t ON t.{strid} = w.{strid}\n"
+                "WHERE g.ID_WIKIDATA REGEXP '^Q[0-9]+$'\n"
+                f"  AND st.ID_PROPERTY IN ({strproperties})\n"
+                "  AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+                "  AND COALESCE(st.DELETED, 0) = 0"))
+            connection.commit()
+
+            # --- 3. The result: attached works only -------------------------------
+            cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_group_work_result")
+            cursor.execute(
+                "CREATE TEMPORARY TABLE tmp_group_work_result ("
+                " ID_GROUP INT NOT NULL, ID_WORK INT NOT NULL,"
+                " MEMBER_COUNT INT NOT NULL DEFAULT 0,"
+                " MEMBER_SHARE DOUBLE NOT NULL DEFAULT 0,"
+                " IS_GROUP_CREDITED INT NOT NULL DEFAULT 0,"
+                " CREDIT_KINDS VARCHAR(20) NULL,"
+                " SORT_DATE DATE NULL,"
+                " DISPLAY_ORDER INT NULL,"
+                " PRIMARY KEY (ID_GROUP, ID_WORK)"
+                ") " + strtablecharset)
+            # The share is rounded to 4 decimals so that two passes compute the same
+            # value and an unchanged row is not counted as updated. LEAST(1, ...) guards
+            # a PERSON_COUNT that lags behind PERSON_GROUP.
+            strkinds = ("NULLIF(CONCAT_WS(',',\n"
+                        "    IF(MAX(c.CREDIT_TYPE = 'cast'), 'cast', NULL),\n"
+                        "    IF(MAX(c.CREDIT_TYPE = 'crew'), 'crew', NULL)), '')")
+            strshare = "ROUND(LEAST(1, COUNT(DISTINCT c.ID_PERSON) / g.PERSON_COUNT), 4)"
+            # 3a. By the members: at least N members AND at least the share.
+            arrcounts["by_members"] = _f_groupworkstep(cursor, "3a. INSERT the works attached by their members", (
+                "INSERT INTO tmp_group_work_result (ID_GROUP, ID_WORK, MEMBER_COUNT, MEMBER_SHARE, IS_GROUP_CREDITED, CREDIT_KINDS)\n"
+                f"SELECT c.ID_GROUP, c.ID_WORK, COUNT(DISTINCT c.ID_PERSON), {strshare}, 0,\n"
+                f"  {strkinds}\n"
+                "FROM tmp_group_work_credit c\n"
+                "INNER JOIN tmp_group_work_scope g ON g.ID_GROUP = c.ID_GROUP\n"
+                "GROUP BY c.ID_GROUP, c.ID_WORK, g.PERSON_COUNT\n"
+                "HAVING COUNT(DISTINCT c.ID_PERSON) >= %s\n"
+                "   AND COUNT(DISTINCT c.ID_PERSON) / g.PERSON_COUNT >= %s"),
+                (INT_GROUP_WORK_MIN_MEMBERS, DBL_GROUP_WORK_MIN_SHARE))
+            # 3b. By the group's own credit, whatever the member count (0 included).
+            _f_groupworkstep(cursor, "3b. UPSERT the works crediting the group itself", (
+                "INSERT INTO tmp_group_work_result (ID_GROUP, ID_WORK, MEMBER_COUNT, MEMBER_SHARE, IS_GROUP_CREDITED, CREDIT_KINDS)\n"
+                f"SELECT cr.ID_GROUP, cr.ID_WORK, COUNT(DISTINCT c.ID_PERSON), {strshare}, 1,\n"
+                f"  {strkinds}\n"
+                "FROM tmp_group_work_credited cr\n"
+                "INNER JOIN tmp_group_work_scope g ON g.ID_GROUP = cr.ID_GROUP\n"
+                "LEFT JOIN tmp_group_work_credit c ON c.ID_GROUP = cr.ID_GROUP AND c.ID_WORK = cr.ID_WORK\n"
+                "GROUP BY cr.ID_GROUP, cr.ID_WORK, g.PERSON_COUNT\n"
+                "ON DUPLICATE KEY UPDATE IS_GROUP_CREDITED = 1"))
+            # 3c. Only works present in the T2S read model (the credit tables already
+            # are, but the check costs nothing and guards against a stale credit row).
+            arrcounts["outside_t2s"] = _f_groupworkstep(cursor, f"3c. DELETE the works absent from {strt2s}", (
+                "DELETE r FROM tmp_group_work_result r\n"
+                f"LEFT JOIN {strt2s} t ON t.{strid} = r.ID_WORK\n"
+                f"WHERE t.{strid} IS NULL"))
+            _f_groupworkstep(cursor, f"3d. UPDATE the sort date from {strt2s}.{strdate}", (
+                "UPDATE tmp_group_work_result r\n"
+                f"INNER JOIN {strt2s} t ON t.{strid} = r.ID_WORK\n"
+                f"SET r.SORT_DATE = t.{strdate}"))
+            # 3e. DISPLAY_ORDER per group: the group credited first, then the most
+            # members, then the oldest work (undated works last), the id as tie-break.
+            # Computed in its own table: MariaDB does not take a window function in an
+            # UPDATE, and a temporary table cannot be opened twice in one statement.
+            cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_group_work_rank")
+            cursor.execute(
+                "CREATE TEMPORARY TABLE tmp_group_work_rank ("
+                " ID_GROUP INT NOT NULL, ID_WORK INT NOT NULL, DISPLAY_ORDER INT NOT NULL,"
+                " PRIMARY KEY (ID_GROUP, ID_WORK)"
+                ") " + strtablecharset)
+            _f_groupworkstep(cursor, "3e. INSERT the display order (tmp_group_work_rank)", (
+                "INSERT INTO tmp_group_work_rank (ID_GROUP, ID_WORK, DISPLAY_ORDER)\n"
+                "SELECT r.ID_GROUP, r.ID_WORK,\n"
+                "  ROW_NUMBER() OVER (PARTITION BY r.ID_GROUP\n"
+                "    ORDER BY r.IS_GROUP_CREDITED DESC, r.MEMBER_COUNT DESC,\n"
+                "             (r.SORT_DATE IS NULL) ASC, r.SORT_DATE ASC, r.ID_WORK ASC)\n"
+                "FROM tmp_group_work_result r"))
+            _f_groupworkstep(cursor, "3f. UPDATE the display order", (
+                "UPDATE tmp_group_work_result r\n"
+                "INNER JOIN tmp_group_work_rank k ON k.ID_GROUP = r.ID_GROUP AND k.ID_WORK = r.ID_WORK\n"
+                "SET r.DISPLAY_ORDER = k.DISPLAY_ORDER"))
+            connection.commit()
+
+            # --- 4. The counts, measured BEFORE the writes --------------------------
+            # ON DUPLICATE KEY UPDATE reports 1 per insert and 2 per changed row in one
+            # rowcount, which cannot be split afterwards; the three counts are read here.
+            arrcounts["created"] = _f_groupworkcount(cursor, (
+                "SELECT COUNT(*) AS COMPTE FROM tmp_group_work_result r\n"
+                f"LEFT JOIN {strtarget} x ON x.ID_GROUP = r.ID_GROUP AND x.{strid} = r.ID_WORK\n"
+                "WHERE x.ID_ROW IS NULL"))
+            arrcounts["updated"] = _f_groupworkcount(cursor, (
+                "SELECT COUNT(*) AS COMPTE FROM tmp_group_work_result r\n"
+                f"INNER JOIN {strtarget} x ON x.ID_GROUP = r.ID_GROUP AND x.{strid} = r.ID_WORK\n"
+                "WHERE NOT (x.MEMBER_COUNT <=> r.MEMBER_COUNT AND x.MEMBER_SHARE <=> r.MEMBER_SHARE\n"
+                "     AND x.IS_GROUP_CREDITED <=> r.IS_GROUP_CREDITED AND x.CREDIT_KINDS <=> r.CREDIT_KINDS\n"
+                "     AND x.DISPLAY_ORDER <=> r.DISPLAY_ORDER AND x.DELETED <=> 0)"))
+            arrcounts["deleted"] = _f_groupworkcount(cursor, (
+                f"SELECT COUNT(*) AS COMPTE FROM {strtarget} x\n"
+                f"LEFT JOIN tmp_group_work_result r ON r.ID_GROUP = x.ID_GROUP AND r.ID_WORK = x.{strid}\n"
+                "WHERE r.ID_GROUP IS NULL"))
+
+            # --- 5. The writes: one upsert, one delete -----------------------------
+            # TIM_UPDATED is assigned FIRST in the UPDATE clause, while the other
+            # columns still hold their old values (MariaDB evaluates the assignments
+            # left to right), so it moves only when the row really changed. Dates in
+            # Paris time, passed from Python (DEPLOYMENT-015, TMDB-MOVIE-PREPROCESS-060).
+            _f_groupworkstep(cursor, f"5a. UPSERT {strtarget}", (
+                f"INSERT INTO {strtarget}\n"
+                f"    (ID_GROUP, {strid}, MEMBER_COUNT, MEMBER_SHARE, IS_GROUP_CREDITED, CREDIT_KINDS,\n"
+                "     DELETED, DISPLAY_ORDER, DAT_CREAT, TIM_UPDATED)\n"
+                "SELECT r.ID_GROUP, r.ID_WORK, r.MEMBER_COUNT, r.MEMBER_SHARE, r.IS_GROUP_CREDITED, r.CREDIT_KINDS,\n"
+                "       0, r.DISPLAY_ORDER, %s, %s\n"
+                "FROM tmp_group_work_result r\n"
+                "ON DUPLICATE KEY UPDATE\n"
+                f"  TIM_UPDATED = IF({strtarget}.MEMBER_COUNT <=> VALUES(MEMBER_COUNT)\n"
+                f"                   AND {strtarget}.MEMBER_SHARE <=> VALUES(MEMBER_SHARE)\n"
+                f"                   AND {strtarget}.IS_GROUP_CREDITED <=> VALUES(IS_GROUP_CREDITED)\n"
+                f"                   AND {strtarget}.CREDIT_KINDS <=> VALUES(CREDIT_KINDS)\n"
+                f"                   AND {strtarget}.DISPLAY_ORDER <=> VALUES(DISPLAY_ORDER)\n"
+                f"                   AND {strtarget}.DELETED <=> 0,\n"
+                f"                   {strtarget}.TIM_UPDATED, VALUES(TIM_UPDATED)),\n"
+                "  MEMBER_COUNT = VALUES(MEMBER_COUNT),\n"
+                "  MEMBER_SHARE = VALUES(MEMBER_SHARE),\n"
+                "  IS_GROUP_CREDITED = VALUES(IS_GROUP_CREDITED),\n"
+                "  CREDIT_KINDS = VALUES(CREDIT_KINDS),\n"
+                "  DISPLAY_ORDER = VALUES(DISPLAY_ORDER),\n"
+                "  DELETED = 0,\n"
+                f"  DAT_CREAT = COALESCE({strtarget}.DAT_CREAT, VALUES(DAT_CREAT))"),
+                (strtoday, strnow))
+            # A row that no longer attaches is removed, not flagged: the table stores
+            # attached works only, and ID_ROW is a row number, not an id anyone keeps.
+            # This also removes the works of groups that left the scope or vanished.
+            _f_groupworkstep(cursor, f"5b. DELETE from {strtarget} the works no longer attached", (
+                f"DELETE x FROM {strtarget} x\n"
+                f"LEFT JOIN tmp_group_work_result r ON r.ID_GROUP = x.ID_GROUP AND r.ID_WORK = x.{strid}\n"
+                "WHERE r.ID_GROUP IS NULL"))
+            connection.commit()
+
+            arrcounts["rows"] = _f_groupworkcount(cursor, f"SELECT COUNT(*) AS COMPTE FROM {strtarget}")
+            arrcounts["credited"] = _f_groupworkcount(cursor, f"SELECT COUNT(*) AS COMPTE FROM {strtarget} WHERE IS_GROUP_CREDITED = 1")
+            arrresult[strmajor] = arrcounts
+
+        for strtemp in ("tmp_group_work_rank", "tmp_group_work_result", "tmp_group_work_credited",
+                        "tmp_group_work_credit", "tmp_group_work_scope"):
+            cursor.execute("DROP TEMPORARY TABLE IF EXISTS " + strtemp)
+        connection.commit()
+        return arrresult
+    finally:
+        cursor.close()

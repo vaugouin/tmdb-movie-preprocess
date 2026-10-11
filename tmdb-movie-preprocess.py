@@ -36,6 +36,9 @@ from tmdb_preprocess_helpers import (
     f_buildlocationtables,
     f_buildsourceworkclasstable,
     f_buildsourceworktables,
+    f_buildgroupworktables,
+    INT_GROUP_WORK_MIN_MEMBERS,
+    DBL_GROUP_WORK_MIN_SHARE,
     f_awarddrivingsql,
     f_awardlinksql,
     f_persondrivingsql,
@@ -133,7 +136,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 73: 'T2S_SOURCE_WORK', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 73: 'T2S_SOURCE_WORK', 74: 'T2S_GROUP_WORK', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -186,6 +189,12 @@ try:
             # caveat as locations: the image columns are written by process 71, not here.
             # Run with TMDB_PREPROCESS_SCOPE=source-works.
             arrprocessscopesourceworks = {73: 'T2S_SOURCE_WORK'}
+            # A group's works only (Process 74, TMDB-MOVIE-PREPROCESS-059): rebuild
+            # T_WC_T2S_GROUP_MOVIE and T_WC_T2S_GROUP_SERIE from the members' credits and the
+            # group's own Wikidata credits, on demand. Reads the outputs of 43 (groups) and
+            # 9, 10, 29, 31 (person credits), so it runs after them in main.
+            # Run with TMDB_PREPROCESS_SCOPE=group-works.
+            arrprocessscopegroupworks = {74: 'T2S_GROUP_WORK'}
             # Process 64 alone, for the first backfill and for reruns on demand
             # (TMDB-MOVIE-PREPROCESS-049). In main it sits between 1 and 2.
             arrprocessscopewikidatacolour = {64: 'WIKIDATA_COLOR'}
@@ -210,6 +219,8 @@ try:
                 arrprocessscope = arrprocessscopelocations
             elif strprocessscope in ("source-works", "source-work", "based-on"):
                 arrprocessscope = arrprocessscopesourceworks
+            elif strprocessscope in ("group-works", "group-work"):
+                arrprocessscope = arrprocessscopegroupworks
             elif strprocessscope in ("wikidata-colour", "wikidata-color"):
                 arrprocessscope = arrprocessscopewikidatacolour
             elif strprocessscope in ("genre-alias", "genres-aliases"):
@@ -227,7 +238,7 @@ try:
             # il restait un piege pour le prochain lecteur et un precedent a ne pas suivre.
             # Un forcage ponctuel se fait par la variable d'environnement, jamais par une
             # date en dur qui survit a son jour.
-            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations | source-works | wikidata-colour | genre-alias)", 0)
+            cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations | source-works | group-works | wikidata-colour | genre-alias)", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}
@@ -7695,6 +7706,68 @@ ORDER BY COMPTE DESC
                         cp.f_setservervariable("strtmdbmoviepreprocesssourcework" + strkey.replace("_", "") + "count", str(arrsourceworkcounts.get(strkey, 0)), strsourceworkdesc + " the source-work rebuild (process 73)", 0)
                     telsourcework.set_processed(arrsourceworkcounts.get("sources", 0))
                     telsourcework.finish()
+
+                elif intindex == 74:
+                    #----------------------------------------------------
+                    # T2S_GROUP_WORK : a group's works (TMDB-MOVIE-PREPROCESS-059)
+                    #
+                    # A group holds members and nothing else; this process attaches the films
+                    # and series a group made, in T_WC_T2S_GROUP_MOVIE and T_WC_T2S_GROUP_SERIE.
+                    # A work attaches when the group's own Wikidata item is credited on it
+                    # (IS_GROUP_CREDITED), or when at least INT_GROUP_WORK_MIN_MEMBERS members
+                    # are credited AND they make at least DBL_GROUP_WORK_MIN_SHARE of the group
+                    # (rule decided by Philippe on 2026-10-11, constants in
+                    # tmdb_preprocess_helpers.py). Only P463 (member of) and custom groups:
+                    # P108 (employer) and P54 (sports team) are left out on purpose.
+                    #
+                    # PLACE: after 43 (groups, PERSON_COUNT) and 9, 10, 29, 31 (the person
+                    # credits it rolls up). Set-based SQL in f_buildgroupworktables(); a
+                    # failure is isolated like 72 and 73, so that 70 and 71 still run.
+                    print("T2S_GROUP_WORK processing")
+                    print(f"74: rule: group credited, or >= {INT_GROUP_WORK_MIN_MEMBERS} members and share >= {DBL_GROUP_WORK_MIN_SHARE}")
+                    telgroupwork = EntityTelemetry("groupwork", 74, "group work", kind="derivation")
+                    telgroupwork.begin()
+                    arrgroupworkcounts = {}
+                    try:
+                        arrgroupworkcounts = f_buildgroupworktables()
+                        cp.f_setservervariable("strtmdbmoviepreprocessgroupworkerror", "", "Last error of the group-work rebuild (process 74), empty when it succeeded", 0)
+                    except Exception as groupworkerror:
+                        strgroupworkerror = f"{type(groupworkerror).__name__}: {groupworkerror}"
+                        print(f"74: FAILED: {strgroupworkerror}")
+                        print("74: the rest of the pipeline continues. Re-run with TMDB_PREPROCESS_SCOPE=group-works.")
+                        try:
+                            cp.connectioncp.rollback()
+                        except Exception:
+                            pass
+                        cp.f_setservervariable("strtmdbmoviepreprocessgroupworkerror", strgroupworkerror, "Last error of the group-work rebuild (process 74), empty when it succeeded", 0)
+                    lnggroupworkgroupcount = arrgroupworkcounts.get("groups", 0)
+                    cp.f_setservervariable("strtmdbmoviepreprocessgroupworkgroupcount", str(lnggroupworkgroupcount), "Groups in scope (P463 and custom) of the group-work rebuild (process 74)", 0)
+                    lnggroupworkrowstotal = 0
+                    for strgroupworkmajor in ("movie", "serie"):
+                        arrgroupworkmajor = arrgroupworkcounts.get(strgroupworkmajor, {})
+                        print(f"74: {strgroupworkmajor}: {arrgroupworkmajor.get('rows', 0)} rows "
+                              f"({arrgroupworkmajor.get('created', 0)} created, "
+                              f"{arrgroupworkmajor.get('updated', 0)} updated, "
+                              f"{arrgroupworkmajor.get('deleted', 0)} deleted), "
+                              f"{arrgroupworkmajor.get('credited', 0)} with the group itself credited, "
+                              f"{arrgroupworkmajor.get('by_members', 0)} attached by their members, "
+                              f"{arrgroupworkmajor.get('credited_pairs', 0)} group-credited pairs found in Wikidata")
+                        # Server variables: strtmdbmoviepreprocessgroupwork<movie|serie>count (rows
+                        # stored), then ...createdcount, ...updatedcount, ...deletedcount and
+                        # ...creditedcount. strgroupworkdesc and not strdesc, which is the
+                        # pipeline loop variable (AGENTS.md).
+                        for strkey, strgroupworkdesc in (("rows", "rows stored after"),
+                                                         ("created", "rows created by"),
+                                                         ("updated", "rows updated by"),
+                                                         ("deleted", "rows deleted (no longer attached) by"),
+                                                         ("credited", "rows with IS_GROUP_CREDITED = 1 after")):
+                            strgroupworksuffix = "" if strkey == "rows" else strkey
+                            cp.f_setservervariable("strtmdbmoviepreprocessgroupwork" + strgroupworkmajor + strgroupworksuffix + "count", str(arrgroupworkmajor.get(strkey, 0)), f"T_WC_T2S_GROUP_{strgroupworkmajor.upper()} {strgroupworkdesc} the group-work rebuild (process 74)", 0)
+                        lnggroupworkrowstotal += arrgroupworkmajor.get("rows", 0)
+                        telgroupwork.created(arrgroupworkmajor.get("created", 0) + arrgroupworkmajor.get("updated", 0))
+                        telgroupwork.deleted(arrgroupworkmajor.get("deleted", 0))
+                    telgroupwork.set_processed(lnggroupworkrowstotal)
+                    telgroupwork.finish()
 
                 elif intindex == 64:
                     #----------------------------------------------------

@@ -21,10 +21,11 @@ for intindex, strdesc in arrprocessscope.items():
 - `wikidata-all` (alias `wikidata`) — **all** Wikidata linkers run **sequentially in one container** (Process 60 → 63 → future network/genre/character). This is the scope to **schedule**: one process means one Wikimedia request stream, so the linkers never contend for the rate limit. The `wikidata-topics` / `wikidata-companies` scopes remain for targeted single-linker / debug runs.
 - `locations` (alias `location`) — **only** Process 72 (rebuild `T_WC_T2S_LOCATION` and its two association tables from the Wikidata V2 statements `P840` / `P915`, plus the `T_WC_T2S_LOCATION_CLASS` cone table that `LOCATION_TYPE` is derived from). Wrapper: `tmdb-movie-preprocess-locations.sh`. **`ID_LOCATION` is stable across rebuilds** (fixed 2026-09-13): a known place keeps its id and `DAT_CREAT`, a place that left the perimeter stays as a `DELETED = 1` row so its id is never reused, a new place gets an id above `MAX(ID_LOCATION)` of the served table; consumers must filter `DELETED = 0`. Recette: `doc/sql/test-014-location-id-stability.sql`, run before and after a pass. **Does not fill the image columns** — those belong to Process 71, so chain `wikipedia-main-image` after the first pass or `WIKIPEDIA_MAIN_IMAGE_URL` stays NULL, which reads as "no image" when it is in fact "no pass".
 - `source-works` (aliases `source-work`, `based-on`) — **only** Process 73 (TMDB-MOVIE-PREPROCESS-055): rebuild `T_WC_T2S_SOURCE_WORK` and its two link tables `T_WC_T2S_MOVIE_SOURCE_WORK` / `T_WC_T2S_SERIE_SOURCE_WORK` from the Wikidata V2 statements `P144` (based on), plus the `T_WC_T2S_SOURCE_WORK_CLASS` cone table that `SOURCE_WORK_TYPE` / `SOURCE_WORK_FORM` are derived from. Wrapper: `tmdb-movie-preprocess-source-works.sh`. Prerequisite once: `doc/sql/migration-t2s-source-work.sql`. **The shape (method A, 2026-10-09)**: the work studied is carried by the link table (movie or series), the source is always a `SOURCE_WORK` row, whatever its kind, and points to its T2S sheet by `ID_MOVIE` / `ID_SERIE` when it is itself a T2S work. `SOURCE_WORK_TYPE` is one of `literary`, `comic`, `stage`, `game`, `screen`, `folklore`, `other`; `SOURCE_WORK_FORM` is NULL or `manga`, `light_novel`, `play`, `musical` (`novel` / `short_story` once wikidata-crawler caches P7937). `SOURCE_WORK_NAME_FR` falls back to the English name. `ID_SOURCE_WORK` is stable across rebuilds, with the same three-insert rule as `ID_LOCATION`; consumers filter `DELETED = 0`. Acceptance: `doc/sql/test-055-post-run.sql`. Like `locations`, it does not fill the image columns (Process 71 does).- `wikidata-colour` (alias `wikidata-color`), **only** Process 64 (colour flags from Wikidata `P462` for films without a French Format line, TMDB-MOVIE-PREPROCESS-049). For the first backfill and reruns on demand; in `main` it runs between 1 and 2.
+- `group-works` (alias `group-work`), **only** Process 74 (TMDB-MOVIE-PREPROCESS-059): rebuild `T_WC_T2S_GROUP_MOVIE` and `T_WC_T2S_GROUP_SERIE`, a group's works. Wrapper: `tmdb-movie-preprocess-group-works.sh`. Prerequisite once: `doc/sql/migration-t2s-group-work.sql`. Acceptance: `doc/sql/test-059-group-work.sql`. In `main` it runs after 73, hence after 43 and 9, 10, 29, 31 whose outputs it reads.
 - `genre-alias` (alias `genres-aliases`), **only** Processes 51 and 50 (`T_WC_T2S_PERSON_ALSO_KNOWN_AS`, then `T_WC_T2S_GENRE` and `T_WC_T2S_GENRE_LANG`). For the first build of the three tables and reruns on demand; in `main`, 51 runs right after 6 and 50 right before 11. Wrapper: `tmdb-movie-preprocess-genre-alias.sh`.
 - `neighbours` (aliases `neighbors`, `similar-recommendations`) — **only** Processes 36-39 (rebuild the T2S `similar` / `recommendation` neighbour tables from the raw `T_WC_TMDB_*` twins). Handy as a **unit test** right after creating the four T2S tables, without the whole pipeline. Wrapper: `tmdb-movie-preprocess-neighbours.sh`.
 
-The `main` scope runs processes: **1, 64, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 51, 7, 8, 9, 10, 50, 11, 12, 36, 37, 38, 39, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40, 72, 73, 70, 71**. Processes 72 (locations) and 73 (source works) sit **before** 71: the image copier fills every T2S entity table and must therefore find the locations already built. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
+The `main` scope runs processes: **1, 64, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 51, 7, 8, 9, 10, 50, 11, 12, 36, 37, 38, 39, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40, 72, 73, 74, 70, 71**. Process 74 (a group's works) runs after 43 and after the person credits 9, 10, 29, 31, which it reads. Processes 72 (locations) and 73 (source works) sit **before** 71: the image copier fills every T2S entity table and must therefore find the locations already built. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
 
 Progress is tracked server-side via `cp.f_setservervariable()`. Multiple cursor objects (`cursor`, `cursor2` … `cursor5`) allow parallel DB operations within a single process.
 
@@ -971,6 +972,30 @@ This is a pure performance change — the output set is unchanged because the pr
 
 ---
 
+### Process 74 - T2S_GROUP_WORK
+
+A group's works (TMDB-MOVIE-PREPROCESS-059): the films and series a group made, derived from its members' credits and from the group's own Wikidata item credited on the work. Runs after 43 (groups) and 9, 10, 29, 31 (person credits). Scope `group-works`, wrapper `tmdb-movie-preprocess-group-works.sh`, builder `f_buildgroupworktables()` in `tmdb_preprocess_helpers.py`.
+
+**Reads:** `T_WC_T2S_GROUP` (`GROUP_SOURCE`, `PERSON_COUNT`), `T_WC_T2S_PERSON_GROUP`, `T_WC_T2S_PERSON_MOVIE`, `T_WC_T2S_PERSON_SERIE`, `T_WC_T2S_PERSON_SEASON`, `T_WC_T2S_PERSON_EPISODE`, `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE` (V2), `T_WC_TMDB_MOVIE` / `T_WC_TMDB_SERIE` (`ID_WIKIDATA`), `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE`
+**Writes:** `T_WC_T2S_GROUP_MOVIE`, `T_WC_T2S_GROUP_SERIE`
+
+**The rule (Philippe, 2026-10-11).** A work attaches when `IS_GROUP_CREDITED = 1`, or when `MEMBER_COUNT >= 2` AND `MEMBER_SHARE >= 0.4`. The two thresholds are the constants `INT_GROUP_WORK_MIN_MEMBERS` and `DBL_GROUP_WORK_MIN_SHARE` at the top of the builder. Only attached rows are stored.
+
+**Group families.** Only `GROUP_SOURCE IN ('P463', 'custom')` (member of, and the custom groups of `T_WC_CUSTOM_LIST`). `P108` (employer) and `P54` (sports team) are left out: two colleagues or teammates sharing a film is coincidence. Section G of the acceptance file measures what the rule would attach for every family, for the record.
+
+**Columns.**
+- `MEMBER_COUNT`: distinct members credited on the work, cast or crew. For a series, the series, season and episode credits are rolled up (the aggregate series cast holds the latest season only, TMDB-CRAWLER-033).
+- `MEMBER_SHARE`: `MEMBER_COUNT / PERSON_COUNT`, 0..1, 4 decimals.
+- `IS_GROUP_CREDITED`: the group's own Q-item is the value of a live (non-deprecated) V2 statement `P161`, `P175`, `P58`, `P86`, `P170`, `P162`, `P57` or `P725` on the work's `ID_WIKIDATA`. Custom groups carry `ID_CUSTOM_LIST` in `ID_WIKIDATA`, not a Q-id, and attach by their members only.
+- `CREDIT_KINDS`: `cast`, `crew` or `cast,crew`, from `CREDIT_TYPE`; NULL when the group is credited but no member is.
+- `DISPLAY_ORDER` per group: `IS_GROUP_CREDITED` desc, `MEMBER_COUNT` desc, `DAT_RELEASE` / `DAT_FIRST_AIR` asc (undated last).
+
+**Operations.** Set-based SQL on temporary tables, per major: groups in scope, member credits (driven from the group, then `PERSON_GROUP`, then the credit table by `ID_PERSON`, `STRAIGHT_JOIN`), group credits (driven from the group's Q-id through `ITEM_VALUE.ID_ITEM`, then the statement, then the work), the attached result and its display order. Then one `INSERT ... ON DUPLICATE KEY UPDATE` on the served table (`TIM_UPDATED` moves only when a value changed) and one `DELETE` of the rows no longer attached. Session in READ COMMITTED when the binary log allows it, as 72 and 73. A failure is caught, written to `strtmdbmoviepreprocessgroupworkerror`, and the pipeline continues.
+
+**Server variables.** `strtmdbmoviepreprocessgroupwork{startdatetime,enddatetime,processedcount,createdcount,deletedcount,processedseconds}` (EntityTelemetry), `strtmdbmoviepreprocessgroupworkgroupcount`, `strtmdbmoviepreprocessgroupwork{movie,serie}count` (rows stored), `...{movie,serie}createdcount`, `...{movie,serie}updatedcount`, `...{movie,serie}deletedcount`, `...{movie,serie}creditedcount`, and `strtmdbmoviepreprocessgroupworkerror`.
+
+---
+
 ### Process 44 — T2S_AWARD
 
 Builds award records from the Wikidata "award received" property (P166).
@@ -1168,6 +1193,7 @@ The one-column form is unchanged and remains right for a single-kind question (`
 | T_WC_TMDB_MOVIE (technical fields) | T_WC_T2S_TECHNICAL, T_WC_T2S_MOVIE_TECHNICAL |
 | T_WC_WIKIDATA_ITEM_V1 | T_WC_T2S_ITEM |
 | T_WC_WIKIDATA_ITEM_PROPERTY (P463, P108) / T_WC_CUSTOM_LIST (TARGET_TABLE=3) | T_WC_T2S_GROUP, T_WC_T2S_PERSON_GROUP |
+| T_WC_T2S_PERSON_GROUP + T_WC_T2S_PERSON_MOVIE / _SERIE / _SEASON / _EPISODE, T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P161, P175, P58, P86, P170, P162, P57, P725) | T_WC_T2S_GROUP_MOVIE, T_WC_T2S_GROUP_SERIE |
 | T_WC_WIKIDATA_ITEM_PROPERTY (P166) | T_WC_T2S_AWARD, T_WC_T2S_MOVIE_AWARD, T_WC_T2S_SERIE_AWARD, T_WC_T2S_PERSON_AWARD |
 | T_WC_CUSTOM_LIST (TARGET_TABLE=4) | T_WC_T2S_MOVEMENT, T_WC_T2S_MOVIE_MOVEMENT, T_WC_T2S_SERIE_MOVEMENT |
 | T_WC_WIKIDATA_ITEM_PROPERTY (P509, P1196) | T_WC_T2S_DEATH, T_WC_T2S_PERSON_DEATH |
