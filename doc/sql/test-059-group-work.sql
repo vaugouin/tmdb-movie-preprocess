@@ -252,3 +252,46 @@ FROM (
 ) x
 GROUP BY x.GROUP_SOURCE
 ORDER BY x.GROUP_SOURCE;
+
+-- ---------------------------------------------------------------------------------------------------------
+-- H. The three corrections of 2026-10-11 (after the first run): every count must be 0
+--    1. talk, news and reality series attached by their members only (TMDb genres 10767, 10763, 10764)
+--    2. group-credited works with no member credited whose credit is only P175 performer (song heard)
+--    3. Monty Python series still attached among the talk shows of the first run
+-- ---------------------------------------------------------------------------------------------------------
+SELECT 'H. Corrections of 2026-10-11 (every count must be 0)' AS SECTION;
+
+SELECT
+  (SELECT COUNT(*) FROM T_WC_T2S_GROUP_SERIE gs
+    WHERE gs.IS_GROUP_CREDITED = 0
+      AND EXISTS (SELECT 1 FROM T_WC_T2S_SERIE_GENRE sg
+                  WHERE sg.ID_SERIE = gs.ID_SERIE AND sg.ID_GENRE IN (10767, 10763, 10764)
+                    AND COALESCE(sg.DELETED, 0) = 0)) AS TALK_NEWS_REALITY_BY_MEMBERS,
+  (SELECT COUNT(*) FROM T_WC_T2S_GROUP_MOVIE gm WHERE gm.IS_GROUP_CREDITED = 1 AND gm.MEMBER_COUNT = 0) AS MOVIE_CREDITED_NO_MEMBER_LEFT,
+  (SELECT COUNT(*) FROM T_WC_T2S_GROUP_SERIE gs WHERE gs.IS_GROUP_CREDITED = 1 AND gs.MEMBER_COUNT = 0) AS SERIE_CREDITED_NO_MEMBER_LEFT,
+  (SELECT COUNT(*) FROM T_WC_T2S_GROUP_SERIE gs
+    JOIN `T_WC_T2S_GROUP` g ON g.ID_GROUP = gs.ID_GROUP
+    JOIN T_WC_TMDB_SERIE s ON s.ID_SERIE = gs.ID_SERIE
+    WHERE g.GROUP_NAME = 'Monty Python'
+      AND s.TITLE IN ('Saturday Night Live', 'The Graham Norton Show', 'Wogan', 'The One Show',
+                      'Late Night with Conan O''Brien', 'The Tonight Show Starring Jimmy Fallon')) AS PYTHON_TALK_SHOWS_LEFT;
+
+-- MOVIE_ and SERIE_CREDITED_NO_MEMBER_LEFT are not 0 by construction: a work whose group is credited as
+-- cast, writer, composer, director, producer, creator or voice stays without any member credited (a duo
+-- TMDb credits as one person). Read the list: it must hold no song-only case.
+SELECT 'movie' AS MAJOR, g.GROUP_NAME, m.TITLE, m.DAT_RELEASE
+FROM T_WC_T2S_GROUP_MOVIE gm
+JOIN `T_WC_T2S_GROUP` g ON g.ID_GROUP = gm.ID_GROUP
+JOIN T_WC_TMDB_MOVIE m ON m.ID_MOVIE = gm.ID_MOVIE
+WHERE gm.IS_GROUP_CREDITED = 1 AND gm.MEMBER_COUNT = 0
+ORDER BY g.GROUP_NAME, m.DAT_RELEASE
+LIMIT 60;
+
+-- The Beatles after the corrections: the archive documentaries must be gone
+SELECT gm.DISPLAY_ORDER, m.TITLE, m.DAT_RELEASE, gm.IS_GROUP_CREDITED, gm.MEMBER_COUNT, gm.CREDIT_KINDS
+FROM T_WC_T2S_GROUP_MOVIE gm
+JOIN `T_WC_T2S_GROUP` g ON g.ID_GROUP = gm.ID_GROUP
+JOIN T_WC_TMDB_MOVIE m ON m.ID_MOVIE = gm.ID_MOVIE
+WHERE g.GROUP_NAME = 'The Beatles'
+ORDER BY gm.DISPLAY_ORDER
+LIMIT 80;

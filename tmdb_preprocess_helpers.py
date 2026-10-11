@@ -3010,6 +3010,24 @@ ARR_GROUP_WORK_SOURCES = ("P463", "custom")
 # director, P725 voice actor.
 ARR_GROUP_WORK_CREDIT_PROPERTIES = ("P161", "P175", "P58", "P86", "P170", "P162", "P57", "P725")
 
+# CORRECTIONS AFTER THE FIRST RUN (2026-10-11, doc/sql/test-059-group-work-20261011.txt).
+# 1. P175 performer is how Wikidata says a group's SONG is heard in a work: The Beatles
+#    "performer" of One Crazy Night, with no Beatle in the credits (676 movies and 76
+#    series were credited with no member at all). A P175 credit alone attaches nothing;
+#    it counts only when at least one member is credited too. The other properties
+#    (cast, writing, composing, directing, producing, creating, voicing) are taking part
+#    and attach on their own: Laxmikant-Pyarelal, a composing duo TMDb often credits as
+#    one person, keeps its films.
+ARR_GROUP_WORK_PARTICIPATION_PROPERTIES = ("P161", "P58", "P86", "P170", "P162", "P57", "P725")
+# 2. Archive footage is not taking part: a Beatles clip in an Ali documentary attached
+#    the film to the band. TMDb writes it in the character ("Self (archive footage)").
+STR_GROUP_WORK_ARCHIVE_PATTERN = "%archive%"
+# 3. Talk, news and reality series gather guests episode after episode: three Pythons
+#    over the years on Wogan or Conan attached the show to Monty Python. TMDb genre ids
+#    10767 Talk, 10763 News, 10764 Reality: such a series never attaches by its members
+#    (a group credited on it still does).
+ARR_GROUP_WORK_EXCLUDED_SERIE_GENRES = (10767, 10763, 10764)
+
 # One entry per major: the served table, the work id column, the TMDb table that
 # carries ID_WIKIDATA, the T2S table that decides presence, its date column, and the
 # member credit tables rolled up to the work.
@@ -3064,6 +3082,8 @@ def f_buildgroupworktables():
     strtoday = strnow[:10]
     strsources = ", ".join(f"'{s}'" for s in ARR_GROUP_WORK_SOURCES)
     strproperties = ", ".join(f"'{p}'" for p in ARR_GROUP_WORK_CREDIT_PROPERTIES)
+    strparticipation = ", ".join(f"'{p}'" for p in ARR_GROUP_WORK_PARTICIPATION_PROPERTIES)
+    strexcludedgenres = ", ".join(str(i) for i in ARR_GROUP_WORK_EXCLUDED_SERIE_GENRES)
     strtablecharset = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     try:
         cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
@@ -3116,7 +3136,9 @@ def f_buildgroupworktables():
                     "STRAIGHT_JOIN T_WC_T2S_PERSON_GROUP pg ON pg.ID_GROUP = g.ID_GROUP\n"
                     f"STRAIGHT_JOIN {strcredittable} c ON c.ID_PERSON = pg.ID_PERSON\n"
                     "WHERE COALESCE(pg.DELETED, 0) = 0\n"
-                    "  AND COALESCE(c.DELETED, 0) = 0"))
+                    "  AND COALESCE(c.DELETED, 0) = 0\n"
+                    "  AND COALESCE(c.CAST_CHARACTER, '') NOT LIKE %s"),
+                    (STR_GROUP_WORK_ARCHIVE_PATTERN,))
                 connection.commit()
 
             # --- 2. The group's own item credited on the work (Wikidata V2) --------
@@ -3129,11 +3151,12 @@ def f_buildgroupworktables():
             cursor.execute(
                 "CREATE TEMPORARY TABLE tmp_group_work_credited ("
                 " ID_GROUP INT NOT NULL, ID_WORK INT NOT NULL,"
+                " IS_PARTICIPATION INT NOT NULL DEFAULT 0,"
                 " PRIMARY KEY (ID_GROUP, ID_WORK)"
                 ") " + strtablecharset)
             arrcounts["credited_pairs"] = _f_groupworkstep(cursor, "2. INSERT the works crediting the group's own item", (
-                "INSERT IGNORE INTO tmp_group_work_credited (ID_GROUP, ID_WORK)\n"
-                f"SELECT g.ID_GROUP, w.{strid}\n"
+                "INSERT INTO tmp_group_work_credited (ID_GROUP, ID_WORK, IS_PARTICIPATION)\n"
+                f"SELECT g.ID_GROUP, w.{strid}, MAX(st.ID_PROPERTY IN ({strparticipation}))\n"
                 "FROM tmp_group_work_scope g\n"
                 "STRAIGHT_JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_ITEM = g.ID_WIKIDATA\n"
                 "STRAIGHT_JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_STATEMENT = iv.ID_STATEMENT\n"
@@ -3142,7 +3165,8 @@ def f_buildgroupworktables():
                 "WHERE g.ID_WIKIDATA REGEXP '^Q[0-9]+$'\n"
                 f"  AND st.ID_PROPERTY IN ({strproperties})\n"
                 "  AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
-                "  AND COALESCE(st.DELETED, 0) = 0"))
+                "  AND COALESCE(st.DELETED, 0) = 0\n"
+                f"GROUP BY g.ID_GROUP, w.{strid}"))
             connection.commit()
 
             # --- 3. The result: attached works only -------------------------------
@@ -3172,6 +3196,10 @@ def f_buildgroupworktables():
                 f"  {strkinds}\n"
                 "FROM tmp_group_work_credit c\n"
                 "INNER JOIN tmp_group_work_scope g ON g.ID_GROUP = c.ID_GROUP\n"
+                + ("WHERE NOT EXISTS (SELECT 1 FROM T_WC_T2S_SERIE_GENRE sg\n"
+                   f"  WHERE sg.ID_SERIE = c.ID_WORK AND sg.ID_GENRE IN ({strexcludedgenres})\n"
+                   "  AND COALESCE(sg.DELETED, 0) = 0)\n"
+                   if strmajor == "serie" else "") +
                 "GROUP BY c.ID_GROUP, c.ID_WORK, g.PERSON_COUNT\n"
                 "HAVING COUNT(DISTINCT c.ID_PERSON) >= %s\n"
                 "   AND COUNT(DISTINCT c.ID_PERSON) / g.PERSON_COUNT >= %s"),
@@ -3184,7 +3212,8 @@ def f_buildgroupworktables():
                 "FROM tmp_group_work_credited cr\n"
                 "INNER JOIN tmp_group_work_scope g ON g.ID_GROUP = cr.ID_GROUP\n"
                 "LEFT JOIN tmp_group_work_credit c ON c.ID_GROUP = cr.ID_GROUP AND c.ID_WORK = cr.ID_WORK\n"
-                "GROUP BY cr.ID_GROUP, cr.ID_WORK, g.PERSON_COUNT\n"
+                "GROUP BY cr.ID_GROUP, cr.ID_WORK, g.PERSON_COUNT, cr.IS_PARTICIPATION\n"
+                "HAVING cr.IS_PARTICIPATION = 1 OR COUNT(DISTINCT c.ID_PERSON) >= 1\n"
                 "ON DUPLICATE KEY UPDATE IS_GROUP_CREDITED = 1"))
             # 3c. Only works present in the T2S read model (the credit tables already
             # are, but the check costs nothing and guards against a stale credit row).
