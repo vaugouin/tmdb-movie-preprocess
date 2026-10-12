@@ -11,7 +11,7 @@
 # In the main scope, 51 runs right after 6 and 50 right before 11: this wrapper is for the
 # first build and for reruns, without waiting for the nightly run.
 #
-# Acceptance after the run: doc/sql/check-053-054-genre-alias.sql through the runner.
+# Acceptance after the run: doc/sql/archive/check-053-054-genre-alias.sql through the runner.
 
 if [ $(docker ps -q -f name=tmdb-movie-preprocess-genre-alias) ]; then
     echo "tmdb-movie-preprocess-genre-alias Docker container is already running."

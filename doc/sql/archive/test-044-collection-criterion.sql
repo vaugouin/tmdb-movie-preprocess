@@ -29,7 +29,7 @@
 -- toute comparaison passant par un CAST rend ERROR 1267. Lancer avec --force.
 --
 -- COMMENT PRODUIRE LA SORTIE :
---   mysql --force -t vaugouindb < doc/sql/test-044-collection-criterion.sql \
+--   mysql --force -t vaugouindb < doc/sql/archive/test-044-collection-criterion.sql \
 --       > doc/sql/test-044-collection-criterion-AAAAMMJJ.txt 2>&1
 --
 -- Proprietes lues : P9584 identifiant du film sur criterion.com (appartenance),

@@ -35,7 +35,7 @@
 --      on lui a dit qu'elle n'existe pas.
 --
 -- COMMENT PRODUIRE LA SORTIE :
---   mysql --force -t vaugouindb < doc/sql/alter-t2s-serie-criterion.sql > doc/sql/alter-t2s-serie-criterion-AAAAMMJJ.txt 2>&1
+--   mysql --force -t vaugouindb < doc/sql/archive/alter-t2s-serie-criterion.sql > doc/sql/alter-t2s-serie-criterion-AAAAMMJJ.txt 2>&1
 
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
