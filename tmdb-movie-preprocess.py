@@ -7975,10 +7975,13 @@ ORDER BY COMPTE DESC
                     # lost its English lead image to a French portal banner. Never pivot
                     # the two languages into a single join.
                     #
-                    # NEVER BLANK: the WHERE keeps an empty source from erasing what an
-                    # earlier pass had found. A crawl that fails today must not cost the
-                    # image found last week, which is the rule the crawler applies to its
-                    # own writes.
+                    # NULL IS UNKNOWN, '' IS AN ANSWER (WIKIPEDIA-CRAWLER-019, 2026-10-14).
+                    # wikipedia-crawler leaves MAIN_IMAGE_URL untouched (NULL) when a
+                    # request fails, and writes '' when Wikipedia says the page has no
+                    # lead image. Copying '' is what lets a wrong image leave T2S: under
+                    # the former "never blank" rule, 4552 French movie rows kept the
+                    # Apollo_11_Crew.jpg portal photo forever. A failed crawl still costs
+                    # nothing, since it leaves NULL and the WHERE skips NULL.
                     #
                     # Placed LAST: it reads the T2S rows every other process builds.
                     # Per-statement try/except so a table missing the columns (migration
@@ -7998,7 +8001,7 @@ INNER JOIN T_WC_WIKIPEDIA_PAGE_LANG pl
     ON  pl.ID_WIKIDATA = t2s.ID_WIKIDATA
     AND pl.LANG = '{strlang}'
 SET t2s.{strcolumn} = pl.MAIN_IMAGE_URL
-WHERE COALESCE(pl.MAIN_IMAGE_URL,'') <> '' """
+WHERE pl.MAIN_IMAGE_URL IS NOT NULL """
                             try:
                                 cursor2.execute(strsqlmainimage)
                                 lngwikipediaimagerows = cursor2.rowcount
