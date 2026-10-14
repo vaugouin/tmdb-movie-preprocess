@@ -1,7 +1,7 @@
 -- The Muppets: a T2S collection for the Muppet film series, which TMDb does not have (custom list, TARGET_TABLE = 2)
 --
 -- Why. On 2026-10-11 (shoot 11-21-11) "the movie adaptation of this show" found nothing for The Muppet Show.
--- check-326-muppets-adaptations-20261011.txt settles where the films are:
+-- archive/check-326-muppets-adaptations-20261011.txt settles where the films are:
 --   * the source-work tables link only Muppet Treasure Island (1996) and the 2026 special to the series
 --     (Wikidata P144 "based on");
 --   * no T2S collection holds The Muppet Movie (part 4 of the check is empty);
