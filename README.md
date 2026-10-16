@@ -155,9 +155,10 @@ docker run -d --rm \
     tmdb-movie-preprocess-python-app
 ```
 
-The included `tmdb-movie-preprocess-wikidata.sh` wraps build + run, and the main
-`tmdb-movie-preprocess.sh` launcher calls it (one decoupled Wikidata job, not one
-per entity). Apply each linker's migration first. The single-linker scopes
+The included `tmdb-movie-preprocess-wikidata.sh` wraps build + run (one decoupled
+Wikidata job, not one per entity). Since 2026-10-16 the main
+`tmdb-movie-preprocess.sh` launcher no longer calls it (the chaining block is kept
+commented out there); run it by hand or from its own cron entry. Apply each linker's migration first. The single-linker scopes
 (`wikidata-topics`, `wikidata-companies`) remain for targeted/debug runs.
 
 ---

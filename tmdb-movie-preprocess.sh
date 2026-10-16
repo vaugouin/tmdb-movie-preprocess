@@ -20,28 +20,33 @@ else
     echo "tmdb-movie-preprocess Docker container started."
 fi
 
-# ---- SEQUENTIEL, pas parallele (2026-09-01) ------------------------------------
-# Ce script demarrait le conteneur principal en detache puis enchainait aussitot sur
-# le conteneur wikidata : les deux travaillaient la MEME base en meme temps. C'est la
-# contention qui a fait echouer un UPDATE de -045 sur « Lock wait timeout exceeded ».
-# On attend donc que le principal ait fini avant de lancer le second.
+# ---- Chainage wikidata COUPE (2026-10-16) ---------------------------------------
+# Ce script n'enchaine plus sur tmdb-movie-preprocess-wikidata.sh : le job Wikidata
+# est desactive. Le bloc d'origine est garde en commentaire ci-dessous pour le
+# remettre tel quel ; le lanceur wikidata reste appelable a la main.
 #
-# `docker wait` bloque jusqu'a l'arret du conteneur et rend son code de sortie. Il
-# peut cependant rendre la main en erreur quand `--rm` a deja supprime le conteneur,
-# d'ou la boucle de garde qui suit : elle ne coute rien quand `docker wait` a fait son
-# travail, et rattrape la course sinon. Le `|| true` evite qu'un `set -e` futur ne
-# fasse tomber le script sur ce cas parfaitement normal.
-echo "Waiting for tmdb-movie-preprocess to finish before starting the Wikidata linkers..."
-docker wait tmdb-movie-preprocess >/dev/null 2>&1 || true
-while [ -n "$(docker ps -q -f name=^tmdb-movie-preprocess$)" ]; do
-    sleep 10
-done
-echo "tmdb-movie-preprocess finished."
-
-# Decoupled Wikidata linkers: ALL of them, sequentially, in ONE container
-# (scope wikidata-all = Process 60 topics -> 63 companies -> future linkers).
-# One process = one Wikimedia request stream, so they never contend for the rate
-# limit. For a targeted single-linker run, call -wikidata-topics.sh or
-# -wikidata-companies.sh directly instead.
-cd /home/debian/docker/tmdb-movie-preprocess
-./tmdb-movie-preprocess-wikidata.sh
+## ---- SEQUENTIEL, pas parallele (2026-09-01) ------------------------------------
+## Ce script demarrait le conteneur principal en detache puis enchainait aussitot sur
+## le conteneur wikidata : les deux travaillaient la MEME base en meme temps. C'est la
+## contention qui a fait echouer un UPDATE de -045 sur « Lock wait timeout exceeded ».
+## On attend donc que le principal ait fini avant de lancer le second.
+##
+## `docker wait` bloque jusqu'a l'arret du conteneur et rend son code de sortie. Il
+## peut cependant rendre la main en erreur quand `--rm` a deja supprime le conteneur,
+## d'ou la boucle de garde qui suit : elle ne coute rien quand `docker wait` a fait son
+## travail, et rattrape la course sinon. Le `|| true` evite qu'un `set -e` futur ne
+## fasse tomber le script sur ce cas parfaitement normal.
+# echo "Waiting for tmdb-movie-preprocess to finish before starting the Wikidata linkers..."
+# docker wait tmdb-movie-preprocess >/dev/null 2>&1 || true
+# while [ -n "$(docker ps -q -f name=^tmdb-movie-preprocess$)" ]; do
+#     sleep 10
+# done
+# echo "tmdb-movie-preprocess finished."
+#
+## Decoupled Wikidata linkers: ALL of them, sequentially, in ONE container
+## (scope wikidata-all = Process 60 topics -> 63 companies -> future linkers).
+## One process = one Wikimedia request stream, so they never contend for the rate
+## limit. For a targeted single-linker run, call -wikidata-topics.sh or
+## -wikidata-companies.sh directly instead.
+# cd /home/debian/docker/tmdb-movie-preprocess
+# ./tmdb-movie-preprocess-wikidata.sh
