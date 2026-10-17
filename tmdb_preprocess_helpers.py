@@ -2135,11 +2135,26 @@ STR_LOCATION_DRIVING = (
     "       OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = st.ID_WIKIDATA) )\n"
 )
 
+# Le meme perimetre, episodes compris (TMDB-MOVIE-PREPROCESS-062, 2026-10-17). Mesure du
+# jour (doc/sql/test-062-episode-locations-20261017.txt) : 4 494 citations sur 3 370
+# episodes T2S, 440 lieux que ni un film ni une serie ne citent. Sert seulement quand
+# T_WC_T2S_EPISODE_LOCATION existe, voir f_buildlocationtables().
+STR_LOCATION_DRIVING_WITH_EPISODES = (
+    "  SELECT DISTINCT iv.ID_ITEM AS ID_WIKIDATA\n"
+    "  FROM T_WC_WIKIDATA_STATEMENT st\n"
+    "  INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+    "  WHERE st.ID_PROPERTY IN ('P840', 'P915')\n"
+    "    AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+    "    AND ( EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE m WHERE m.ID_WIKIDATA = st.ID_WIKIDATA)\n"
+    "       OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE s WHERE s.ID_WIKIDATA = st.ID_WIKIDATA)\n"
+    "       OR EXISTS (SELECT 1 FROM T_WC_T2S_EPISODE e WHERE e.ID_WIKIDATA = st.ID_WIKIDATA) )\n"
+)
+
 
 def f_locationassociationsql(strmajor):
-    """Le peuplement d'une table d'association, film ou serie.
+    """Le peuplement d'une table d'association, film, serie ou episode.
 
-    strmajor vaut 'MOVIE' ou 'SERIE'. Les deux requetes sont rigoureusement paralleles,
+    strmajor vaut 'MOVIE', 'SERIE' ou 'EPISODE' (TMDB-MOVIE-PREPROCESS-062). Les deux requetes sont rigoureusement paralleles,
     et c'est la raison de les generer plutot que de les ecrire deux fois : le defaut
     classique de ces paires est qu'une des deux derive lors d'une correction.
 
@@ -2190,7 +2205,7 @@ def _f_locationstep(cursor, strstep, strsql):
 
 
 def f_buildlocationtables():
-    """Reconstruit les trois tables des lieux, en entier, par du SQL seul.
+    """Reconstruit les tables des lieux (trois, quatre avec les episodes), en entier, par du SQL seul.
 
     RECONSTRUCTION TOTALE ET NON INCREMENTALE, et c'est la volumetrie qui l'a decide :
     11 922 lieux et 95 766 associations mesures le 2026-09-11. A cette taille, un
@@ -2256,6 +2271,22 @@ def f_buildlocationtables():
             # mais correct.
             print(f"72: isolation laissee par defaut ({type(isolationerror).__name__}: {isolationerror}).")
 
+        # --- 0. Les episodes, seulement si leur table existe (TMDB-MOVIE-PREPROCESS-062) --
+        # La table T_WC_T2S_EPISODE_LOCATION et la colonne EPISODE_COUNT viennent d'une
+        # migration (doc/sql/migration-062-episode-location.sql) qui ne passe pas par ce
+        # code. Sans cette verification, un deploiement du code avant la migration ferait
+        # echouer le CREATE ... LIKE de l'etape 3 chaque nuit, et les lieux cesseraient de
+        # se rafraichir. Absentes, le passage reste celui d'avant, films et series.
+        cursor.execute("SHOW TABLES LIKE 'T_WC_T2S_EPISODE_LOCATION'")
+        blnepisodes = cursor.fetchone() is not None
+        if blnepisodes:
+            cursor.execute("SHOW COLUMNS FROM T_WC_T2S_LOCATION LIKE 'EPISODE_COUNT'")
+            blnepisodes = cursor.fetchone() is not None
+        arrmajors = ("MOVIE", "SERIE", "EPISODE") if blnepisodes else ("MOVIE", "SERIE")
+        arrresult["episodes_actifs"] = 1 if blnepisodes else 0
+        print("72: episodes " + ("inclus (T_WC_T2S_EPISODE_LOCATION presente)." if blnepisodes else
+                                 "exclus : T_WC_T2S_EPISODE_LOCATION ou EPISODE_COUNT absente, migration 062 a passer."))
+
         # --- 1. L'entite -----------------------------------------------------
         # Le libelle et la description viennent de V2 seul, jamais de T_WC_T2S_ITEM :
         # la population de cette derniere est pilotee par V1 deliberement, et elle part
@@ -2301,7 +2332,7 @@ def f_buildlocationtables():
         arrresult["perimetre"] = _f_locationstep(cursor, "1c-0. INSERT du perimetre (tmp_lieux)", (
             "INSERT INTO tmp_lieux (ID_WIKIDATA)\n"
             "SELECT lieux.ID_WIKIDATA\n"
-            "FROM (\n" + STR_LOCATION_DRIVING + ") lieux\n"
+            "FROM (\n" + (STR_LOCATION_DRIVING_WITH_EPISODES if blnepisodes else STR_LOCATION_DRIVING) + ") lieux\n"
             "WHERE lieux.ID_WIKIDATA IS NOT NULL AND lieux.ID_WIKIDATA <> ''"))
         connection.commit()
         strlabels = (
@@ -2390,8 +2421,8 @@ def f_buildlocationtables():
         cursor.execute("SELECT COUNT(*) AS C FROM T_WC_T2S_LOCATION_BUILD WHERE LOCATION_TYPE IS NULL")
         arrresult["sans_type"] = int(cursor.fetchone()["C"])
 
-        # --- 3. Les deux associations ----------------------------------------
-        for strmajor in ("MOVIE", "SERIE"):
+        # --- 3. Les associations, deux ou trois selon les episodes ----------
+        for strmajor in arrmajors:
             strtable = "T_WC_T2S_" + strmajor + "_LOCATION"
             _f_locationstep(cursor, "3a. DROP " + strtable + "_BUILD",
                             "DROP TABLE IF EXISTS " + strtable + "_BUILD")
@@ -2418,6 +2449,13 @@ def f_buildlocationtables():
             "                     FROM T_WC_T2S_SERIE_LOCATION_BUILD sl\n"
             "                     WHERE sl.ID_LOCATION = loc.ID_LOCATION)"))
         connection.commit()
+        if blnepisodes:
+            _f_locationstep(cursor, "4a-bis. UPDATE de EPISODE_COUNT", (
+                "UPDATE T_WC_T2S_LOCATION_BUILD loc SET\n"
+                "  loc.EPISODE_COUNT = (SELECT COUNT(DISTINCT el.ID_EPISODE)\n"
+                "                       FROM T_WC_T2S_EPISODE_LOCATION_BUILD el\n"
+                "                       WHERE el.ID_LOCATION = loc.ID_LOCATION)"))
+            connection.commit()
         _f_locationstep(cursor, "4b. UPDATE des notes et de la popularite", (
             "UPDATE T_WC_T2S_LOCATION_BUILD loc SET\n"
             "  loc.IMDB_RATING = (SELECT AVG(m.IMDB_RATING)\n"
@@ -2434,28 +2472,27 @@ def f_buildlocationtables():
             "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.POPULARITY > 0)"))
         connection.commit()
 
-        # --- 5. Les trois bascules -------------------------------------------
+        # --- 5. Les bascules ------------------------------------------------
         # RENAME TABLE d'un seul tenant : MariaDB le traite comme une operation atomique,
         # donc aucune requete ne peut voir une table nouvelle et une autre ancienne.
         #
         # ⚠ C'EST L'ETAPE LA PLUS EXPOSEE AU VERROU, parce qu'elle demande un verrou de
-        # metadonnees exclusif sur trois tables que l'API lit en permanence. Une session
+        # metadonnees exclusif sur les tables que l'API lit en permanence. Une session
         # qui a laisse une transaction ouverte sur l'une d'elles, un onglet phpMyAdmin
         # par exemple, suffit a la faire echouer en 1205. Si c'est ici que le passage
         # meurt, chercher la transaction fautive plutot que rejouer.
-        for strtable in ("T_WC_T2S_LOCATION", "T_WC_T2S_MOVIE_LOCATION", "T_WC_T2S_SERIE_LOCATION"):
+        # Avec les episodes, quatre tables basculent dans le meme RENAME : un lieu nouveau
+        # que seul un episode cite ne doit jamais etre servi sans son association.
+        arrswaptables = ["T_WC_T2S_LOCATION"] + ["T_WC_T2S_" + strmajor + "_LOCATION" for strmajor in arrmajors]
+        for strtable in arrswaptables:
             cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
         connection.commit()
-        _f_locationstep(cursor, "5. RENAME des trois tables", (
-            "RENAME TABLE\n"
-            "  T_WC_T2S_LOCATION TO T_WC_T2S_LOCATION_OLD,\n"
-            "  T_WC_T2S_LOCATION_BUILD TO T_WC_T2S_LOCATION,\n"
-            "  T_WC_T2S_MOVIE_LOCATION TO T_WC_T2S_MOVIE_LOCATION_OLD,\n"
-            "  T_WC_T2S_MOVIE_LOCATION_BUILD TO T_WC_T2S_MOVIE_LOCATION,\n"
-            "  T_WC_T2S_SERIE_LOCATION TO T_WC_T2S_SERIE_LOCATION_OLD,\n"
-            "  T_WC_T2S_SERIE_LOCATION_BUILD TO T_WC_T2S_SERIE_LOCATION"))
+        _f_locationstep(cursor, f"5. RENAME des {len(arrswaptables)} tables", (
+            "RENAME TABLE\n" +
+            ",\n".join(f"  {strtable} TO {strtable}_OLD,\n  {strtable}_BUILD TO {strtable}"
+                       for strtable in arrswaptables)))
         connection.commit()
-        for strtable in ("T_WC_T2S_LOCATION", "T_WC_T2S_MOVIE_LOCATION", "T_WC_T2S_SERIE_LOCATION"):
+        for strtable in arrswaptables:
             cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
         connection.commit()
         return arrresult

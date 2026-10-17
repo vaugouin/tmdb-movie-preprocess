@@ -7623,6 +7623,8 @@ ORDER BY COMPTE DESC
                           f"{arrlocationcounts.get('lieux_supprimes', 0)} left the perimeter and stay as DELETED = 1), "
                           f"{arrlocationcounts.get('movie', 0)} movie links, "
                           f"{arrlocationcounts.get('serie', 0)} serie links, "
+                          f"{arrlocationcounts.get('episode', 0)} episode links"
+                          f"{'' if arrlocationcounts.get('episodes_actifs', 0) else ' (episodes skipped, migration 062 not applied)'}, "
                           f"{arrlocationcounts.get('sans_type', 0)} without a type")
                     # Les trois comptes de l'etape 1c en variables serveur : c'est la trace qui
                     # prouve, nuit apres nuit, que l'identifiant est conserve (correctif du 2026-09-13).
@@ -7641,6 +7643,7 @@ ORDER BY COMPTE DESC
                     for strkey, strlocationdesc in (("lieux", "Locations rebuilt by"),
                                                     ("movie", "Movie-location links rebuilt by"),
                                                     ("serie", "Serie-location links rebuilt by"),
+                                                    ("episode", "Episode-location links rebuilt by"),
                                                     ("sans_type", "Locations left without a LOCATION_TYPE by")):
                         cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strkey + "count", str(arrlocationcounts.get(strkey, 0)), strlocationdesc + " the location rebuild (process 72)", 0)
                     # set_processed() et non une affectation directe : kind="copy"
