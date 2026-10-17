@@ -2311,12 +2311,21 @@ def f_buildlocationtables():
             "       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.DESCRIPTIONS_JSON, '$.en')),\n"
             "                NULLIF(wi.DESCRIPTION_EN, '')),\n"
         )
+        # (i) reporte aussi tout ce que le passage ne recalcule pas : les images (71), le
+        # tampon TIM_WIKIDATA_COMPLETED, l'ordre d'affichage et les colonnes de
+        # proprietaire. Sans ce report, chaque nuit les remettait a NULL pour tous les
+        # lieux vivants, et seule la branche (ii) les gardait. Le type, les compteurs et
+        # les agregats sont recalcules plus bas, inutile de les reporter.
         arrresult["lieux_conserves"] = _f_locationstep(cursor, "1c-i. INSERT des lieux connus (ID_LOCATION conserve)", (
             "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
             "    (ID_LOCATION, ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
-            "     LOCATION_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
+            "     LOCATION_SOURCE, DELETED, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT,\n"
+            "     ID_OWNER, TIM_UPDATED, ID_USER_UPDATED, POSTER_PATH, WIKIPEDIA_IMAGE_PATH,\n"
+            "     TIM_WIKIDATA_COMPLETED, WIKIPEDIA_MAIN_IMAGE_URL, WIKIPEDIA_MAIN_IMAGE_URL_FR)\n"
             "SELECT old.ID_LOCATION, lieux.ID_WIKIDATA,\n" + strlabels +
-            "       'wikidata', 0, COALESCE(old.DAT_CREAT, CURDATE()), NOW()\n"
+            "       'wikidata', 0, old.DISPLAY_ORDER, old.ID_CREATOR, COALESCE(old.DAT_CREAT, CURDATE()),\n"
+            "       old.ID_OWNER, NOW(), old.ID_USER_UPDATED, old.POSTER_PATH, old.WIKIPEDIA_IMAGE_PATH,\n"
+            "       old.TIM_WIKIDATA_COMPLETED, old.WIKIPEDIA_MAIN_IMAGE_URL, old.WIKIPEDIA_MAIN_IMAGE_URL_FR\n"
             "FROM tmp_lieux lieux\n"
             "INNER JOIN T_WC_T2S_LOCATION old ON old.ID_WIKIDATA = lieux.ID_WIKIDATA\n"
             "LEFT JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = lieux.ID_WIKIDATA"))
