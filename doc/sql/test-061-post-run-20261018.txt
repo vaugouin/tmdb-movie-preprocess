@@ -1,0 +1,55 @@
+-- test-061-post-run.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-18 04:15:47
+--
++------------------------------+
+| SECTION                      |
++------------------------------+
+| 1. Variables du processus 72 |
++------------------------------+
++------------------------------------------------+---------------------+---------------------+
+| VAR_NAME                                       | VAR_VALUE           | TIM_UPDATED         |
++------------------------------------------------+---------------------+---------------------+
+| strtmdbmoviepreprocesslocationconecity         | 2750                | 2026-10-18 04:48:10 |
+| strtmdbmoviepreprocesslocationconecountry      | 214                 | 2026-10-18 04:48:10 |
+| strtmdbmoviepreprocesslocationconefiction      | 168                 | 2026-10-18 04:48:10 |
+| strtmdbmoviepreprocesslocationconeisland       | 115                 | 2026-10-18 04:48:10 |
+| strtmdbmoviepreprocesslocationconenature       | 505                 | 2026-10-18 04:48:10 |
+| strtmdbmoviepreprocesslocationconeregion       | 16113               | 2026-10-18 04:48:10 |
+| strtmdbmoviepreprocesslocationconestructure    | 13965               | 2026-10-18 04:48:10 |
+| strtmdbmoviepreprocesslocationdeleted          | 6                   | 2026-10-18 05:00:33 |
+| strtmdbmoviepreprocesslocationenddatetime      | 2026-10-18 05:00:34 | 2026-10-18 05:00:34 |
+| strtmdbmoviepreprocesslocationepisodecount     | 4462                | 2026-10-18 05:00:34 |
+| strtmdbmoviepreprocesslocationerror            |                     | 2026-10-18 05:00:33 |
+| strtmdbmoviepreprocesslocationkept             | 12534               | 2026-10-18 05:00:33 |
+| strtmdbmoviepreprocesslocationlieuxcount       | 12977               | 2026-10-18 05:00:34 |
+| strtmdbmoviepreprocesslocationmoviecount       | 85900               | 2026-10-18 05:00:34 |
+| strtmdbmoviepreprocesslocationnew              | 443                 | 2026-10-18 05:00:33 |
+| strtmdbmoviepreprocesslocationprocessedcount   | 12977               | 2026-10-18 05:00:34 |
+| strtmdbmoviepreprocesslocationprocessedseconds | 747.76              | 2026-10-18 05:00:34 |
+| strtmdbmoviepreprocesslocationsans_typecount   | 1060                | 2026-10-18 05:00:34 |
+| strtmdbmoviepreprocesslocationseriecount       | 11386               | 2026-10-18 05:00:34 |
+| strtmdbmoviepreprocesslocationstartdatetime    | 2026-10-18 04:48:06 | 2026-10-18 04:48:06 |
++------------------------------------------------+---------------------+---------------------+
++------------------------------------------------------------------------+
+| SECTION                                                                |
++------------------------------------------------------------------------+
+| 2. Colonnes recopiees, lieux vivants : anciens contre nouveaux du jour |
++------------------------------------------------------------------------+
++------------------+-------+-------------+----------------------+----------------+-------------------+---------------+------------------------+------------------------+------------+----------+
+| LIEUX            | N     | POSTER_PATH | WIKIPEDIA_IMAGE_PATH | MAIN_IMAGE_URL | MAIN_IMAGE_URL_FR | DISPLAY_ORDER | TIM_WIKIDATA_COMPLETED | WIKIDATA_COMPLETED_MIN | ID_CREATOR | ID_OWNER |
++------------------+-------+-------------+----------------------+----------------+-------------------+---------------+------------------------+------------------------+------------+----------+
+| anciens          | 12534 |           0 |                    0 |           9891 |              9166 |             0 |                      0 | NULL                   |          0 |        0 |
+| nouveaux du jour |   443 |           0 |                    0 |            208 |               161 |             0 |                      0 | NULL                   |          0 |        0 |
++------------------+-------+-------------+----------------------+----------------+-------------------+---------------+------------------------+------------------------+------------+----------+
++--------------------------------------------------------+
+| SECTION                                                |
++--------------------------------------------------------+
+| 3. Echantillons 2428, 2429, 2435 apres le processus 70 |
++--------------------------------------------------------+
++-------------------+------------------------+------------------------------------------------------------------------+
+| ID_T2S_EVALUATION | ASSERTION_REFRESH_LAST | ASSERTIONS_QUERY_RESULT                                                |
++-------------------+------------------------+------------------------------------------------------------------------+
+|              2428 | 2026-10-18 03:02:44    | ID_MOVIE IN (27205, 350, 792307, 603692, 331482, 49013, 77931, 791373) |
+|              2429 | 2026-10-18 03:02:44    | ID_MOVIE IN (27205, 153, 28422, 14525, 44737, 42041, 1053460, 899139)  |
+|              2435 | 2026-10-18 03:02:44    | ID_SERIE IN (19885, 60574, 97546, 67070, 65494, 4327, 2490, 815)       |
++-------------------+------------------------+------------------------------------------------------------------------+
