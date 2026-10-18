@@ -2485,13 +2485,18 @@ def f_buildlocationtables():
         # reponse (« pas d'image en tete », WIKIPEDIA-CRAWLER-019) et fait passer a l'autre
         # langue ; NULL dans les deux langues est une inconnue (crawl rate) et garde la
         # valeur recopiee de la veille par 1c-i.
+        # ⚠ La source est en varchar(1000), la cible en varchar(500) : le premier passage,
+        # le 2026-10-18, est tombe sur « Data too long for column » et 72 a tout annule.
+        # Une URL de plus de 500 caracteres est sautee (l'autre langue, sinon rien) plutot
+        # que tronquee : une URL coupee est une image cassee a l'ecran.
         _f_locationstep(cursor, "4c. UPDATE de WIKIPEDIA_IMAGE_PATH", (
             "UPDATE T_WC_T2S_LOCATION_BUILD loc\n"
             "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pen ON pen.ID_WIKIDATA = loc.ID_WIKIDATA AND pen.LANG = 'en'\n"
             "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pfr ON pfr.ID_WIKIDATA = loc.ID_WIKIDATA AND pfr.LANG = 'fr'\n"
             "SET loc.WIKIPEDIA_IMAGE_PATH = CASE\n"
             "    WHEN pen.MAIN_IMAGE_URL IS NULL AND pfr.MAIN_IMAGE_URL IS NULL THEN loc.WIKIPEDIA_IMAGE_PATH\n"
-            "    ELSE COALESCE(NULLIF(pen.MAIN_IMAGE_URL, ''), NULLIF(pfr.MAIN_IMAGE_URL, '')) END"))
+            "    ELSE COALESCE(IF(CHAR_LENGTH(pen.MAIN_IMAGE_URL) BETWEEN 1 AND 500, pen.MAIN_IMAGE_URL, NULL),\n"
+            "                  IF(CHAR_LENGTH(pfr.MAIN_IMAGE_URL) BETWEEN 1 AND 500, pfr.MAIN_IMAGE_URL, NULL)) END"))
         connection.commit()
         cursor.execute("SELECT COUNT(*) AS C FROM T_WC_T2S_LOCATION_BUILD "
                        "WHERE DELETED = 0 AND WIKIPEDIA_IMAGE_PATH IS NOT NULL AND WIKIPEDIA_IMAGE_PATH <> ''")

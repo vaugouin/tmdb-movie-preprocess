@@ -7615,39 +7615,45 @@ ORDER BY COMPTE DESC
                     except Exception as locationerror:
                         strlocationerror = f"{type(locationerror).__name__}: {locationerror}"
                         print(f"72: FAILED, the served tables are unchanged: {strlocationerror}")
-                        print("72: the rest of the pipeline continues. Re-run with TMDB_PREPROCESS_SCOPE=locations once wikidata-crawler is idle.")
+                        print("72: the rest of the pipeline continues. Re-run with TMDB_PREPROCESS_SCOPE=locations once the cause is fixed (a lock wait means wikidata-crawler was busy).")
                         cp.f_setservervariable("strtmdbmoviepreprocesslocationerror", strlocationerror, "Last error of the location rebuild (process 72), empty when it succeeded", 0)
-                    print(f"72: {arrlocationcounts.get('lieux', 0)} locations "
-                          f"({arrlocationcounts.get('lieux_conserves', 0)} kept their ID_LOCATION, "
-                          f"{arrlocationcounts.get('lieux_nouveaux', 0)} new, "
-                          f"{arrlocationcounts.get('lieux_supprimes', 0)} left the perimeter and stay as DELETED = 1), "
-                          f"{arrlocationcounts.get('movie', 0)} movie links, "
-                          f"{arrlocationcounts.get('serie', 0)} serie links, "
-                          f"{arrlocationcounts.get('episode', 0)} episode links"
-                          f"{'' if arrlocationcounts.get('episodes_actifs', 0) else ' (episodes skipped, migration 062 not applied)'}, "
-                          f"{arrlocationcounts.get('sans_type', 0)} without a type, "
-                          f"{arrlocationcounts.get('avec_image', 0)} with an image")
-                    # Les trois comptes de l'etape 1c en variables serveur : c'est la trace qui
-                    # prouve, nuit apres nuit, que l'identifiant est conserve (correctif du 2026-09-13).
-                    for strlocationcountkey, strlocationcountsuffix, strlocationcountdesc in (
-                            ("lieux_conserves", "kept", "Locations that kept their ID_LOCATION"),
-                            ("lieux_nouveaux", "new", "New locations, ID_LOCATION assigned above the previous maximum"),
-                            ("lieux_supprimes", "deleted", "Locations that left the perimeter, kept as DELETED = 1")):
-                        cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strlocationcountsuffix, str(arrlocationcounts.get(strlocationcountkey, 0)), strlocationcountdesc + " (process 72)", 0)
-                    # ⚠ strlocationdesc et NON strdesc : la variable de boucle du pipeline
-                    # s'appelle strdesc (ligne 326) et sert APRES le bloc, au classement des
-                    # durees et a la description de la variable serveur du temps ecoule. La
-                    # premiere version de ce bloc la masquait, si bien que le passage du
-                    # 2026-09-12 a titre le processus 72 « Locations left without a
-                    # LOCATION_TYPE by » au lieu de « T2S_LOCATION ». Aucun calcul fausse,
-                    # mais un rapport qui ment sur ce qu'il mesure.
-                    for strkey, strlocationdesc in (("lieux", "Locations rebuilt by"),
-                                                    ("movie", "Movie-location links rebuilt by"),
-                                                    ("serie", "Serie-location links rebuilt by"),
-                                                    ("episode", "Episode-location links rebuilt by"),
-                                                    ("sans_type", "Locations left without a LOCATION_TYPE by"),
-                                                    ("avec_image", "Living locations with a WIKIPEDIA_IMAGE_PATH after")):
-                        cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strkey + "count", str(arrlocationcounts.get(strkey, 0)), strlocationdesc + " the location rebuild (process 72)", 0)
+                    # Apres un echec, arrlocationcounts est vide : imprimer ses zeros et les
+                    # ecrire en variables serveur ferait croire a une table vide et a des
+                    # episodes sautes (passage du 2026-10-18, « 0 locations ... migration 062
+                    # not applied »), alors que la table servie n'a pas bouge. On garde donc
+                    # les comptes du dernier passage reussi.
+                    if arrlocationcounts:
+                        print(f"72: {arrlocationcounts.get('lieux', 0)} locations "
+                              f"({arrlocationcounts.get('lieux_conserves', 0)} kept their ID_LOCATION, "
+                              f"{arrlocationcounts.get('lieux_nouveaux', 0)} new, "
+                              f"{arrlocationcounts.get('lieux_supprimes', 0)} left the perimeter and stay as DELETED = 1), "
+                              f"{arrlocationcounts.get('movie', 0)} movie links, "
+                              f"{arrlocationcounts.get('serie', 0)} serie links, "
+                              f"{arrlocationcounts.get('episode', 0)} episode links"
+                              f"{'' if arrlocationcounts.get('episodes_actifs', 0) else ' (episodes skipped, migration 062 not applied)'}, "
+                              f"{arrlocationcounts.get('sans_type', 0)} without a type, "
+                              f"{arrlocationcounts.get('avec_image', 0)} with an image")
+                        # Les trois comptes de l'etape 1c en variables serveur : c'est la trace qui
+                        # prouve, nuit apres nuit, que l'identifiant est conserve (correctif du 2026-09-13).
+                        for strlocationcountkey, strlocationcountsuffix, strlocationcountdesc in (
+                                ("lieux_conserves", "kept", "Locations that kept their ID_LOCATION"),
+                                ("lieux_nouveaux", "new", "New locations, ID_LOCATION assigned above the previous maximum"),
+                                ("lieux_supprimes", "deleted", "Locations that left the perimeter, kept as DELETED = 1")):
+                            cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strlocationcountsuffix, str(arrlocationcounts.get(strlocationcountkey, 0)), strlocationcountdesc + " (process 72)", 0)
+                        # ⚠ strlocationdesc et NON strdesc : la variable de boucle du pipeline
+                        # s'appelle strdesc (ligne 326) et sert APRES le bloc, au classement des
+                        # durees et a la description de la variable serveur du temps ecoule. La
+                        # premiere version de ce bloc la masquait, si bien que le passage du
+                        # 2026-09-12 a titre le processus 72 « Locations left without a
+                        # LOCATION_TYPE by » au lieu de « T2S_LOCATION ». Aucun calcul fausse,
+                        # mais un rapport qui ment sur ce qu'il mesure.
+                        for strkey, strlocationdesc in (("lieux", "Locations rebuilt by"),
+                                                        ("movie", "Movie-location links rebuilt by"),
+                                                        ("serie", "Serie-location links rebuilt by"),
+                                                        ("episode", "Episode-location links rebuilt by"),
+                                                        ("sans_type", "Locations left without a LOCATION_TYPE by"),
+                                                        ("avec_image", "Living locations with a WIKIPEDIA_IMAGE_PATH after")):
+                            cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strkey + "count", str(arrlocationcounts.get(strkey, 0)), strlocationdesc + " the location rebuild (process 72)", 0)
                     # set_processed() et non une affectation directe : kind="copy"
                     # laisse _track_processed a faux, donc finish() n'ecrirait pas le
                     # compte, et la variable serveur resterait a la valeur du passage
