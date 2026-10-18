@@ -1,0 +1,69 @@
+-- test-065-image-preview.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-18 10:55:31
+--
++------------------------------+
+| SECTION                      |
++------------------------------+
+| 1. Index on the source table |
++------------------------------+
++--------------------------+------------+---------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+| Table                    | Non_unique | Key_name                  | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | Ignored |
++--------------------------+------------+---------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+| T_WC_WIKIPEDIA_PAGE_LANG |          0 | UQ_ID_WIKIDATA_LANG       |            1 | ID_WIKIDATA | A         |     1177016 |     NULL | NULL   |      | BTREE      |         |               | NO      |
+| T_WC_WIKIPEDIA_PAGE_LANG |          0 | UQ_ID_WIKIDATA_LANG       |            2 | LANG        | A         |     1177016 |     NULL | NULL   |      | BTREE      |         |               | NO      |
+| T_WC_WIKIPEDIA_PAGE_LANG |          1 | ID_WIKIDATA               |            1 | ID_WIKIDATA | A         |     1177016 |     NULL | NULL   |      | BTREE      |         |               | NO      |
+| T_WC_WIKIPEDIA_PAGE_LANG |          1 | LANG                      |            1 | LANG        | A         |           1 |     NULL | NULL   |      | BTREE      |         |               | NO      |
+| T_WC_WIKIPEDIA_PAGE_LANG |          1 | LANG_WIKIPEDIA_PAGE_TITLE |            1 | LANG        | A         |           1 |     NULL | NULL   |      | BTREE      |         |               | NO      |
++--------------------------+------------+---------------------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
++-------------------------------------------------------------------+
+| SECTION                                                           |
++-------------------------------------------------------------------+
+| 2. Duplicate (ID_WIKIDATA, LANG) among location QIDs (expected 0) |
++-------------------------------------------------------------------+
++----------+
+| DOUBLONS |
++----------+
+|        0 |
++----------+
++-----------------------------------------+
+| SECTION                                 |
++-----------------------------------------+
+| 3. Living places with an image after 4c |
++-----------------------------------------+
++-------+------------+-----------+-----------+
+| LIEUX | AVEC_IMAGE | DEPUIS_EN | DEPUIS_FR |
++-------+------------+-----------+-----------+
+| 12977 |      10438 |      9883 |       555 |
++-------+------------+-----------+-----------+
++--------------------------------------+
+| SECTION                              |
++--------------------------------------+
+| 4. Los Angeles, London, Paris, Tokyo |
++--------------------------------------+
++-------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_WIKIDATA | LOCATION_NAME | IMG                                                                                                                                                              |
++-------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Q1490       | Tokyo         | https://upload.wikimedia.org/wikipedia/commons/b/b2/Skyscrapers_of_Shinjuku_2009_January.jpg                                                                     |
+| Q65         | Los Angeles   | https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Hollywood_sign_%288485145044%29.jpg/3840px-Hollywood_sign_%288485145044%29.jpg                          |
+| Q84         | London        | https://upload.wikimedia.org/wikipedia/commons/6/67/London_Skyline_%28125508655%29.jpeg                                                                          |
+| Q90         | Paris         | https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/La_Tour_Eiffel_vue_de_la_Tour_Saint-Jacques%2C_Paris_ao%C3%BBt_2014_%282%29.jpg/3840px-La_Tour_Eiffel_v |
++-------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++------------------------------------------------------+
+| SECTION                                              |
++------------------------------------------------------+
+| 5. Images shared by several places (banner suspects) |
++------------------------------------------------------+
++----------------------------------------------------------------------------------------------------------------------------------------------+-------+
+| IMG                                                                                                                                          | LIEUX |
++----------------------------------------------------------------------------------------------------------------------------------------------+-------+
+| https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f8/Galaxymap_p1.svg/1920px-Galaxymap_p1.svg.png                                        |     5 |
+| https://upload.wikimedia.org/wikipedia/commons/8/8c/Estonia_adm_location_map.svg                                                             |     4 |
+| https://upload.wikimedia.org/wikipedia/commons/b/b2/Skyscrapers_of_Shinjuku_2009_January.jpg                                                 |     3 |
+| https://upload.wikimedia.org/wikipedia/commons/4/47/Atlantic_Ocean_-_en.png                                                                  |     3 |
+| https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Flag_of_Ireland.svg/1280px-Flag_of_Ireland.svg.png                                  |     3 |
+| https://upload.wikimedia.org/wikipedia/commons/a/a7/Flag_map_of_Arag%C3%B3n.svg                                                              |     3 |
+| https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Falezlerden_Antalya_Konyaalt%C4%B1_Plaj%C4%B1na_do%C4%9Fru_bir_g%C3%B6r%C3%BCn%C3%B |     3 |
+| https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Flag_of_Japan_%281870%E2%80%931999%29.svg/1280px-Flag_of_Japan_%281870%E2%80%931999 |     3 |
+| https://upload.wikimedia.org/wikipedia/commons/5/54/2004-09-05%2C_Twede%27s_Cafe%2C_North_Bend%2C_Washington.jpg                             |     3 |
+| https://thumb.wikimedia.org/wikipedia/commons/thumb/b/ba/Paris_A%C3%A9roport_logo.svg/120px-Paris_A%C3%A9roport_logo.svg.png                 |     3 |
++----------------------------------------------------------------------------------------------------------------------------------------------+-------+

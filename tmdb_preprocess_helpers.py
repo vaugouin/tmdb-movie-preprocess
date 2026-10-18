@@ -2472,6 +2472,31 @@ def f_buildlocationtables():
             "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.POPULARITY > 0)"))
         connection.commit()
 
+        # --- 4c. L'image du lieu (TMDB-MOVIE-PREPROCESS-065) ----------------
+        # tmdb-front et voice-agent lisent POSTER_PATH puis WIKIPEDIA_IMAGE_PATH, comme pour
+        # les mouvements ou les collections, que f_getwikidataimagepath() remplit avec
+        # l'image principale de la page Wikipedia. Ici personne ne l'ecrivait : le
+        # 2026-10-18, 0 lieu sur 12 977 l'avait, alors que 9 883 portaient l'URL anglaise
+        # dans WIKIPEDIA_MAIN_IMAGE_URL (processus 71), Los Angeles le panneau Hollywood.
+        # Meme source que 71, T_WC_WIKIPEDIA_PAGE_LANG, lue directement parce que 72 passe
+        # AVANT 71 : un lieu nouveau a son image des sa premiere nuit.
+        # L'anglais d'abord, le francais a defaut (555 lieux n'ont que lui, Londres entre
+        # autres, dont l'image anglaise a ete effacee comme bandeau partage). '' est une
+        # reponse (« pas d'image en tete », WIKIPEDIA-CRAWLER-019) et fait passer a l'autre
+        # langue ; NULL dans les deux langues est une inconnue (crawl rate) et garde la
+        # valeur recopiee de la veille par 1c-i.
+        _f_locationstep(cursor, "4c. UPDATE de WIKIPEDIA_IMAGE_PATH", (
+            "UPDATE T_WC_T2S_LOCATION_BUILD loc\n"
+            "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pen ON pen.ID_WIKIDATA = loc.ID_WIKIDATA AND pen.LANG = 'en'\n"
+            "LEFT JOIN T_WC_WIKIPEDIA_PAGE_LANG pfr ON pfr.ID_WIKIDATA = loc.ID_WIKIDATA AND pfr.LANG = 'fr'\n"
+            "SET loc.WIKIPEDIA_IMAGE_PATH = CASE\n"
+            "    WHEN pen.MAIN_IMAGE_URL IS NULL AND pfr.MAIN_IMAGE_URL IS NULL THEN loc.WIKIPEDIA_IMAGE_PATH\n"
+            "    ELSE COALESCE(NULLIF(pen.MAIN_IMAGE_URL, ''), NULLIF(pfr.MAIN_IMAGE_URL, '')) END"))
+        connection.commit()
+        cursor.execute("SELECT COUNT(*) AS C FROM T_WC_T2S_LOCATION_BUILD "
+                       "WHERE DELETED = 0 AND WIKIPEDIA_IMAGE_PATH IS NOT NULL AND WIKIPEDIA_IMAGE_PATH <> ''")
+        arrresult["avec_image"] = int(cursor.fetchone()["C"])
+
         # --- 5. Les bascules ------------------------------------------------
         # RENAME TABLE d'un seul tenant : MariaDB le traite comme une operation atomique,
         # donc aucune requete ne peut voir une table nouvelle et une autre ancienne.
