@@ -63,5 +63,5 @@ SHOW COLUMNS FROM T_WC_T2S_LOCATION LIKE 'EPISODE_COUNT';
 -- ----------------------------------------------------------------------------
 -- ENSUITE. Le prochain passage du processus 72 (nuit, ou a la demande avec
 -- ./tmdb-movie-preprocess-locations.sh puis ./tmdb-movie-preprocess-wikipedia-main-image.sh)
--- remplit la table. Recette : doc/sql/test-062-post-run.sql.
+-- remplit la table. Recette : doc/sql/archive/test-062-post-run.sql.
 -- ----------------------------------------------------------------------------
