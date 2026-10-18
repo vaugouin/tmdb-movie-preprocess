@@ -1,0 +1,78 @@
+-- test-062-post-run.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-18 04:13:32
+--
++--------------------------------+
+| SECTION                        |
++--------------------------------+
+| 1. Liens episode-lieu par role |
++--------------------------------+
++---------------+-------+----------+-------+
+| LOCATION_ROLE | LIENS | EPISODES | LIEUX |
++---------------+-------+----------+-------+
+| filming       |   663 |      525 |   164 |
+| narrative     |  3799 |     2845 |   610 |
++---------------+-------+----------+-------+
++------------------------------+
+| SECTION                      |
++------------------------------+
+| 2. Lieux vivants par origine |
++------------------------------+
++---------------+--------------+--------------------+--------------------+
+| LIEUX_VIVANTS | AVEC_EPISODE | EPISODES_SEULEMENT | SANS_AUCUNE_OEUVRE |
++---------------+--------------+--------------------+--------------------+
+|         12977 |          761 |                440 |                  0 |
++---------------+--------------+--------------------+--------------------+
++-------------------------------------+
+| SECTION                             |
++-------------------------------------+
+| 3. Liens orphelins (doit etre 0, 0) |
++-------------------------------------+
++-----------+--------------+
+| SANS_LIEU | SANS_EPISODE |
++-----------+--------------+
+|         0 |            0 |
++-----------+--------------+
++-------------------------------------------+
+| SECTION                                   |
++-------------------------------------------+
+| 4. Identifiants : lieux crees aujourd hui |
++-------------------------------------------+
++-------------------------+---------+---------+
+| LIEUX_CREES_AUJOURD_HUI | PREMIER | DERNIER |
++-------------------------+---------+---------+
+|                     443 |   12541 |   12983 |
++-------------------------+---------+---------+
++--------------------------------------------------------------------------+
+| SECTION                                                                  |
++--------------------------------------------------------------------------+
+| 5. Exemple : The West Wing, lieux des episodes que la serie ne porte pas |
++--------------------------------------------------------------------------+
++---------------+----------------+------------------------------------+---------------+------------------------------------------------+
+| SEASON_NUMBER | EPISODE_NUMBER | EPISODE_TITLE                      | LOCATION_ROLE | LOCATION_NAME                                  |
++---------------+----------------+------------------------------------+---------------+------------------------------------------------+
+|             1 |             10 | In Excelsis Deo                    | filming       | Arlington National Cemetery                    |
+|             1 |             16 | 20 Hours in L. A.                  | narrative     | Los Angeles                                    |
+|             1 |             16 | 20 Hours in L. A.                  | narrative     | Air Force One                                  |
+|             1 |             19 | Let Bartlet Be Bartlet             | narrative     | Eisenhower Executive Office Building           |
+|             1 |             22 | What Kind of Day Has It Been       | narrative     | Rosslyn                                        |
+|             2 |              1 | In the Shadow of Two Gunmen (1)    | narrative     | Manhattan                                      |
+|             2 |              1 | In the Shadow of Two Gunmen (1)    | narrative     | Nashua                                         |
+|             2 |              1 | In the Shadow of Two Gunmen (1)    | narrative     | George Washington University Hospital          |
+|             2 |              1 | In the Shadow of Two Gunmen (1)    | narrative     | United States Senate                           |
+|             2 |              1 | In the Shadow of Two Gunmen (1)    | narrative     | Rosslyn                                        |
+|             2 |              2 | In the Shadow of Two Gunmen (2)    | narrative     | Los Angeles                                    |
+|             2 |              2 | In the Shadow of Two Gunmen (2)    | narrative     | Chicago                                        |
+|             2 |              2 | In the Shadow of Two Gunmen (2)    | narrative     | Manhattan                                      |
+|             2 |              2 | In the Shadow of Two Gunmen (2)    | filming       | Los Angeles International Airport              |
+|             2 |              2 | In the Shadow of Two Gunmen (2)    | narrative     | O'Hare International Airport                   |
+|             2 |              2 | In the Shadow of Two Gunmen (2)    | narrative     | George Washington University Hospital          |
+|             2 |              6 | The Lame Duck Congress             | narrative     | United States Congress                         |
+|             2 |              7 | The Portland Trip                  | narrative     | Air Force One                                  |
+|             2 |              8 | Shibboleth                         | narrative     | San Diego                                      |
+|             2 |              9 | Galileo                            | filming       | John F. Kennedy Center for the Performing Arts |
+|             2 |             11 | The Leadership Breakfast           | narrative     | United States Capitol                          |
+|             2 |             13 | Bartlet's Third State of the Union | narrative     | United States Capitol                          |
+|             2 |             17 | The Stackhouse Filibuster          | narrative     | United States Capitol                          |
+|             2 |             22 | Two Cathedrals                     | filming       | St. Andrew's School                            |
+|             2 |             22 | Two Cathedrals                     | filming       | Washington National Cathedral                  |
++---------------+----------------+------------------------------------+---------------+------------------------------------------------+
