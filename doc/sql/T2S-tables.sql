@@ -947,6 +947,9 @@ CREATE TABLE `T_WC_T2S_LOCATION` (
   `LOCATION_NAME` varchar(250) DEFAULT NULL,
   `LOCATION_NAME_FR` varchar(250) DEFAULT NULL,
   `OVERVIEW` mediumtext DEFAULT NULL,
+  -- TMDB-MOVIE-PREPROCESS-064 (1.1.20): French Wikidata description, no English fallback.
+  -- Added by process 72 itself (ALTER TABLE ... ADD COLUMN IF NOT EXISTS), no migration.
+  `OVERVIEW_FR` mediumtext DEFAULT NULL,
   `LOCATION_SOURCE` varchar(20) DEFAULT NULL,
   `LOCATION_TYPE` varchar(20) DEFAULT NULL,
   `DELETED` int(5) DEFAULT NULL,

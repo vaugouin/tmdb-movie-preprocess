@@ -2442,6 +2442,14 @@ def f_buildlocationtables():
         # "Paris, city in Texas" se distinguent par le vecteur, la ou "Paris" et "Paris"
         # produisent deux documents identiques que rien ne peut departager. Le type seul
         # n'y suffirait pas, les deux sont des villes.
+        # OVERVIEW_FR (TMDB-MOVIE-PREPROCESS-064) est ajoutee ici a la table servie, AVANT que
+        # 1b ne cree la table de construction LIKE elle : sinon la colonne manquerait a la
+        # construction et les INSERT qui la nomment echoueraient. Meme geste que IMDB_VOTES
+        # sur T_WC_T2S_EPISODE (processus 26) ; une seule nuit l'execute, les suivantes
+        # trouvent la colonne et ne font rien. Pas de migration en voie 2 a passer.
+        _f_locationstep(cursor, "1-0. ALTER T_WC_T2S_LOCATION ADD OVERVIEW_FR IF NOT EXISTS",
+                        "ALTER TABLE T_WC_T2S_LOCATION ADD COLUMN IF NOT EXISTS OVERVIEW_FR MEDIUMTEXT NULL AFTER OVERVIEW")
+        connection.commit()
         _f_locationstep(cursor, "1a. DROP T_WC_T2S_LOCATION_BUILD",
                         "DROP TABLE IF EXISTS T_WC_T2S_LOCATION_BUILD")
         _f_locationstep(cursor, "1b. CREATE T_WC_T2S_LOCATION_BUILD",
@@ -2479,12 +2487,34 @@ def f_buildlocationtables():
             "FROM (\n" + (STR_LOCATION_DRIVING_WITH_EPISODES if blnepisodes else STR_LOCATION_DRIVING) + ") lieux\n"
             "WHERE lieux.ID_WIKIDATA IS NOT NULL AND lieux.ID_WIKIDATA <> ''"))
         connection.commit()
+        # Les libelles (TMDB-MOVIE-PREPROCESS-064). LOCATION_NAME : l'anglais, le 'mul' que
+        # LABEL_EN porte deja (WIKIDATA-CRAWLER-026), les variantes en-gb et en-us, le
+        # francais, puis le premier libelle de n'importe quelle langue : le 2026-10-19,
+        # 172 lieux vivants n'avaient aucun nom, et tmdb-front ne lie pas un lieu sans nom
+        # (Unterfuhrung Messedamm n'existait qu'en allemand). Seul un lieu sans aucune
+        # ligne Wikidata reste sans nom.
+        # LOCATION_NAME_FR : le francais, puis 'mul', puis le nom ci-dessus. Pas de drapeau
+        # de repli : un LOCATION_NAME_FR egal a LOCATION_NAME dit deja « pas de libelle
+        # francais propre », la convention qu'embedding-update applique (pas de document FR
+        # quand les deux noms sont egaux). Le prompt de l'API qui compare LOCATION_NAME_FR
+        # a « Londres » y gagne : « Oslo » repond en francais aussi (2 214 lieux sans
+        # libelle francais le 2026-10-19).
+        # OVERVIEW_FR : la description francaise seule, sans repli sur l'anglais ; une
+        # description anglaise sur une page francaise est un choix du consommateur.
+        strnameexpr = ("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.en')),\n"
+                       "                NULLIF(wi.LABEL_EN, ''),\n"
+                       "                JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.\"en-gb\"')),\n"
+                       "                JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.\"en-us\"')),\n"
+                       "                JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.fr')),\n"
+                       "                JSON_UNQUOTE(JSON_EXTRACT(JSON_EXTRACT(wi.LABELS_JSON, '$.*'), '$[0]')))")
         strlabels = (
-            "       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.en')),\n"
-            "                NULLIF(wi.LABEL_EN, '')),\n"
-            "       JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.fr')),\n"
+            "       " + strnameexpr + ",\n"
+            "       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.fr')),\n"
+            "                JSON_UNQUOTE(JSON_EXTRACT(wi.LABELS_JSON, '$.mul')),\n"
+            "                " + strnameexpr + "),\n"
             "       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(wi.DESCRIPTIONS_JSON, '$.en')),\n"
             "                NULLIF(wi.DESCRIPTION_EN, '')),\n"
+            "       JSON_UNQUOTE(JSON_EXTRACT(wi.DESCRIPTIONS_JSON, '$.fr')),\n"
         )
         # (i) reporte aussi tout ce que le passage ne recalcule pas : les images (71), le
         # tampon TIM_WIKIDATA_COMPLETED, l'ordre d'affichage et les colonnes de
@@ -2493,7 +2523,7 @@ def f_buildlocationtables():
         # les agregats sont recalcules plus bas, inutile de les reporter.
         arrresult["lieux_conserves"] = _f_locationstep(cursor, "1c-i. INSERT des lieux connus (ID_LOCATION conserve)", (
             "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
-            "    (ID_LOCATION, ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
+            "    (ID_LOCATION, ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW, OVERVIEW_FR,\n"
             "     LOCATION_SOURCE, DELETED, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT,\n"
             "     ID_OWNER, TIM_UPDATED, ID_USER_UPDATED, POSTER_PATH, WIKIPEDIA_IMAGE_PATH,\n"
             "     TIM_WIKIDATA_COMPLETED, WIKIPEDIA_MAIN_IMAGE_URL, WIKIPEDIA_MAIN_IMAGE_URL_FR)\n"
@@ -2507,11 +2537,11 @@ def f_buildlocationtables():
         connection.commit()
         arrresult["lieux_supprimes"] = _f_locationstep(cursor, "1c-ii. INSERT des lieux sortis du perimetre (DELETED = 1)", (
             "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
-            "    (ID_LOCATION, ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
+            "    (ID_LOCATION, ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW, OVERVIEW_FR,\n"
             "     LOCATION_SOURCE, LOCATION_TYPE, DELETED, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT,\n"
             "     ID_OWNER, TIM_UPDATED, ID_USER_UPDATED, POSTER_PATH, WIKIPEDIA_IMAGE_PATH,\n"
             "     TIM_WIKIDATA_COMPLETED, WIKIPEDIA_MAIN_IMAGE_URL, WIKIPEDIA_MAIN_IMAGE_URL_FR)\n"
-            "SELECT old.ID_LOCATION, old.ID_WIKIDATA, old.LOCATION_NAME, old.LOCATION_NAME_FR, old.OVERVIEW,\n"
+            "SELECT old.ID_LOCATION, old.ID_WIKIDATA, old.LOCATION_NAME, old.LOCATION_NAME_FR, old.OVERVIEW, old.OVERVIEW_FR,\n"
             "       old.LOCATION_SOURCE, old.LOCATION_TYPE, 1, old.DISPLAY_ORDER, old.ID_CREATOR, old.DAT_CREAT,\n"
             "       old.ID_OWNER, CASE WHEN old.DELETED = 1 THEN old.TIM_UPDATED ELSE NOW() END, old.ID_USER_UPDATED,\n"
             "       old.POSTER_PATH, old.WIKIPEDIA_IMAGE_PATH,\n"
@@ -2525,7 +2555,7 @@ def f_buildlocationtables():
                         f"ALTER TABLE T_WC_T2S_LOCATION_BUILD AUTO_INCREMENT = {lngnextlocationid}")
         arrresult["lieux_nouveaux"] = _f_locationstep(cursor, "1c-iii. INSERT des lieux nouveaux (ID_LOCATION attribue)", (
             "INSERT INTO T_WC_T2S_LOCATION_BUILD\n"
-            "    (ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW,\n"
+            "    (ID_WIKIDATA, LOCATION_NAME, LOCATION_NAME_FR, OVERVIEW, OVERVIEW_FR,\n"
             "     LOCATION_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
             "SELECT lieux.ID_WIKIDATA,\n" + strlabels +
             "       'wikidata', 0, CURDATE(), NOW()\n"
@@ -2622,21 +2652,48 @@ def f_buildlocationtables():
                 "                       FROM T_WC_T2S_EPISODE_LOCATION_BUILD el\n"
                 "                       WHERE el.ID_LOCATION = loc.ID_LOCATION)"))
             connection.commit()
-        _f_locationstep(cursor, "4b. UPDATE des notes et de la popularite", (
-            "UPDATE T_WC_T2S_LOCATION_BUILD loc SET\n"
-            "  loc.IMDB_RATING = (SELECT AVG(m.IMDB_RATING)\n"
-            "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
-            "                     JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ml.ID_MOVIE\n"
-            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.IMDB_RATING > 0),\n"
-            "  loc.IMDB_RATING_WEIGHTED = (SELECT AVG(m.IMDB_RATING_WEIGHTED)\n"
-            "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
-            "                     JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ml.ID_MOVIE\n"
-            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.IMDB_RATING_WEIGHTED > 0),\n"
-            "  loc.POPULARITY = (SELECT AVG(m.POPULARITY)\n"
-            "                     FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
-            "                     JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ml.ID_MOVIE\n"
-            "                     WHERE ml.ID_LOCATION = loc.ID_LOCATION AND m.POPULARITY > 0)"))
+        # 4b, les notes et la popularite (TMDB-MOVIE-PREPROCESS-064) : films ET series,
+        # une voix par oeuvre. Jusqu'en 1.1.19 la moyenne ne lisait que les films, et
+        # chaque ligne d'association : un film tourne ET situe au meme lieu comptait deux
+        # fois, et les 2 117 lieux que seules des series citent restaient sans note. Les
+        # oeuvres passent par une table temporaire cle (lieu, type, oeuvre), ou l'INSERT
+        # IGNORE retire le second role ; MariaDB refuse une reference exterieure dans une
+        # table derivee, d'ou l'UPDATE par jointure plutot que des sous-requetes correlees.
+        # Les episodes n'y entrent pas : leur serie y est deja, ou y entrera par ses
+        # propres liens. Le zero reste exclu (CASE ... > 0), NULL reste « pas de mesure ».
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_oeuvre")
+        cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_oeuvre (\n"
+                       "  ID_LOCATION INT NOT NULL, KIND CHAR(1) NOT NULL, ID_WORK INT NOT NULL,\n"
+                       "  IMDB_RATING DOUBLE NULL, IMDB_RATING_WEIGHTED DOUBLE NULL, POPULARITY DOUBLE NULL,\n"
+                       "  PRIMARY KEY (ID_LOCATION, KIND, ID_WORK)\n"
+                       ") ENGINE=InnoDB")
+        _f_locationstep(cursor, "4b-1. INSERT des films dans tmp_lieu_oeuvre", (
+            "INSERT IGNORE INTO tmp_lieu_oeuvre\n"
+            "SELECT ml.ID_LOCATION, 'm', m.ID_MOVIE, m.IMDB_RATING, m.IMDB_RATING_WEIGHTED, m.POPULARITY\n"
+            "FROM T_WC_T2S_MOVIE_LOCATION_BUILD ml\n"
+            "JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = ml.ID_MOVIE"))
+        _f_locationstep(cursor, "4b-2. INSERT des series dans tmp_lieu_oeuvre", (
+            "INSERT IGNORE INTO tmp_lieu_oeuvre\n"
+            "SELECT sl.ID_LOCATION, 's', s.ID_SERIE, s.IMDB_RATING, s.IMDB_RATING_WEIGHTED, s.POPULARITY\n"
+            "FROM T_WC_T2S_SERIE_LOCATION_BUILD sl\n"
+            "JOIN T_WC_T2S_SERIE s ON s.ID_SERIE = sl.ID_SERIE"))
+        _f_locationstep(cursor, "4b-3. UPDATE des notes et de la popularite (films et series)", (
+            "UPDATE T_WC_T2S_LOCATION_BUILD loc\n"
+            "LEFT JOIN (\n"
+            "    SELECT ID_LOCATION,\n"
+            "           AVG(CASE WHEN IMDB_RATING > 0 THEN IMDB_RATING END) AS R,\n"
+            "           AVG(CASE WHEN IMDB_RATING_WEIGHTED > 0 THEN IMDB_RATING_WEIGHTED END) AS RW,\n"
+            "           AVG(CASE WHEN POPULARITY > 0 THEN POPULARITY END) AS P\n"
+            "    FROM tmp_lieu_oeuvre GROUP BY ID_LOCATION) agg ON agg.ID_LOCATION = loc.ID_LOCATION\n"
+            "SET loc.IMDB_RATING = agg.R, loc.IMDB_RATING_WEIGHTED = agg.RW, loc.POPULARITY = agg.P"))
         connection.commit()
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_oeuvre")
+        cursor.execute("SELECT SUM(LOCATION_NAME IS NULL OR LOCATION_NAME = '') AS N, "
+                       "SUM(OVERVIEW_FR IS NOT NULL AND OVERVIEW_FR <> '') AS F "
+                       "FROM T_WC_T2S_LOCATION_BUILD WHERE DELETED = 0")
+        row = cursor.fetchone()
+        arrresult["sans_nom"] = int(row["N"] or 0)
+        arrresult["avec_overview_fr"] = int(row["F"] or 0)
 
         # --- 4c. L'image du lieu (TMDB-MOVIE-PREPROCESS-065) ----------------
         # tmdb-front et voice-agent lisent POSTER_PATH puis WIKIPEDIA_IMAGE_PATH, comme pour

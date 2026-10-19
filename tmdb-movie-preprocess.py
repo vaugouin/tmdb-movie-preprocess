@@ -7649,6 +7649,8 @@ ORDER BY COMPTE DESC
                               f"{'' if arrlocationcounts.get('episodes_actifs', 0) else ' (episodes skipped, migration 062 not applied)'}, "
                               f"{arrlocationcounts.get('sans_type', 0)} without a type, "
                               f"{arrlocationcounts.get('avec_image', 0)} with an image, "
+                              f"{arrlocationcounts.get('sans_nom', 0)} living without a name, "
+                              f"{arrlocationcounts.get('avec_overview_fr', 0)} with a French overview, "
                               f"{arrlocationcounts.get('ancetres', 0)} hierarchy rows "
                               f"({arrlocationcounts.get('ancetres_au_dessus', 0)} above depth 0, "
                               f"deepest {arrlocationcounts.get('ancetres_profondeur', 0)})")
@@ -7672,7 +7674,8 @@ ORDER BY COMPTE DESC
                                                         ("serie", "Serie-location links rebuilt by"),
                                                         ("episode", "Episode-location links rebuilt by"),
                                                         ("sans_type", "Locations left without a LOCATION_TYPE by"),
-                                                        ("avec_image", "Living locations with a WIKIPEDIA_IMAGE_PATH after")):
+                                                        ("avec_image", "Living locations with a WIKIPEDIA_IMAGE_PATH after"),
+                                                        ("sans_nom", "Living locations without a LOCATION_NAME after (TMDB-MOVIE-PREPROCESS-064)")):
                             cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strkey + "count", str(arrlocationcounts.get(strkey, 0)), strlocationdesc + " the location rebuild (process 72)", 0)
                     # set_processed() et non une affectation directe : kind="copy"
                     # laisse _track_processed a faux, donc finish() n'ecrirait pas le
