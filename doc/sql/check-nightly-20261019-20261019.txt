@@ -1,0 +1,447 @@
+-- check-nightly-20261019.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-19 05:04:42
+--
++------------------------------+
+| SECTION                      |
++------------------------------+
+| 1. Variables written tonight |
++------------------------------+
++--------------------------------------------------------------+--------------------------------------------------------------------------------------------+---------------------+
+| VAR_NAME                                                     | VAR_VALUE                                                                                  | TIM_UPDATED         |
++--------------------------------------------------------------+--------------------------------------------------------------------------------------------+---------------------+
+| strtmdbmoviepreprocessstartdatetime                          | 2026-10-19 03:00:15                                                                        | 2026-10-19 03:00:15 |
+| strtmdbmoviepreprocessprocessesexecutedprevious              | 72,                                                                                        | 2026-10-19 03:00:15 |
+| strtmdbmoviepreprocesstotalruntimeprevious                   | 14 minutes, 23 seconds                                                                     | 2026-10-19 03:00:15 |
+| strtmdbmoviepreprocessscope                                  | main                                                                                       | 2026-10-19 03:00:15 |
+| strtmdbmoviepreprocesscustomlistunescapeenddatetime          | 2026-10-19 03:00:52                                                                        | 2026-10-19 03:00:52 |
+| strtmdbmoviepreprocesscustomlistunescapestartdatetime        | 2026-10-19 03:00:52                                                                        | 2026-10-19 03:00:52 |
+| strtmdbmoviepreprocesscustomlistunescapeprocessedseconds     | 0.03                                                                                       | 2026-10-19 03:00:52 |
+| strtmdbmoviepreprocesswikipediaformatlinestartdatetime       | 2026-10-19 03:00:52                                                                        | 2026-10-19 03:00:52 |
+| strtmdbmoviepreprocessprocesselapsedseconds0                 | 0.03                                                                                       | 2026-10-19 03:00:52 |
+| strtmdbmoviepreprocesswikipedialineformatparsedcount         | 25032                                                                                      | 2026-10-19 03:06:02 |
+| strtmdbmoviepreprocesswikipedialineformatfailedcount         | 0                                                                                          | 2026-10-19 03:06:02 |
+| strtmdbmoviepreprocesswikipediaformatlineprocessedcount      | 25032                                                                                      | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocessmediumformatrowscount                  | 26401                                                                                      | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocessaspectratiorowscount                   | 16319                                                                                      | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocessmultiratiomoviescount                  | 268                                                                                        | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocesswikipediaformatlineenddatetime         | 2026-10-19 03:07:58                                                                        | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocesswikipediaformatlineprocessedseconds    | 425.97                                                                                     | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocesswikipediaformatlinelastrun             | 2026-10-19 03:00:52                                                                        | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocessprocesselapsedseconds1                 | 425.97                                                                                     | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocesswikidatacolourstartdatetime            | 2026-10-19 03:07:58                                                                        | 2026-10-19 03:07:58 |
+| strtmdbmoviepreprocessmovietechnicalstartdatetime            | 2026-10-19 03:09:17                                                                        | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolourjunctionrowscount        | 0                                                                                          | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolourclearedcount             | 0                                                                                          | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolourupdatedcount             | 0                                                                                          | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesscoloursourcenonecount                  | 1249087                                                                                    | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolouritemscount               | 197463                                                                                     | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesscoloursourcewikidatacount              | 101338                                                                                     | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesscoloursourceformatlinecount            | 50775                                                                                      | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolourenddatetime              | 2026-10-19 03:09:17                                                                        | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolourlastrun                  | 2026-10-19 03:07:58                                                                        | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolourerror                    |                                                                                            | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolourprocessedcount           | 0                                                                                          | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocesswikidatacolourprocessedseconds         | 78.53                                                                                      | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocessprocesselapsedseconds64                | 78.53                                                                                      | 2026-10-19 03:09:17 |
+| strtmdbmoviepreprocessmovietechnicalenddatetime              | 2026-10-19 03:14:57                                                                        | 2026-10-19 03:14:57 |
+| strtmdbmoviepreprocessmovietechnicalprocessedseconds         | 340.34                                                                                     | 2026-10-19 03:14:57 |
+| strtmdbmoviepreprocesstechnicalwikidatalinkstartdatetime     | 2026-10-19 03:14:57                                                                        | 2026-10-19 03:14:57 |
+| strtmdbmoviepreprocessprocesselapsedseconds2                 | 340.35                                                                                     | 2026-10-19 03:14:57 |
+| strtmdbmoviepreprocesscurrenttechnicalid                     | 50                                                                                         | 2026-10-19 03:15:03 |
+| strtmdbmoviepreprocesstopicstartdatetime                     | 2026-10-19 03:15:04                                                                        | 2026-10-19 03:15:04 |
+| strtmdbmoviepreprocesstechnicalwikidatalinkenddatetime       | 2026-10-19 03:15:04                                                                        | 2026-10-19 03:15:04 |
+| strtmdbmoviepreprocesstechnicalwikidatalinkprocessedseconds  | 6.55                                                                                       | 2026-10-19 03:15:04 |
+| strtmdbmoviepreprocessprocesselapsedseconds62                | 6.56                                                                                       | 2026-10-19 03:15:04 |
+| strtmdbmoviepreprocesstopicenddatetime                       | 2026-10-19 03:15:28                                                                        | 2026-10-19 03:15:28 |
+| strtmdbmoviepreprocesstopicprocessedcount                    | 0                                                                                          | 2026-10-19 03:15:28 |
+| strtmdbmoviepreprocesstopiccreatedcount                      | 0                                                                                          | 2026-10-19 03:15:28 |
+| strtmdbmoviepreprocesstopicdeletedcount                      | 0                                                                                          | 2026-10-19 03:15:28 |
+| strtmdbmoviepreprocessprocesselapsedseconds3                 | 23.70                                                                                      | 2026-10-19 03:15:28 |
+| strtmdbmoviepreprocesstopicprocessedseconds                  | 23.70                                                                                      | 2026-10-19 03:15:28 |
+| strtmdbmoviepreprocesscollectionstartdatetime                | 2026-10-19 03:15:28                                                                        | 2026-10-19 03:15:28 |
+| strtmdbmoviepreprocesscollectionenddatetime                  | 2026-10-19 03:21:13                                                                        | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectionprocessedcount               | 22138                                                                                      | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectioncreatedcount                 | 10383                                                                                      | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectiondeletedcount                 | 2                                                                                          | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectioncurrentprocess               | 5: Copying from T_WC_CUSTOM_LIST to T2S_COLLECTION                                         | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectionwikidataid                   | 92                                                                                         | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectioncurrentvalue                 | The Muppets film series (additions to the TMDb collection)                                 | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectionid                           | 1188                                                                                       | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectionprocessedseconds             | 345.57                                                                                     | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscollectionwikidatalinkstartdatetime    | 2026-10-19 03:21:13                                                                        | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocessprocesselapsedseconds41                | 345.58                                                                                     | 2026-10-19 03:21:13 |
+| strtmdbmoviepreprocesscurrentcollectionid                    | 5386                                                                                       | 2026-10-19 03:21:42 |
+| strtmdbmoviepreprocessliststartdatetime                      | 2026-10-19 03:21:42                                                                        | 2026-10-19 03:21:42 |
+| strtmdbmoviepreprocesscollectionwikidatalinkprocessedseconds | 28.99                                                                                      | 2026-10-19 03:21:42 |
+| strtmdbmoviepreprocesscollectionwikidatalinkenddatetime      | 2026-10-19 03:21:42                                                                        | 2026-10-19 03:21:42 |
+| strtmdbmoviepreprocessprocesselapsedseconds61                | 28.99                                                                                      | 2026-10-19 03:21:42 |
+| strtmdbmoviepreprocesslistenddatetime                        | 2026-10-19 03:22:00                                                                        | 2026-10-19 03:22:00 |
+| strtmdbmoviepreprocesslistprocessedcount                     | 23                                                                                         | 2026-10-19 03:22:00 |
+| strtmdbmoviepreprocesslistcurrentprocess                     | 3: Copying from T_WC_CUSTOM_LIST to T2S_LIST                                               | 2026-10-19 03:22:00 |
+| strtmdbmoviepreprocesslistwikidataid                         | 88                                                                                         | 2026-10-19 03:22:00 |
+| strtmdbmoviepreprocesslistcurrentvalue                       | The 100 Most Significant German Films                                                      | 2026-10-19 03:22:00 |
+| strtmdbmoviepreprocesslistid                                 | 70                                                                                         | 2026-10-19 03:22:00 |
+| strtmdbmoviepreprocessgroupstartdatetime                     | 2026-10-19 03:22:01                                                                        | 2026-10-19 03:22:01 |
+| strtmdbmoviepreprocesslistcreatedcount                       | 22                                                                                         | 2026-10-19 03:22:01 |
+| strtmdbmoviepreprocesslistdeletedcount                       | 0                                                                                          | 2026-10-19 03:22:01 |
+| strtmdbmoviepreprocesslistprocessedseconds                   | 18.37                                                                                      | 2026-10-19 03:22:01 |
+| strtmdbmoviepreprocessprocesselapsedseconds42                | 18.37                                                                                      | 2026-10-19 03:22:01 |
+| strtmdbmoviepreprocessgroupprocessedcount                    | 8569                                                                                       | 2026-10-19 03:30:08 |
+| strtmdbmoviepreprocessgroupcurrentprocess                    | 3: Copying from WIKIDATA P54 to T2S_GROUP                                                  | 2026-10-19 03:30:08 |
+| strtmdbmoviepreprocessgroupwikidataid                        | Q995337                                                                                    | 2026-10-19 03:30:08 |
+| strtmdbmoviepreprocessgroupcurrentvalue                      | Brynäs IF                                                                                  | 2026-10-19 03:30:08 |
+| strtmdbmoviepreprocessgroupid                                | 7659                                                                                       | 2026-10-19 03:30:08 |
+| strtmdbmoviepreprocessgroupdeletedcount                      | 0                                                                                          | 2026-10-19 03:31:29 |
+| strtmdbmoviepreprocessgroupcreatedcount                      | 8569                                                                                       | 2026-10-19 03:31:29 |
+| strtmdbmoviepreprocessgroupenddatetime                       | 2026-10-19 03:31:29                                                                        | 2026-10-19 03:31:29 |
+| strtmdbmoviepreprocessgroupprocessedseconds                  | 568.85                                                                                     | 2026-10-19 03:31:29 |
+| strtmdbmoviepreprocessprocesselapsedseconds43                | 568.85                                                                                     | 2026-10-19 03:31:29 |
+| strtmdbmoviepreprocessawardstartdatetime                     | 2026-10-19 03:31:31                                                                        | 2026-10-19 03:31:31 |
+| strtmdbmoviepreprocessawardcurrentprocess                    | P166: Copying from WIKIDATA to T2S_AWARD                                                   | 2026-10-19 03:46:03 |
+| strtmdbmoviepreprocessawardwikidataid                        | Q99980667                                                                                  | 2026-10-19 03:46:03 |
+| strtmdbmoviepreprocessawardcurrentvalue                      | honorary doctor of the University of Antwerp                                               | 2026-10-19 03:46:03 |
+| strtmdbmoviepreprocessawardid                                | 30910                                                                                      | 2026-10-19 03:46:03 |
+| strtmdbmoviepreprocessawardprocessedseconds                  | 881.56                                                                                     | 2026-10-19 03:46:13 |
+| strtmdbmoviepreprocessawardenddatetime                       | 2026-10-19 03:46:13                                                                        | 2026-10-19 03:46:13 |
+| strtmdbmoviepreprocessawardprocessedcount                    | 18004                                                                                      | 2026-10-19 03:46:13 |
+| strtmdbmoviepreprocessawardcreatedcount                      | 18004                                                                                      | 2026-10-19 03:46:13 |
+| strtmdbmoviepreprocessawarddeletedcount                      | 0                                                                                          | 2026-10-19 03:46:13 |
+| strtmdbmoviepreprocessprocesselapsedseconds44                | 883.28                                                                                     | 2026-10-19 03:46:13 |
+| strtmdbmoviepreprocessnominationstartdatetime                | 2026-10-19 03:46:14                                                                        | 2026-10-19 03:46:14 |
+| strtmdbmoviepreprocessawardconeclasses                       | 11845                                                                                      | 2026-10-19 03:46:14 |
+| strtmdbmoviepreprocessawardconeskipstreak                    | 0                                                                                          | 2026-10-19 03:46:14 |
+| strtmdbmoviepreprocessawardconeskipreason                    |                                                                                            | 2026-10-19 03:46:14 |
+| strtmdbmoviepreprocessnominationcurrentprocess               | P1411: Copying from WIKIDATA to T2S_NOMINATION                                             | 2026-10-19 03:49:42 |
+| strtmdbmoviepreprocessnominationwikidataid                   | Q99612675                                                                                  | 2026-10-19 03:49:42 |
+| strtmdbmoviepreprocessnominationcurrentvalue                 | Lambda Literary Award for Children's and Young Adult Literature                            | 2026-10-19 03:49:42 |
+| strtmdbmoviepreprocessnominationid                           | 38080                                                                                      | 2026-10-19 03:49:42 |
+| strtmdbmoviepreprocessnominationenddatetime                  | 2026-10-19 03:49:44                                                                        | 2026-10-19 03:49:44 |
+| strtmdbmoviepreprocessnominationprocessedcount               | 2971                                                                                       | 2026-10-19 03:49:44 |
+| strtmdbmoviepreprocessnominationcreatedcount                 | 2971                                                                                       | 2026-10-19 03:49:44 |
+| strtmdbmoviepreprocessnominationdeletedcount                 | 0                                                                                          | 2026-10-19 03:49:44 |
+| strtmdbmoviepreprocessprocesselapsedseconds47                | 210.96                                                                                     | 2026-10-19 03:49:44 |
+| strtmdbmoviepreprocessnominationprocessedseconds             | 209.68                                                                                     | 2026-10-19 03:49:44 |
+| strtmdbmoviepreprocessmovementstartdatetime                  | 2026-10-19 03:49:44                                                                        | 2026-10-19 03:49:44 |
+| strtmdbmoviepreprocessmovementcurrentprocess                 | 1: Copying from T_WC_CUSTOM_LIST to T2S_MOVEMENT                                           | 2026-10-19 03:49:54 |
+| strtmdbmoviepreprocessmovementwikidataid                     | 89                                                                                         | 2026-10-19 03:49:54 |
+| strtmdbmoviepreprocessmovementcurrentvalue                   | Poetic Realism                                                                             | 2026-10-19 03:49:54 |
+| strtmdbmoviepreprocessmovementid                             | 21                                                                                         | 2026-10-19 03:49:54 |
+| strtmdbmoviepreprocessdeathstartdatetime                     | 2026-10-19 03:49:55                                                                        | 2026-10-19 03:49:55 |
+| strtmdbmoviepreprocessmovementenddatetime                    | 2026-10-19 03:49:55                                                                        | 2026-10-19 03:49:55 |
+| strtmdbmoviepreprocessmovementprocessedcount                 | 21                                                                                         | 2026-10-19 03:49:55 |
+| strtmdbmoviepreprocessmovementcreatedcount                   | 21                                                                                         | 2026-10-19 03:49:55 |
+| strtmdbmoviepreprocessmovementdeletedcount                   | 0                                                                                          | 2026-10-19 03:49:55 |
+| strtmdbmoviepreprocessmovementprocessedseconds               | 10.90                                                                                      | 2026-10-19 03:49:55 |
+| strtmdbmoviepreprocessprocesselapsedseconds45                | 10.90                                                                                      | 2026-10-19 03:49:55 |
+| strtmdbmoviepreprocesscurrentrecord                          | Q855919                                                                                    | 2026-10-19 03:51:42 |
+| strtmdbmoviepreprocessdeathprocessedcount                    | 389                                                                                        | 2026-10-19 03:51:42 |
+| strtmdbmoviepreprocessdeathcurrentprocess                    | 2: Copying from WIKIDATA P1196 to T2S_DEATH                                                | 2026-10-19 03:51:42 |
+| strtmdbmoviepreprocessdeathwikidataid                        | Q855919                                                                                    | 2026-10-19 03:51:42 |
+| strtmdbmoviepreprocessdeathcurrentvalue                      | unnatural death                                                                            | 2026-10-19 03:51:42 |
+| strtmdbmoviepreprocessdeathid                                | 259                                                                                        | 2026-10-19 03:51:42 |
+| strtmdbmoviepreprocessdeathenddatetime                       | 2026-10-19 03:51:43                                                                        | 2026-10-19 03:51:43 |
+| strtmdbmoviepreprocessdeathcreatedcount                      | 389                                                                                        | 2026-10-19 03:51:43 |
+| strtmdbmoviepreprocessdeathdeletedcount                      | 0                                                                                          | 2026-10-19 03:51:43 |
+| strtmdbmoviepreprocessdeathprocessedseconds                  | 108.82                                                                                     | 2026-10-19 03:51:43 |
+| strtmdbmoviepreprocessprocesselapsedseconds46                | 108.82                                                                                     | 2026-10-19 03:51:43 |
+| strtmdbmoviepreprocessmoviestartdatetime                     | 2026-10-19 03:51:43                                                                        | 2026-10-19 03:51:43 |
+| strtmdbmoviepreprocesscurrentmovieid                         | 1800001                                                                                    | 2026-10-19 03:56:03 |
+| strtmdbmoviepreprocessmovieprocessedseconds                  | 259.66                                                                                     | 2026-10-19 03:56:03 |
+| strtmdbmoviepreprocessmovieenddatetime                       | 2026-10-19 03:56:03                                                                        | 2026-10-19 03:56:03 |
+| strtmdbmoviepreprocessprocesselapsedseconds4                 | 259.66                                                                                     | 2026-10-19 03:56:03 |
+| strtmdbmoviepreprocessseriestartdatetime                     | 2026-10-19 03:56:03                                                                        | 2026-10-19 03:56:03 |
+| strtmdbmoviepreprocesst2smovielastrun                        | 2026-10-19 03:51:43                                                                        | 2026-10-19 03:56:03 |
+| strtmdbmoviepreprocesscurrentserieid                         | 335001                                                                                     | 2026-10-19 03:56:48 |
+| strtmdbmoviepreprocessserieenddatetime                       | 2026-10-19 03:56:48                                                                        | 2026-10-19 03:56:48 |
+| strtmdbmoviepreprocessserieprocessedseconds                  | 44.81                                                                                      | 2026-10-19 03:56:48 |
+| strtmdbmoviepreprocessprocesselapsedseconds5                 | 44.82                                                                                      | 2026-10-19 03:56:48 |
+| strtmdbmoviepreprocesspersonstartdatetime                    | 2026-10-19 03:56:48                                                                        | 2026-10-19 03:56:48 |
+| strtmdbmoviepreprocesst2sserielastrun                        | 2026-10-19 03:56:03                                                                        | 2026-10-19 03:56:48 |
+| strtmdbmoviepreprocesscurrentpersonid                        | 6555001                                                                                    | 2026-10-19 03:57:11 |
+| strtmdbmoviepreprocesst2spersonlastrun                       | 2026-10-19 03:56:48                                                                        | 2026-10-19 03:58:50 |
+| strtmdbmoviepreprocesspersonprocessedseconds                 | 122.56                                                                                     | 2026-10-19 03:58:50 |
+| strtmdbmoviepreprocesspersonenddatetime                      | 2026-10-19 03:58:50                                                                        | 2026-10-19 03:58:50 |
+| strtmdbmoviepreprocessprocesselapsedseconds6                 | 122.56                                                                                     | 2026-10-19 03:58:50 |
+| strtmdbmoviepreprocesscompanystartdatetime                   | 2026-10-19 03:59:41                                                                        | 2026-10-19 03:59:41 |
+| strtmdbmoviepreprocessprocesselapsedseconds51                | 50.83                                                                                      | 2026-10-19 03:59:41 |
+| strtmdbmoviepreprocesscurrentcompanyid                       | BUILD                                                                                      | 2026-10-19 03:59:55 |
+| strtmdbmoviepreprocessnetworkstartdatetime                   | 2026-10-19 04:00:21                                                                        | 2026-10-19 04:00:21 |
+| strtmdbmoviepreprocesscompanyenddatetime                     | 2026-10-19 04:00:21                                                                        | 2026-10-19 04:00:21 |
+| strtmdbmoviepreprocesscompanyprocessedseconds                | 40.06                                                                                      | 2026-10-19 04:00:21 |
+| strtmdbmoviepreprocessprocesselapsedseconds7                 | 40.06                                                                                      | 2026-10-19 04:00:21 |
+| strtmdbmoviepreprocesscurrentnetworkid                       | BUILD                                                                                      | 2026-10-19 04:00:22 |
+| strtmdbmoviepreprocessnetworkprocessedseconds                | 1.08                                                                                       | 2026-10-19 04:00:22 |
+| strtmdbmoviepreprocesspersonmoviestartdatetime               | 2026-10-19 04:00:22                                                                        | 2026-10-19 04:00:22 |
+| strtmdbmoviepreprocessnetworkenddatetime                     | 2026-10-19 04:00:22                                                                        | 2026-10-19 04:00:22 |
+| strtmdbmoviepreprocessprocesselapsedseconds8                 | 1.09                                                                                       | 2026-10-19 04:00:22 |
+| strtmdbmoviepreprocesscurrentpersonmovieid                   | 21933001                                                                                   | 2026-10-19 04:06:39 |
+| strtmdbmoviepreprocesspersonmovieenddatetime                 | 2026-10-19 04:06:39                                                                        | 2026-10-19 04:06:39 |
+| strtmdbmoviepreprocesspersonmovieprocessedseconds            | 376.42                                                                                     | 2026-10-19 04:06:39 |
+| strtmdbmoviepreprocessprocesselapsedseconds9                 | 376.43                                                                                     | 2026-10-19 04:06:39 |
+| strtmdbmoviepreprocesspersonseriestartdatetime               | 2026-10-19 04:06:39                                                                        | 2026-10-19 04:06:39 |
+| strtmdbmoviepreprocesscurrentpersonserieid                   | 7929001                                                                                    | 2026-10-19 04:07:52 |
+| strtmdbmoviepreprocesspersonserieenddatetime                 | 2026-10-19 04:07:52                                                                        | 2026-10-19 04:07:52 |
+| strtmdbmoviepreprocesspersonserieprocessedseconds            | 73.33                                                                                      | 2026-10-19 04:07:52 |
+| strtmdbmoviepreprocessprocesselapsedseconds10                | 73.33                                                                                      | 2026-10-19 04:07:52 |
+| strtmdbmoviepreprocessmoviegenrestartdatetime                | 2026-10-19 04:07:52                                                                        | 2026-10-19 04:07:52 |
+| strtmdbmoviepreprocessprocesselapsedseconds50                | 0.01                                                                                       | 2026-10-19 04:07:52 |
+| strtmdbmoviepreprocesscurrentmoviegenreid                    | BUILD                                                                                      | 2026-10-19 04:07:53 |
+| strtmdbmoviepreprocesscurrentseriegenreid                    | BUILD                                                                                      | 2026-10-19 04:08:46 |
+| strtmdbmoviepreprocessmoviegenreenddatetime                  | 2026-10-19 04:08:46                                                                        | 2026-10-19 04:08:46 |
+| strtmdbmoviepreprocessmoviegenreprocessedseconds             | 53.56                                                                                      | 2026-10-19 04:08:46 |
+| strtmdbmoviepreprocessprocesselapsedseconds11                | 53.57                                                                                      | 2026-10-19 04:08:46 |
+| strtmdbmoviepreprocessseriegenrestartdatetime                | 2026-10-19 04:08:46                                                                        | 2026-10-19 04:08:46 |
+| strtmdbmoviepreprocessseriegenreenddatetime                  | 2026-10-19 04:08:51                                                                        | 2026-10-19 04:08:51 |
+| strtmdbmoviepreprocessseriegenreprocessedseconds             | 5.59                                                                                       | 2026-10-19 04:08:51 |
+| strtmdbmoviepreprocessprocesselapsedseconds12                | 5.59                                                                                       | 2026-10-19 04:08:51 |
+| strtmdbmoviepreprocesscurrentmoviesimilarid                  | BUILD                                                                                      | 2026-10-19 04:08:54 |
+| strtmdbmoviepreprocessprocesselapsedseconds36                | 119.47                                                                                     | 2026-10-19 04:10:51 |
+| strtmdbmoviepreprocesscurrentmovierecommendationid           | BUILD                                                                                      | 2026-10-19 04:10:58 |
+| strtmdbmoviepreprocessprocesselapsedseconds37                | 334.80                                                                                     | 2026-10-19 04:16:26 |
+| strtmdbmoviepreprocesscurrentseriesimilarid                  | BUILD                                                                                      | 2026-10-19 04:16:26 |
+| strtmdbmoviepreprocessprocesselapsedseconds38                | 15.61                                                                                      | 2026-10-19 04:16:41 |
+| strtmdbmoviepreprocesscurrentserierecommendationid           | BUILD                                                                                      | 2026-10-19 04:16:42 |
+| strtmdbmoviepreprocessmoviecompanystartdatetime              | 2026-10-19 04:17:17                                                                        | 2026-10-19 04:17:17 |
+| strtmdbmoviepreprocessprocesselapsedseconds39                | 35.83                                                                                      | 2026-10-19 04:17:17 |
+| strtmdbmoviepreprocesscurrentmoviecompanyid                  | BUILD                                                                                      | 2026-10-19 04:17:18 |
+| strtmdbmoviepreprocesscurrentseriecompanyid                  | BUILD                                                                                      | 2026-10-19 04:18:00 |
+| strtmdbmoviepreprocessmoviecompanyenddatetime                | 2026-10-19 04:18:00                                                                        | 2026-10-19 04:18:00 |
+| strtmdbmoviepreprocessmoviecompanyprocessedseconds           | 42.77                                                                                      | 2026-10-19 04:18:00 |
+| strtmdbmoviepreprocessprocesselapsedseconds13                | 42.77                                                                                      | 2026-10-19 04:18:00 |
+| strtmdbmoviepreprocessseriecompanystartdatetime              | 2026-10-19 04:18:00                                                                        | 2026-10-19 04:18:00 |
+| strtmdbmoviepreprocesscurrentserienetworkid                  | BUILD                                                                                      | 2026-10-19 04:18:06 |
+| strtmdbmoviepreprocessseriecompanyenddatetime                | 2026-10-19 04:18:06                                                                        | 2026-10-19 04:18:06 |
+| strtmdbmoviepreprocessseriecompanyprocessedseconds           | 5.83                                                                                       | 2026-10-19 04:18:06 |
+| strtmdbmoviepreprocessprocesselapsedseconds14                | 5.83                                                                                       | 2026-10-19 04:18:06 |
+| strtmdbmoviepreprocessserienetworkstartdatetime              | 2026-10-19 04:18:06                                                                        | 2026-10-19 04:18:06 |
+| strtmdbmoviepreprocessserienetworkprocessedseconds           | 4.74                                                                                       | 2026-10-19 04:18:10 |
+| strtmdbmoviepreprocessserienetworkenddatetime                | 2026-10-19 04:18:10                                                                        | 2026-10-19 04:18:10 |
+| strtmdbmoviepreprocessprocesselapsedseconds15                | 4.74                                                                                       | 2026-10-19 04:18:10 |
+| strtmdbmoviepreprocessmovieproductioncountrystartdatetime    | 2026-10-19 04:18:10                                                                        | 2026-10-19 04:18:10 |
+| strtmdbmoviepreprocesscurrentmoviecountryid                  | BUILD                                                                                      | 2026-10-19 04:18:11 |
+| strtmdbmoviepreprocesscurrentseriedcountryid                 | BUILD                                                                                      | 2026-10-19 04:18:31 |
+| strtmdbmoviepreprocessmovieproductioncountryenddatetime      | 2026-10-19 04:18:31                                                                        | 2026-10-19 04:18:31 |
+| strtmdbmoviepreprocessmovieproductioncountryprocessedseconds | 20.70                                                                                      | 2026-10-19 04:18:31 |
+| strtmdbmoviepreprocessprocesselapsedseconds16                | 20.70                                                                                      | 2026-10-19 04:18:31 |
+| strtmdbmoviepreprocessserieproductioncountrystartdatetime    | 2026-10-19 04:18:31                                                                        | 2026-10-19 04:18:31 |
+| strtmdbmoviepreprocesscurrentmoviespokenlangid               | BUILD                                                                                      | 2026-10-19 04:18:34 |
+| strtmdbmoviepreprocessserieproductioncountryenddatetime      | 2026-10-19 04:18:34                                                                        | 2026-10-19 04:18:34 |
+| strtmdbmoviepreprocessserieproductioncountryprocessedseconds | 2.65                                                                                       | 2026-10-19 04:18:34 |
+| strtmdbmoviepreprocessprocesselapsedseconds17                | 2.66                                                                                       | 2026-10-19 04:18:34 |
+| strtmdbmoviepreprocessmoviespokenlanguagestartdatetime       | 2026-10-19 04:18:34                                                                        | 2026-10-19 04:18:34 |
+| strtmdbmoviepreprocesscurrentseriespokenlangid               | BUILD                                                                                      | 2026-10-19 04:18:55 |
+| strtmdbmoviepreprocessmoviespokenlanguageenddatetime         | 2026-10-19 04:18:55                                                                        | 2026-10-19 04:18:55 |
+| strtmdbmoviepreprocessmoviespokenlanguageprocessedseconds    | 20.96                                                                                      | 2026-10-19 04:18:55 |
+| strtmdbmoviepreprocessprocesselapsedseconds18                | 20.96                                                                                      | 2026-10-19 04:18:55 |
+| strtmdbmoviepreprocessseriespokenlanguagestartdatetime       | 2026-10-19 04:18:55                                                                        | 2026-10-19 04:18:55 |
+| strtmdbmoviepreprocesscurrentcompanyimageid                  | BUILD                                                                                      | 2026-10-19 04:18:59 |
+| strtmdbmoviepreprocessseriespokenlanguageenddatetime         | 2026-10-19 04:18:59                                                                        | 2026-10-19 04:18:59 |
+| strtmdbmoviepreprocessseriespokenlanguageprocessedseconds    | 4.00                                                                                       | 2026-10-19 04:18:59 |
+| strtmdbmoviepreprocessprocesselapsedseconds19                | 4.00                                                                                       | 2026-10-19 04:18:59 |
+| strtmdbmoviepreprocesscompanyimagestartdatetime              | 2026-10-19 04:18:59                                                                        | 2026-10-19 04:18:59 |
+| strtmdbmoviepreprocesscompanyimageenddatetime                | 2026-10-19 04:19:00                                                                        | 2026-10-19 04:19:00 |
+| strtmdbmoviepreprocesscompanyimageprocessedseconds           | 1.21                                                                                       | 2026-10-19 04:19:00 |
+| strtmdbmoviepreprocessprocesselapsedseconds20                | 1.21                                                                                       | 2026-10-19 04:19:00 |
+| strtmdbmoviepreprocessmovieimagestartdatetime                | 2026-10-19 04:19:00                                                                        | 2026-10-19 04:19:00 |
+| strtmdbmoviepreprocesscurrentmovieimageid                    | 1800501                                                                                    | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocesscurrentnetworkimageid                  | BUILD                                                                                      | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocesscurrentpersonimageid                   | BUILD                                                                                      | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocessmovieimageenddatetime                  | 2026-10-19 04:24:34                                                                        | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocessmovieimageprocessedseconds             | 333.52                                                                                     | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocessprocesselapsedseconds21                | 333.52                                                                                     | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocessnetworkimagestartdatetime              | 2026-10-19 04:24:34                                                                        | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocessnetworkimageenddatetime                | 2026-10-19 04:24:34                                                                        | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocessnetworkimageprocessedseconds           | 0.27                                                                                       | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocessprocesselapsedseconds22                | 0.27                                                                                       | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocesspersonimagestartdatetime               | 2026-10-19 04:24:34                                                                        | 2026-10-19 04:24:34 |
+| strtmdbmoviepreprocesspersonimageenddatetime                 | 2026-10-19 04:25:03                                                                        | 2026-10-19 04:25:03 |
+| strtmdbmoviepreprocesspersonimageprocessedseconds            | 28.97                                                                                      | 2026-10-19 04:25:03 |
+| strtmdbmoviepreprocessprocesselapsedseconds23                | 28.98                                                                                      | 2026-10-19 04:25:03 |
+| strtmdbmoviepreprocessserieimagestartdatetime                | 2026-10-19 04:25:03                                                                        | 2026-10-19 04:25:03 |
+| strtmdbmoviepreprocesscurrentserieimageid                    | BUILD                                                                                      | 2026-10-19 04:25:04 |
+| strtmdbmoviepreprocesscurrentmovievideoid                    | BUILD                                                                                      | 2026-10-19 04:26:14 |
+| strtmdbmoviepreprocessserieimageprocessedseconds             | 71.34                                                                                      | 2026-10-19 04:26:14 |
+| strtmdbmoviepreprocessserieimageenddatetime                  | 2026-10-19 04:26:14                                                                        | 2026-10-19 04:26:14 |
+| strtmdbmoviepreprocessprocesselapsedseconds24                | 71.34                                                                                      | 2026-10-19 04:26:14 |
+| strtmdbmoviepreprocessmovievideostartdatetime                | 2026-10-19 04:26:14                                                                        | 2026-10-19 04:26:14 |
+| strtmdbmoviepreprocesscurrentserievideoid                    | BUILD                                                                                      | 2026-10-19 04:26:35 |
+| strtmdbmoviepreprocessmovievideoenddatetime                  | 2026-10-19 04:26:35                                                                        | 2026-10-19 04:26:35 |
+| strtmdbmoviepreprocessmovievideoprocessedseconds             | 21.14                                                                                      | 2026-10-19 04:26:35 |
+| strtmdbmoviepreprocessprocesselapsedseconds25                | 21.14                                                                                      | 2026-10-19 04:26:35 |
+| strtmdbmoviepreprocessserievideostartdatetime                | 2026-10-19 04:26:35                                                                        | 2026-10-19 04:26:35 |
+| strtmdbmoviepreprocessserievideoenddatetime                  | 2026-10-19 04:26:38                                                                        | 2026-10-19 04:26:38 |
+| strtmdbmoviepreprocessserievideoprocessedseconds             | 2.83                                                                                       | 2026-10-19 04:26:38 |
+| strtmdbmoviepreprocessprocesselapsedseconds26                | 2.83                                                                                       | 2026-10-19 04:26:38 |
+| strtmdbmoviepreprocessseasonstartdatetime                    | 2026-10-19 04:26:38                                                                        | 2026-10-19 04:26:38 |
+| strtmdbmoviepreprocesscurrentseasonid                        | 2325001                                                                                    | 2026-10-19 04:26:44 |
+| strtmdbmoviepreprocessseasonenddatetime                      | 2026-10-19 04:26:45                                                                        | 2026-10-19 04:26:45 |
+| strtmdbmoviepreprocessseasonprocessedseconds                 | 6.64                                                                                       | 2026-10-19 04:26:45 |
+| strtmdbmoviepreprocessprocesselapsedseconds27                | 6.64                                                                                       | 2026-10-19 04:26:45 |
+| strtmdbmoviepreprocessepisodestartdatetime                   | 2026-10-19 04:26:45                                                                        | 2026-10-19 04:26:45 |
+| strtmdbmoviepreprocesst2sseasonlastrun                       | 2026-10-19 04:26:38                                                                        | 2026-10-19 04:26:45 |
+| strtmdbmoviepreprocesscurrentepisodeid                       | 7970001                                                                                    | 2026-10-19 04:29:32 |
+| strtmdbmoviepreprocessepisodeprocessedseconds                | 179.91                                                                                     | 2026-10-19 04:29:45 |
+| strtmdbmoviepreprocessepisodeenddatetime                     | 2026-10-19 04:29:45                                                                        | 2026-10-19 04:29:45 |
+| strtmdbmoviepreprocesspersonseasonstartdatetime              | 2026-10-19 04:29:45                                                                        | 2026-10-19 04:29:45 |
+| strtmdbmoviepreprocesst2sepisodelastrun                      | 2026-10-19 04:26:45                                                                        | 2026-10-19 04:29:45 |
+| strtmdbmoviepreprocessprocesselapsedseconds28                | 179.91                                                                                     | 2026-10-19 04:29:45 |
+| strtmdbmoviepreprocesscurrentpersonseasonid                  | 3201001                                                                                    | 2026-10-19 04:31:29 |
+| strtmdbmoviepreprocesspersonseasonenddatetime                | 2026-10-19 04:31:29                                                                        | 2026-10-19 04:31:29 |
+| strtmdbmoviepreprocesspersonseasonprocessedseconds           | 103.90                                                                                     | 2026-10-19 04:31:29 |
+| strtmdbmoviepreprocessprocesselapsedseconds29                | 103.90                                                                                     | 2026-10-19 04:31:29 |
+| strtmdbmoviepreprocesspersonepisodestartdatetime             | 2026-10-19 04:31:29                                                                        | 2026-10-19 04:31:29 |
+| strtmdbmoviepreprocesscurrentpersonepisodeid                 | 2794001                                                                                    | 2026-10-19 04:33:14 |
+| strtmdbmoviepreprocesscurrentseasonimageid                   | BUILD                                                                                      | 2026-10-19 04:33:15 |
+| strtmdbmoviepreprocesspersonepisodeenddatetime               | 2026-10-19 04:33:15                                                                        | 2026-10-19 04:33:15 |
+| strtmdbmoviepreprocesspersonepisodeprocessedseconds          | 105.97                                                                                     | 2026-10-19 04:33:15 |
+| strtmdbmoviepreprocessprocesselapsedseconds31                | 105.97                                                                                     | 2026-10-19 04:33:15 |
+| strtmdbmoviepreprocessseasonimagestartdatetime               | 2026-10-19 04:33:15                                                                        | 2026-10-19 04:33:15 |
+| strtmdbmoviepreprocessseasonimageenddatetime                 | 2026-10-19 04:33:25                                                                        | 2026-10-19 04:33:25 |
+| strtmdbmoviepreprocessseasonimageprocessedseconds            | 10.66                                                                                      | 2026-10-19 04:33:25 |
+| strtmdbmoviepreprocessprocesselapsedseconds32                | 10.66                                                                                      | 2026-10-19 04:33:25 |
+| strtmdbmoviepreprocessepisodeimagestartdatetime              | 2026-10-19 04:33:25                                                                        | 2026-10-19 04:33:25 |
+| strtmdbmoviepreprocesscurrentepisodeimageid                  | BUILD                                                                                      | 2026-10-19 04:33:26 |
+| strtmdbmoviepreprocesscurrentseasonvideoid                   | BUILD                                                                                      | 2026-10-19 04:34:39 |
+| strtmdbmoviepreprocessepisodeimageprocessedseconds           | 74.15                                                                                      | 2026-10-19 04:34:39 |
+| strtmdbmoviepreprocessepisodeimageenddatetime                | 2026-10-19 04:34:39                                                                        | 2026-10-19 04:34:39 |
+| strtmdbmoviepreprocessprocesselapsedseconds33                | 74.15                                                                                      | 2026-10-19 04:34:39 |
+| strtmdbmoviepreprocessseasonvideostartdatetime               | 2026-10-19 04:34:39                                                                        | 2026-10-19 04:34:39 |
+| strtmdbmoviepreprocesscurrentepisodevideoid                  | BUILD                                                                                      | 2026-10-19 04:34:40 |
+| strtmdbmoviepreprocessseasonvideoenddatetime                 | 2026-10-19 04:34:40                                                                        | 2026-10-19 04:34:40 |
+| strtmdbmoviepreprocessseasonvideoprocessedseconds            | 0.69                                                                                       | 2026-10-19 04:34:40 |
+| strtmdbmoviepreprocessprocesselapsedseconds34                | 0.70                                                                                       | 2026-10-19 04:34:40 |
+| strtmdbmoviepreprocessepisodevideostartdatetime              | 2026-10-19 04:34:40                                                                        | 2026-10-19 04:34:40 |
+| strtmdbmoviepreprocessepisodevideoenddatetime                | 2026-10-19 04:34:41                                                                        | 2026-10-19 04:34:41 |
+| strtmdbmoviepreprocessepisodevideoprocessedseconds           | 1.08                                                                                       | 2026-10-19 04:34:41 |
+| strtmdbmoviepreprocessprocesselapsedseconds35                | 1.08                                                                                       | 2026-10-19 04:34:41 |
+| strtmdbmoviepreprocessitemstartdatetime                      | 2026-10-19 04:34:41                                                                        | 2026-10-19 04:34:41 |
+| strtmdbmoviepreprocesscurrentitemid                          | BUILD                                                                                      | 2026-10-19 04:34:42 |
+| strtmdbmoviepreprocessitemenddatetime                        | 2026-10-19 04:37:26                                                                        | 2026-10-19 04:37:26 |
+| strtmdbmoviepreprocessitemprocessedseconds                   | 164.98                                                                                     | 2026-10-19 04:37:26 |
+| strtmdbmoviepreprocessprocesselapsedseconds40                | 164.98                                                                                     | 2026-10-19 04:37:26 |
+| strtmdbmoviepreprocesslocationstartdatetime                  | 2026-10-19 04:37:26                                                                        | 2026-10-19 04:37:26 |
+| strtmdbmoviepreprocesslocationconefiction                    | 168                                                                                        | 2026-10-19 04:37:29 |
+| strtmdbmoviepreprocesslocationconenature                     | 505                                                                                        | 2026-10-19 04:37:29 |
+| strtmdbmoviepreprocesslocationconecountry                    | 214                                                                                        | 2026-10-19 04:37:29 |
+| strtmdbmoviepreprocesslocationconecity                       | 2750                                                                                       | 2026-10-19 04:37:29 |
+| strtmdbmoviepreprocesslocationconeisland                     | 115                                                                                        | 2026-10-19 04:37:29 |
+| strtmdbmoviepreprocesslocationconeregion                     | 16113                                                                                      | 2026-10-19 04:37:29 |
+| strtmdbmoviepreprocesslocationconestructure                  | 13965                                                                                      | 2026-10-19 04:37:29 |
+| strtmdbmoviepreprocessprocesselapsedseconds72                | 569.42                                                                                     | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationprocessedseconds               | 569.42                                                                                     | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationerror                          |                                                                                            | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationlieuxcount                     | 12978                                                                                      | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationmoviecount                     | 85900                                                                                      | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationprocessedcount                 | 12978                                                                                      | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationseriecount                     | 11389                                                                                      | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationsans_typecount                 | 1060                                                                                       | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationenddatetime                    | 2026-10-19 04:46:56                                                                        | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationkept                           | 12977                                                                                      | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationnew                            | 1                                                                                          | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationdeleted                        | 6                                                                                          | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesssource_workstartdatetime               | 2026-10-19 04:46:56                                                                        | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationavec_imagecount                | 10434                                                                                      | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesslocationepisodecount                   | 4462                                                                                       | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesssourceworkmoviecount                   | 17626                                                                                      | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworkunhookedcount                | 75                                                                                         | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworksourcescount                 | 17686                                                                                      | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworknewcount                     | 71                                                                                         | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworkkeptcount                    | 17615                                                                                      | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworkerror                        |                                                                                            | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworkdeletedcount                 | 11                                                                                         | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocessgroupworkstartdatetime                 | 2026-10-19 04:47:52                                                                        | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssource_workenddatetime                 | 2026-10-19 04:47:52                                                                        | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworkseriecount                   | 7865                                                                                       | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworkotherbydefaultcount          | 326                                                                                        | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssourceworkwithoutnamecount             | 400                                                                                        | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssource_workprocessedcount              | 17686                                                                                      | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesssource_workprocessedseconds            | 55.94                                                                                      | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocessprocesselapsedseconds73                | 55.94                                                                                      | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocessgroupworkenddatetime                   | 2026-10-19 04:48:26                                                                        | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkprocessedcount                | 25472                                                                                      | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkcreatedcount                  | 64                                                                                         | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkdeletedcount                  | 6                                                                                          | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkerror                         |                                                                                            | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkgroupcount                    | 4321                                                                                       | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkmoviecount                    | 21318                                                                                      | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkmoviecreatedcount             | 1                                                                                          | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkmovieupdatedcount             | 25                                                                                         | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkmoviedeletedcount             | 2                                                                                          | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkmoviecreditedcount            | 2258                                                                                       | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkseriecount                    | 4154                                                                                       | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkseriecreatedcount             | 6                                                                                          | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkserieupdatedcount             | 32                                                                                         | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkseriedeletedcount             | 4                                                                                          | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkseriecreditedcount            | 190                                                                                        | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessgroupworkprocessedseconds              | 34.56                                                                                      | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessprocesselapsedseconds74                | 34.56                                                                                      | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocessprocessesexecuted                      | 0, 1, 64, 2, 62, 3, 41, 61, 42, 43, 44, 47, 45, 46, 4, 5, 6, 51, 7, 8, 9, 10, 50, 11, 12,  | 2026-10-19 04:48:46 |
+| strtmdbmoviepreprocesscurrentsubprocess                      | Copy Wikipedia main image into T2S                                                         | 2026-10-19 04:48:46 |
+| strtmdbmoviepreprocessprocesselapsedseconds70                | 20.24                                                                                      | 2026-10-19 04:48:46 |
+| strtmdbmoviepreprocessassertionrefreshcount                  | 123                                                                                        | 2026-10-19 04:48:46 |
+| strtmdbmoviepreprocessassertionrefreshskipped                | 2                                                                                          | 2026-10-19 04:48:46 |
+| strtmdbmoviepreprocesscurrentprocess                         |                                                                                            | 2026-10-19 04:49:59 |
+| strtmdbmoviepreprocesscurrentsql                             |                                                                                            | 2026-10-19 04:49:59 |
+| strtmdbmoviepreprocessenddatetime                            | 2026-10-19 04:49:59                                                                        | 2026-10-19 04:49:59 |
+| strtmdbmoviepreprocesstotalruntime                           | 1 hour, 49 minutes, 44 seconds                                                             | 2026-10-19 04:49:59 |
+| strtmdbmoviepreprocessprocessdurationranking                 | 44:T2S_AWARD=883.28s | 72:T2S_LOCATION=569.42s | 43:T2S_GROUP=568.85s | 1:WIKIPEDIA_FORMAT | 2026-10-19 04:49:59 |
+| strtmdbmoviepreprocesswikipediamainimagerows                 | 518034                                                                                     | 2026-10-19 04:49:59 |
+| strtmdbmoviepreprocessprocesselapsedseconds71                | 72.90                                                                                      | 2026-10-19 04:49:59 |
++--------------------------------------------------------------+--------------------------------------------------------------------------------------------+---------------------+
++-------------------------------+
+| SECTION                       |
++-------------------------------+
+| 2. Error variables (any date) |
++-------------------------------+
++-------------------------------------------+-----------+---------------------+
+| VAR_NAME                                  | VAR_VALUE | TIM_UPDATED         |
++-------------------------------------------+-----------+---------------------+
+| strtmdbmoviepreprocessgroupworkerror      |           | 2026-10-19 04:48:26 |
+| strtmdbmoviepreprocesslocationerror       |           | 2026-10-19 04:46:56 |
+| strtmdbmoviepreprocesssourceworkerror     |           | 2026-10-19 04:47:52 |
+| strtmdbmoviepreprocesswikidatacolourerror |           | 2026-10-19 03:09:17 |
++-------------------------------------------+-----------+---------------------+
++----------------------------------------------------------------+
+| SECTION                                                        |
++----------------------------------------------------------------+
+| 3. Variables not written for 2 days or more (stale processes?) |
++----------------------------------------------------------------+
++---------------------------------------------------------+-------------------------------------------+---------------------+
+| VAR_NAME                                                | VAR_VALUE                                 | TIM_UPDATED         |
++---------------------------------------------------------+-------------------------------------------+---------------------+
+| strtmdbmoviepreprocesscurrentkeywordid                  | 15095                                     | 2026-10-16 07:05:41 |
+| strtmdbmoviepreprocesstopicwikidatalinkstartdatetime    | 2026-10-16 03:47:41                       | 2026-10-16 03:47:41 |
+| strtmdbmoviepreprocesstopicwikidatalinkenddatetime      |                                           | 2026-10-16 03:47:41 |
+| strtmdbmoviepreprocessprocesselapsedseconds63           | 17476.47                                  | 2026-10-14 14:26:18 |
+| strtmdbmoviepreprocessprocesselapsedseconds60           | 13417.44                                  | 2026-10-14 09:35:02 |
+| strtmdbmoviepreprocesstopicwikidatalinkprocessedseconds | 13417.43                                  | 2026-10-14 09:35:02 |
+| strtmdbmoviepreprocesstopiccurrentprocess               | 5: Copying from TMDB_KEYWORD to T2S_TOPIC | 2026-10-14 03:14:17 |
+| strtmdbmoviepreprocesstopicwikidataid                   | 370069                                    | 2026-10-14 03:14:17 |
+| strtmdbmoviepreprocesstopiccurrentvalue                 | assalto a museu                           | 2026-10-14 03:14:17 |
+| strtmdbmoviepreprocesstopicid                           | 33010                                     | 2026-10-14 03:14:17 |
+| strtmdbmoviepreprocesscurrentcharacterid                | 1193501                                   | 2026-05-19 17:34:50 |
+| strtmdbmoviepreprocesscurrentvalue                      |                                           | 2026-02-28 02:11:12 |
+| strtmdbmoviepreprocessdatetime                          | 2026-02-28 02:11:12                       | 2026-02-28 02:11:12 |
++---------------------------------------------------------+-------------------------------------------+---------------------+
++-------------------------------+
+| SECTION                       |
++-------------------------------+
+| 4a. Locations: image coverage |
++-------------------------------+
++--------+------------+----------+-----------+---------------------+
+| LIVING | WITH_IMAGE | OVER_500 | NEW_TODAY | LAST_UPDATE         |
++--------+------------+----------+-----------+---------------------+
+|  12978 |      10434 |        0 |         1 | 2026-10-19 02:38:06 |
++--------+------------+----------+-----------+---------------------+
++--------------------------------+
+| SECTION                        |
++--------------------------------+
+| 4b. Los Angeles, London, Paris |
++--------------------------------+
++-------------+-------------+---------------+-------------+-------------+---------------+----------------------------------------------------------------------------------------------------------------+
+| ID_LOCATION | ID_WIKIDATA | LOCATION_NAME | MOVIE_COUNT | SERIE_COUNT | EPISODE_COUNT | WIKIPEDIA_IMAGE_PATH                                                                                           |
++-------------+-------------+---------------+-------------+-------------+---------------+----------------------------------------------------------------------------------------------------------------+
+|           4 | Q65         | Los Angeles   |        2504 |         752 |            13 | https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Hollywood_sign_%288485145044%29.jpg/3840px-Hollywood_ |
+|          21 | Q84         | London        |        2517 |         411 |            20 | https://upload.wikimedia.org/wikipedia/commons/6/67/London_Skyline_%28125508655%29.jpeg                        |
+|          38 | Q90         | Paris         |        2335 |          58 |             6 | https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/La_Tour_Eiffel_vue_de_la_Tour_Saint-Jacques%2C_Paris_ |
++-------------+-------------+---------------+-------------+-------------+---------------+----------------------------------------------------------------------------------------------------------------+
