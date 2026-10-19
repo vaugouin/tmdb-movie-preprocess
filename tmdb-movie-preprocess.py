@@ -7648,13 +7648,17 @@ ORDER BY COMPTE DESC
                               f"{arrlocationcounts.get('episode', 0)} episode links"
                               f"{'' if arrlocationcounts.get('episodes_actifs', 0) else ' (episodes skipped, migration 062 not applied)'}, "
                               f"{arrlocationcounts.get('sans_type', 0)} without a type, "
-                              f"{arrlocationcounts.get('avec_image', 0)} with an image")
+                              f"{arrlocationcounts.get('avec_image', 0)} with an image, "
+                              f"{arrlocationcounts.get('ancetres', 0)} hierarchy rows "
+                              f"({arrlocationcounts.get('ancetres_au_dessus', 0)} above depth 0, "
+                              f"deepest {arrlocationcounts.get('ancetres_profondeur', 0)})")
                         # Les trois comptes de l'etape 1c en variables serveur : c'est la trace qui
                         # prouve, nuit apres nuit, que l'identifiant est conserve (correctif du 2026-09-13).
                         for strlocationcountkey, strlocationcountsuffix, strlocationcountdesc in (
                                 ("lieux_conserves", "kept", "Locations that kept their ID_LOCATION"),
                                 ("lieux_nouveaux", "new", "New locations, ID_LOCATION assigned above the previous maximum"),
-                                ("lieux_supprimes", "deleted", "Locations that left the perimeter, kept as DELETED = 1")):
+                                ("lieux_supprimes", "deleted", "Locations that left the perimeter, kept as DELETED = 1"),
+                                ("ancetres_au_dessus", "ancestors", "Rows of T_WC_T2S_LOCATION_ANCESTOR above depth 0, place-in-place links (TMDB-MOVIE-PREPROCESS-048)")):
                             cp.f_setservervariable("strtmdbmoviepreprocesslocation" + strlocationcountsuffix, str(arrlocationcounts.get(strlocationcountkey, 0)), strlocationcountdesc + " (process 72)", 0)
                         # ⚠ strlocationdesc et NON strdesc : la variable de boucle du pipeline
                         # s'appelle strdesc (ligne 326) et sert APRES le bloc, au classement des

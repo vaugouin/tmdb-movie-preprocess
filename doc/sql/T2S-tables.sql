@@ -988,6 +988,22 @@ CREATE TABLE `T_WC_T2S_LOCATION` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
+-- TMDB-MOVIE-PREPROCESS-048 (1.1.19): place-in-place closure over Wikidata P131 / P17, best
+-- rank, the place itself at DEPTH 0. Created by process 72 itself (CREATE TABLE IF NOT
+-- EXISTS), rebuilt nightly and swapped with T_WC_T2S_LOCATION. Both ends are living rows of
+-- T_WC_T2S_LOCATION; DEPTH counts Wikidata hops, not administrative levels.
+CREATE TABLE `T_WC_T2S_LOCATION_ANCESTOR` (
+  `ID_ROW` int(11) NOT NULL AUTO_INCREMENT,
+  `ID_LOCATION` int(11) NOT NULL,
+  `ID_ANCESTOR` int(11) NOT NULL,
+  `DEPTH` int(11) NOT NULL,
+  PRIMARY KEY (`ID_ROW`),
+  UNIQUE KEY `UK_LOCATION_ANCESTOR` (`ID_LOCATION`,`ID_ANCESTOR`),
+  KEY `IDX_ANCESTOR_DEPTH` (`ID_ANCESTOR`,`DEPTH`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `T_WC_T2S_LOCATION_CLASS` (
   `ID_CLASS` varchar(50) NOT NULL,
   `LOCATION_TYPE` varchar(20) NOT NULL,

@@ -2227,6 +2227,104 @@ def f_locationassociationsql(strmajor):
     )
 
 
+# TMDB-MOVIE-PREPROCESS-048 : la hierarchie des lieux, « en France » rend les films tournes
+# a Paris. Fermeture transitive materialisee de P131 (entite administrative contenante) et
+# P17 (pays), calculee chaque nuit avec les lieux et basculee dans le meme RENAME.
+STR_LOCATION_ANCESTOR_TABLE = "T_WC_T2S_LOCATION_ANCESTOR"
+# La mesure du 2026-10-19 (doc/sql/test-048-location-hierarchy-20261019.txt) s'arrete a la
+# profondeur 7 (Angleterre). 12 laisse de la marge ; la borne n'est la que pour les cycles,
+# que Wikidata n'interdit pas.
+INT_LOCATION_ANCESTOR_MAX_DEPTH = 12
+
+
+def _f_buildlocationancestor(cursor, connection):
+    """Remplit T_WC_T2S_LOCATION_ANCESTOR_BUILD a partir de T_WC_T2S_LOCATION_BUILD (-048).
+
+    UNE LIGNE PAR (LIEU, ANCETRE), LE LIEU LUI-MEME A LA PROFONDEUR 0. C'est le detail qui
+    porte tout : « les films en X » se lit d'une seule jointure, que le film soit rattache a
+    X ou a un lieu que X contient. Sans la ligne 0 il faudrait une UNION, et le modele de
+    langage n'en ecrirait qu'une branche. La Lune, Gotham, la Terre du Milieu n'ont que
+    cette ligne, et c'est juste.
+
+    LE MEILLEUR RANG, PAR (ITEM, PROPRIETE). Paris porte six P131 et sept P17 (le royaume de
+    France, l'Empire, l'administration militaire allemande) : si l'item a au moins une
+    declaration 'preferred' pour la propriete, seules celles-la comptent, sinon toutes les
+    non 'deprecated'. Mesure : Paris garde France (P17) et Grand Paris (P131). Le chainage
+    date par les qualificatifs (Berlin-Est et la RDA) est ignore, c'est assume.
+
+    LE PARCOURS TRAVERSE DES ITEMS QUI NE SONT PAS DES LIEUX T2S (« metropolitan France »,
+    les departements) : la table ne garde que les paires dont les deux bouts sont des lieux
+    vivants, mais la profondeur compte les sauts Wikidata. Ne pas lire DEPTH comme un niveau
+    administratif.
+
+    JAMAIS LOCATION_TYPE. La classification des lieux est fausse par endroits (Marseille est
+    une region) et la hierarchie ne doit pas en dependre.
+
+    Parcours en largeur, une instruction par profondeur : INSERT IGNORE sur la cle
+    (lieu, ancetre) garde la premiere profondeur atteinte, la plus petite, et coupe les
+    cycles. Rend (lignes, lignes au-dessus de 0, profondeur atteinte).
+    """
+    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_arete")
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_arete ("
+                   "ID_CHILD VARCHAR(50) NOT NULL, ID_PARENT VARCHAR(50) NOT NULL, "
+                   "PRIMARY KEY (ID_CHILD, ID_PARENT)) "
+                   "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")
+    _f_locationstep(cursor, "3d-0. INSERT des aretes P131 / P17 au meilleur rang (tmp_lieu_arete)", (
+        "INSERT IGNORE INTO tmp_lieu_arete (ID_CHILD, ID_PARENT)\n"
+        "SELECT st.ID_WIKIDATA, iv.ID_ITEM\n"
+        "FROM T_WC_WIKIDATA_STATEMENT st\n"
+        "INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+        "WHERE st.ID_PROPERTY IN ('P131', 'P17')\n"
+        "  AND st.DELETED = 0\n"
+        "  AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+        "  AND (st.`RANK` = 'preferred'\n"
+        "       OR NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT p\n"
+        "                      WHERE p.ID_WIKIDATA = st.ID_WIKIDATA AND p.ID_PROPERTY = st.ID_PROPERTY\n"
+        "                        AND p.`RANK` = 'preferred' AND p.DELETED = 0))\n"
+        "  AND iv.ID_ITEM <> st.ID_WIKIDATA"))
+    connection.commit()
+    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_ancetre")
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_ancetre ("
+                   "ID_LIEU VARCHAR(50) NOT NULL, ID_ANCETRE VARCHAR(50) NOT NULL, DEPTH INT NOT NULL, "
+                   "PRIMARY KEY (ID_LIEU, ID_ANCETRE), KEY (DEPTH)) "
+                   "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")
+    _f_locationstep(cursor, "3d-1. INSERT de la profondeur 0", (
+        "INSERT INTO tmp_lieu_ancetre (ID_LIEU, ID_ANCETRE, DEPTH)\n"
+        "SELECT ID_WIKIDATA, ID_WIKIDATA, 0 FROM T_WC_T2S_LOCATION_BUILD\n"
+        "WHERE DELETED = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''"))
+    intdepth = 0
+    for intnext in range(1, INT_LOCATION_ANCESTOR_MAX_DEPTH + 1):
+        # Pas de _f_locationstep : douze lignes de journal pour une boucle, c'est trop ; la
+        # ligne 3d-2 ci-dessous dit jusqu'ou la remontee est allee.
+        cursor.execute(
+            "INSERT IGNORE INTO tmp_lieu_ancetre (ID_LIEU, ID_ANCETRE, DEPTH)\n"
+            "SELECT t.ID_LIEU, a.ID_PARENT, %s\n"
+            "FROM tmp_lieu_ancetre t\n"
+            "INNER JOIN tmp_lieu_arete a ON a.ID_CHILD = t.ID_ANCETRE\n"
+            "WHERE t.DEPTH = %s", (intnext, intnext - 1))
+        if cursor.rowcount <= 0:
+            break
+        intdepth = intnext
+    if intdepth == INT_LOCATION_ANCESTOR_MAX_DEPTH:
+        print(f"72:   3d-2. ATTENTION : la remontee touche encore la profondeur {intdepth}, "
+              "la borne. Un cycle ou une chaine anormale, a regarder (doc/sql/test-048-location-hierarchy.sql).")
+    print(f"72:   3d-2. remontee jusqu'a la profondeur {intdepth}", flush=True)
+    connection.commit()
+    introws = _f_locationstep(cursor, "3d-3. INSERT " + STR_LOCATION_ANCESTOR_TABLE + "_BUILD", (
+        "INSERT INTO " + STR_LOCATION_ANCESTOR_TABLE + "_BUILD (ID_LOCATION, ID_ANCESTOR, DEPTH)\n"
+        "SELECT loc.ID_LOCATION, anc.ID_LOCATION, t.DEPTH\n"
+        "FROM tmp_lieu_ancetre t\n"
+        "INNER JOIN T_WC_T2S_LOCATION_BUILD loc ON loc.ID_WIKIDATA = t.ID_LIEU AND loc.DELETED = 0\n"
+        "INNER JOIN T_WC_T2S_LOCATION_BUILD anc ON anc.ID_WIKIDATA = t.ID_ANCETRE AND anc.DELETED = 0\n"
+        "ORDER BY loc.ID_LOCATION, t.DEPTH, anc.ID_LOCATION"))
+    connection.commit()
+    cursor.execute("SELECT COUNT(*) AS C FROM " + STR_LOCATION_ANCESTOR_TABLE + "_BUILD WHERE DEPTH > 0")
+    intabove = int(cursor.fetchone()["C"])
+    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_ancetre")
+    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_arete")
+    return introws, intabove, intdepth
+
+
 def _f_locationstep(cursor, strstep, strsql):
     """Execute une etape de la reconstruction des lieux en la NOMMANT d'abord.
 
@@ -2248,7 +2346,10 @@ def _f_locationstep(cursor, strstep, strsql):
 
 
 def f_buildlocationtables():
-    """Reconstruit les tables des lieux (trois, quatre avec les episodes), en entier, par du SQL seul.
+    """Reconstruit les tables des lieux (quatre, cinq avec les episodes), en entier, par du SQL seul.
+
+    Depuis 1.1.19 (TMDB-MOVIE-PREPROCESS-048), la quatrieme est la hierarchie,
+    T_WC_T2S_LOCATION_ANCESTOR, voir _f_buildlocationancestor().
 
     RECONSTRUCTION TOTALE ET NON INCREMENTALE, et c'est la volumetrie qui l'a decide :
     11 922 lieux et 95 766 associations mesures le 2026-09-11. A cette taille, un
@@ -2476,6 +2577,28 @@ def f_buildlocationtables():
                 cursor, "3c. INSERT " + strtable + "_BUILD", f_locationassociationsql(strmajor))
             connection.commit()
 
+        # --- 3d. La hierarchie (TMDB-MOVIE-PREPROCESS-048) -------------------
+        # La table servie est creee ici si elle manque, comme T_WC_T2S_LOCATION_CLASS :
+        # elle ne touche aucune table existante, une migration a part n'apporterait qu'une
+        # etape de deploiement de plus. Elle bascule avec les autres a l'etape 5.
+        _f_locationstep(cursor, "3d. CREATE " + STR_LOCATION_ANCESTOR_TABLE + " IF NOT EXISTS", (
+            "CREATE TABLE IF NOT EXISTS " + STR_LOCATION_ANCESTOR_TABLE + " (\n"
+            "  ID_ROW INT NOT NULL AUTO_INCREMENT,\n"
+            "  ID_LOCATION INT NOT NULL,\n"
+            "  ID_ANCESTOR INT NOT NULL,\n"
+            "  DEPTH INT NOT NULL,\n"
+            "  PRIMARY KEY (ID_ROW),\n"
+            "  UNIQUE KEY UK_LOCATION_ANCESTOR (ID_LOCATION, ID_ANCESTOR),\n"
+            "  KEY IDX_ANCESTOR_DEPTH (ID_ANCESTOR, DEPTH)\n"
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"))
+        _f_locationstep(cursor, "3d. DROP " + STR_LOCATION_ANCESTOR_TABLE + "_BUILD",
+                        "DROP TABLE IF EXISTS " + STR_LOCATION_ANCESTOR_TABLE + "_BUILD")
+        _f_locationstep(cursor, "3d. CREATE " + STR_LOCATION_ANCESTOR_TABLE + "_BUILD",
+                        "CREATE TABLE " + STR_LOCATION_ANCESTOR_TABLE + "_BUILD LIKE " + STR_LOCATION_ANCESTOR_TABLE)
+        connection.commit()
+        arrresult["ancetres"], arrresult["ancetres_au_dessus"], arrresult["ancetres_profondeur"] = \
+            _f_buildlocationancestor(cursor, connection)
+
         # --- 4. Compteurs et agregats ----------------------------------------
         # Les formules sont celles des collections et des mouvements : la note du lieu
         # est la moyenne des notes des oeuvres qui s'y rattachent, sa popularite la
@@ -2556,7 +2679,10 @@ def f_buildlocationtables():
         # meurt, chercher la transaction fautive plutot que rejouer.
         # Avec les episodes, quatre tables basculent dans le meme RENAME : un lieu nouveau
         # que seul un episode cite ne doit jamais etre servi sans son association.
-        arrswaptables = ["T_WC_T2S_LOCATION"] + ["T_WC_T2S_" + strmajor + "_LOCATION" for strmajor in arrmajors]
+        # La hierarchie bascule avec eux : un lieu nouveau ne doit pas etre servi sans sa
+        # ligne de profondeur 0, sinon « les films a X » ne le trouverait pas (-048).
+        arrswaptables = (["T_WC_T2S_LOCATION"] + ["T_WC_T2S_" + strmajor + "_LOCATION" for strmajor in arrmajors]
+                         + [STR_LOCATION_ANCESTOR_TABLE])
         for strtable in arrswaptables:
             cursor.execute("DROP TABLE IF EXISTS " + strtable + "_OLD")
         connection.commit()
