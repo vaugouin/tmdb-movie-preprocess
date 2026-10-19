@@ -756,7 +756,7 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                             except Exception as exc:
                                 print("Wikidata enrichment error for technical " + str(lngtechnicalid) + " (" + strexistingwikidataid + "): " + str(exc))
                                 arrtechnicalcouples = {
-                                    "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                                 }
                                 cp.f_sqlupdatearray("T_WC_T2S_TECHNICAL",arrtechnicalcouples,"ID_TECHNICAL = " + str(lngtechnicalid),0)
                                 continue
@@ -766,12 +766,12 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                                 arrtechnicalcouples = {
                                     "WIKIDATA_LABEL": strwikidatalabel,
                                     "CONFIDENCE": 1.0,
-                                    "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                                 }
                             else:
                                 print("No Wikidata label resolved for technical '" + strtechnicaldescription + "' (" + strexistingwikidataid + ")")
                                 arrtechnicalcouples = {
-                                    "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                                 }
                             cp.f_sqlupdatearray("T_WC_T2S_TECHNICAL",arrtechnicalcouples,"ID_TECHNICAL = " + str(lngtechnicalid),0)
                             continue
@@ -781,7 +781,7 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                         except Exception as exc:
                             print("Wikipedia/Wikidata linking error for technical " + str(lngtechnicalid) + ": " + str(exc))
                             arrtechnicalcouples = {
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_T2S_TECHNICAL",arrtechnicalcouples,"ID_TECHNICAL = " + str(lngtechnicalid),0)
                             continue
@@ -791,13 +791,13 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                                 "ID_WIKIDATA": arrmatch["wikibase_item"],
                                 "WIKIDATA_LABEL": arrmatch.get("wikidata_label", ""),
                                 "CONFIDENCE": arrmatch.get("confidence", 0.0),
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_T2S_TECHNICAL",arrtechnicalcouples,"ID_TECHNICAL = " + str(lngtechnicalid),0)
                         else:
                             print("No match found for technical '" + strtechnicaldescription + "'")
                             arrtechnicalcouples = {
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_T2S_TECHNICAL",arrtechnicalcouples,"ID_TECHNICAL = " + str(lngtechnicalid),0)
 
@@ -836,7 +836,7 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                         except Exception as exc:
                             print("Wikipedia/Wikidata linking error for keyword " + str(lngkeywordid) + ": " + str(exc))
                             arrkeywordcouples = {
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
                             continue
@@ -846,13 +846,13 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                                 "ID_WIKIDATA": arrmatch["wikibase_item"],
                                 "WIKIDATA_LABEL": arrmatch.get("wikidata_label", ""),
                                 "CONFIDENCE": arrmatch.get("confidence", 0.0),
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
                         else:
                             print("No match found for keyword '" + strkeywordname + "'")
                             arrkeywordcouples = {
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_TMDB_KEYWORD",arrkeywordcouples,"ID_KEYWORD = " + str(lngkeywordid),0)
                 elif intindex == 63:
@@ -952,7 +952,7 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                         except Exception as exc:
                             print("Wikipedia/Wikidata linking error for company " + str(lngcompanyid) + ": " + str(exc))
                             arrcompanycouples = {
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_TMDB_COMPANY",arrcompanycouples,"ID_COMPANY = " + str(lngcompanyid),0)
                             continue
@@ -988,13 +988,13 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                                 "ID_WIKIDATA": strwikibaseitem,
                                 "WIKIDATA_LABEL": arrmatch.get("wikidata_label", ""),
                                 "CONFIDENCE": dblconfidence,
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_TMDB_COMPANY",arrcompanycouples,"ID_COMPANY = " + str(lngcompanyid),0)
                         else:
                             print("No match found for company '" + strcompanyname + "'")
                             arrcompanycouples = {
-                                "TIM_WIKIPEDIA_SEARCH": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                "TIM_WIKIPEDIA_SEARCH": datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
                             }
                             cp.f_sqlupdatearray("T_WC_TMDB_COMPANY",arrcompanycouples,"ID_COMPANY = " + str(lngcompanyid),0)
                 elif intindex == 61:
@@ -1077,7 +1077,11 @@ WHERE WIKIPEDIA_FORMAT_LINE IS NOT NULL """
                     strsqlbatch = ""
                     strsqlbatch += "SELECT ID_KEYWORD FROM T_WC_TMDB_KEYWORD "
                     strsqlbatch += "WHERE (USED_FOR_T2S_TOPIC > 0 OR USE_FOR_TAGGING > 0) "
-                    strsqlbatch += "AND (TIM_T2S_TOPIC_REFRESH IS NULL OR TIM_T2S_TOPIC_REFRESH < (NOW() - INTERVAL " + str(lngrefreshcycledays) + " DAY)) "
+                    # TIM_T2S_TOPIC_REFRESH is written in naive Paris time (below), so the
+                    # cutoff is computed in Paris too rather than with the server's NOW()
+                    # (UTC until TMDB-FRONT-100), TMDB-MOVIE-PREPROCESS-060.
+                    strtopicrefreshcutoff = (datetime.now(cp.paris_tz) - timedelta(days=lngrefreshcycledays)).strftime("%Y-%m-%d %H:%M:%S")
+                    strsqlbatch += "AND (TIM_T2S_TOPIC_REFRESH IS NULL OR TIM_T2S_TOPIC_REFRESH < '" + strtopicrefreshcutoff + "') "
                     strsqlbatch += "ORDER BY CASE WHEN TIM_T2S_TOPIC_REFRESH IS NULL THEN 0 ELSE 1 END, TIM_T2S_TOPIC_REFRESH ASC, ID_KEYWORD ASC "
                     strsqlbatch += "LIMIT " + str(lngtopicrefreshbatchsize) + " "
                     print(strsqlbatch)

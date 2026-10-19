@@ -160,6 +160,7 @@ Configuration is environment-driven. `citizenphil.py` calls `load_dotenv()` on t
 Verified env vars (see `.env.example`):
 - **Database:** `DB_HOST`, `DB_PORT` (default 3306), `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_NAMESPACE` (default `T_WC_`).
 - **Locale:** `USER_TIMEZONE` (default `Europe/Paris`; used for all `TIM_*`/`DAT_*` stamps).
+- **Clock rule (2026-10-19, DEPLOYMENT-015, TMDB-MOVIE-PREPROCESS-060).** Every naive `DATETIME`/`DATE` this repo writes is **naive Europe/Paris**: always `datetime.now(cp.paris_tz)`, never a bare `datetime.now()` (the container runs in UTC, the VPS host stays `Etc/UTC`), and never a fixed `+02:00`. A human-read date with an offset uses the zone too. Compare a Paris column against a cutoff computed in Python with `cp.paris_tz`, not against `NOW()`. The SQL-side `NOW()`/`CURDATE()` writes (`ASSERTION_REFRESH_LAST`, `DAT_CREAT`/`TIM_UPDATED` of the Wikidata-sourced T2S rows in `tmdb_preprocess_helpers.py`) follow the MariaDB clock, which is UTC until TMDB-FRONT-100 sets it to Europe/Paris: values written before that switch are UTC. `TIM_WIKIPEDIA_SEARCH` values written by versions before 1.1.18 are naive UTC as well.
 - **Wikimedia (Processes 60/61/62):** `WIKIMEDIA_USER_AGENT`, `WIKIMEDIA_REQUEST_DELAY_SECONDS`, `WIKIMEDIA_BACKOFF_SECONDS`, `WIKIMEDIA_MAX_RETRIES`, `WIKIMEDIA_TIMEOUT_SECONDS`.
 - **TMDb (optional, read by `citizenphil`):** `TMDB_API_DOMAIN_URL`, `TMDB_API_KEY`, `TMDB_API_TOKEN` — used only if TMDb HTTP calls are exercised; the default scope is DB-only.
 
@@ -172,7 +173,7 @@ All source and target data is multilingual (English + French labels, accented an
 ---
 
 **Last Updated**: 2026-10-19
-**Current Version**: 1.1.17
+**Current Version**: 1.1.18
 
 ## Backlog (Nestor second-brain)
 
