@@ -2067,8 +2067,10 @@ INT_WIKIDATA_LOAD_STEPS = range(110, 115)
 INT_WIKIDATA_LOAD_STALE_HOURS = 48
 
 
-def f_wikidataloadbusy():
-    """Return why the location rebuild must wait, or "" when it can run (-063).
+def f_wikidataloadbusy(strprocess="72"):
+    """Return why a Wikidata-reading rebuild must wait, or "" when it can run (-063).
+
+    Used by process 72 (locations) and 73 (source works); strprocess only labels the log line.
 
     Process 72 reads T_WC_WIKIDATA_STATEMENT. While wikidata-crawler upserts it (step 110)
     and then deletes the rows of the previous batch (step 114), a rebuild reads a partial
@@ -2092,7 +2094,7 @@ def f_wikidataloadbusy():
     if dtstarted is not None:
         fltage = (datetime.now(cp.paris_tz).replace(tzinfo=None) - dtstarted).total_seconds() / 3600
         if fltage > INT_WIKIDATA_LOAD_STALE_HOURS:
-            print(f"72: wikidata-crawler says RUNNING step {strcurrent} since {strstarted}, "
+            print(f"{strprocess}: wikidata-crawler says RUNNING step {strcurrent} since {strstarted}, "
                   f"{fltage:.0f} h ago: treated as a stale flag, the rebuild runs")
             return ""
     return f"wikidata-crawler is loading the Wikidata tables (step {strcurrent}, started {strstarted or 'at an unknown time'})"

@@ -7586,7 +7586,7 @@ ORDER BY COMPTE DESC
                     # ecrit les tables Wikidata (etapes 110 a 114). Un instantane partiel passerait
                     # des lieux en DELETED = 1 pour une nuit. La table servie reste celle de la
                     # veille, et la raison part en variable serveur, vide quand 72 a tourne.
-                    strwikidataloadbusy = f_wikidataloadbusy()
+                    strwikidataloadbusy = f_wikidataloadbusy("72")
                     cp.f_setservervariable("strtmdbmoviepreprocesslocationskipped", strwikidataloadbusy, "Why the location rebuild (process 72) was skipped in the last run, empty when it ran", 0)
                     arrconecounts = {}
                     if strwikidataloadbusy:
@@ -7694,39 +7694,49 @@ ORDER BY COMPTE DESC
                     telsourcework.begin()
                     cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Building the source-work class cones","Current sub process in the TMDb database movie preprocess",0)
                     arrsourceworkcounts = {}
+                    # TMDB-MOVIE-PREPROCESS-063 : meme garde que 72, les cones et les sources lisent
+                    # les memes tables Wikidata.
+                    strsourceworkloadbusy = f_wikidataloadbusy("73")
+                    cp.f_setservervariable("strtmdbmoviepreprocesssourceworkskipped", strsourceworkloadbusy, "Why the source-work rebuild (process 73) was skipped in the last run, empty when it ran", 0)
+                    if strsourceworkloadbusy:
+                        print(f"73: SKIPPED, {strsourceworkloadbusy}. The served source-work tables are unchanged; the next night rebuilds them.")
                     try:
-                        arrsourceworkcones = f_buildsourceworkclasstable()
-                        for strconelabel, lngconecount in arrsourceworkcones.items():
-                            print(f"73: cone {strconelabel}: {lngconecount} classes")
-                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Rebuilding T2S_SOURCE_WORK and its associations","Current sub process in the TMDb database movie preprocess",0)
-                        arrsourceworkcounts = f_buildsourceworktables()
-                        cp.f_setservervariable("strtmdbmoviepreprocesssourceworkerror", "", "Last error of the source-work rebuild (process 73), empty when it succeeded", 0)
+                        if not strsourceworkloadbusy:
+                            arrsourceworkcones = f_buildsourceworkclasstable()
+                            for strconelabel, lngconecount in arrsourceworkcones.items():
+                                print(f"73: cone {strconelabel}: {lngconecount} classes")
+                            cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Rebuilding T2S_SOURCE_WORK and its associations","Current sub process in the TMDb database movie preprocess",0)
+                            arrsourceworkcounts = f_buildsourceworktables()
+                            cp.f_setservervariable("strtmdbmoviepreprocesssourceworkerror", "", "Last error of the source-work rebuild (process 73), empty when it succeeded", 0)
                     except Exception as sourceworkerror:
                         strsourceworkerror = f"{type(sourceworkerror).__name__}: {sourceworkerror}"
                         print(f"73: FAILED, the served tables are unchanged: {strsourceworkerror}")
                         print("73: the rest of the pipeline continues. Re-run with TMDB_PREPROCESS_SCOPE=source-works once wikidata-crawler is idle.")
                         cp.f_setservervariable("strtmdbmoviepreprocesssourceworkerror", strsourceworkerror, "Last error of the source-work rebuild (process 73), empty when it succeeded", 0)
-                    print(f"73: {arrsourceworkcounts.get('sources', 0)} sources "
-                          f"({arrsourceworkcounts.get('kept', 0)} kept their ID_SOURCE_WORK, "
-                          f"{arrsourceworkcounts.get('new', 0)} new, "
-                          f"{arrsourceworkcounts.get('deleted', 0)} left the perimeter and stay as DELETED = 1), "
-                          f"{arrsourceworkcounts.get('movie', 0)} movie links, "
-                          f"{arrsourceworkcounts.get('serie', 0)} serie links, "
-                          f"{arrsourceworkcounts.get('unhooked', 0)} T2S hops dropped (source not a film or series), "
-                          f"{arrsourceworkcounts.get('other_by_default', 0)} typed 'other' by default, "
-                          f"{arrsourceworkcounts.get('without_name', 0)} without a name")
-                    for strsourceworktype, lngsourceworktypecount in arrsourceworkcounts.get("types", {}).items():
-                        print(f"73: type {strsourceworktype}: {lngsourceworktypecount}")
-                    for strkey, strsourceworkdesc in (("sources", "Source works rebuilt by"),
-                                                      ("kept", "Source works that kept their ID_SOURCE_WORK in"),
-                                                      ("new", "New source works created by"),
-                                                      ("deleted", "Source works kept as DELETED = 1 by"),
-                                                      ("movie", "Movie-source links rebuilt by"),
-                                                      ("serie", "Serie-source links rebuilt by"),
-                                                      ("unhooked", "Sources whose T2S hop was dropped, not a film or series, by"),
-                                                      ("other_by_default", "Cached sources no cone typed, left 'other' by"),
-                                                      ("without_name", "Source works without any name after")):
-                        cp.f_setservervariable("strtmdbmoviepreprocesssourcework" + strkey.replace("_", "") + "count", str(arrsourceworkcounts.get(strkey, 0)), strsourceworkdesc + " the source-work rebuild (process 73)", 0)
+                    # Comme pour 72 : apres un echec ou un saut (-063), les comptes sont vides ;
+                    # les ecrire mettrait des zeros a la place de ceux du dernier passage reussi.
+                    if arrsourceworkcounts:
+                        print(f"73: {arrsourceworkcounts.get('sources', 0)} sources "
+                              f"({arrsourceworkcounts.get('kept', 0)} kept their ID_SOURCE_WORK, "
+                              f"{arrsourceworkcounts.get('new', 0)} new, "
+                              f"{arrsourceworkcounts.get('deleted', 0)} left the perimeter and stay as DELETED = 1), "
+                              f"{arrsourceworkcounts.get('movie', 0)} movie links, "
+                              f"{arrsourceworkcounts.get('serie', 0)} serie links, "
+                              f"{arrsourceworkcounts.get('unhooked', 0)} T2S hops dropped (source not a film or series), "
+                              f"{arrsourceworkcounts.get('other_by_default', 0)} typed 'other' by default, "
+                              f"{arrsourceworkcounts.get('without_name', 0)} without a name")
+                        for strsourceworktype, lngsourceworktypecount in arrsourceworkcounts.get("types", {}).items():
+                            print(f"73: type {strsourceworktype}: {lngsourceworktypecount}")
+                        for strkey, strsourceworkdesc in (("sources", "Source works rebuilt by"),
+                                                          ("kept", "Source works that kept their ID_SOURCE_WORK in"),
+                                                          ("new", "New source works created by"),
+                                                          ("deleted", "Source works kept as DELETED = 1 by"),
+                                                          ("movie", "Movie-source links rebuilt by"),
+                                                          ("serie", "Serie-source links rebuilt by"),
+                                                          ("unhooked", "Sources whose T2S hop was dropped, not a film or series, by"),
+                                                          ("other_by_default", "Cached sources no cone typed, left 'other' by"),
+                                                          ("without_name", "Source works without any name after")):
+                            cp.f_setservervariable("strtmdbmoviepreprocesssourcework" + strkey.replace("_", "") + "count", str(arrsourceworkcounts.get(strkey, 0)), strsourceworkdesc + " the source-work rebuild (process 73)", 0)
                     telsourcework.set_processed(arrsourceworkcounts.get("sources", 0))
                     telsourcework.finish()
 
