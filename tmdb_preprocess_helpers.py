@@ -2057,6 +2057,47 @@ LOCATION_TYPE_CONES = (
 
 
 
+# TMDB-MOVIE-PREPROCESS-063 : les etapes de wikidata-crawler qui ecrivent les tables cibles
+# Wikidata que lit le processus 72 (110 chargement, 111 controle, 112 medias, 113 controle,
+# 114 purge des anciens lots). 108 et 109 ne touchent que le staging, 115 aussi.
+INT_WIKIDATA_LOAD_STEPS = range(110, 115)
+# Au-dela, une variable RUNNING est un reste d'arret brutal (kill, reboot) et non un
+# chargement : l'etape 110 la plus longue mesuree a dure 12 h (2026-10-15 16:57 au
+# 2026-10-16 05:01). Sans ce plafond, un crawler tue laisserait 72 saute pour toujours.
+INT_WIKIDATA_LOAD_STALE_HOURS = 48
+
+
+def f_wikidataloadbusy():
+    """Return why the location rebuild must wait, or "" when it can run (-063).
+
+    Process 72 reads T_WC_WIKIDATA_STATEMENT. While wikidata-crawler upserts it (step 110)
+    and then deletes the rows of the previous batch (step 114), a rebuild reads a partial
+    snapshot: a place missing from it goes DELETED = 1 for a day, embedding-update drops its
+    document, and both come back the next night. The 2026-10-16 01:00 run fell in the
+    middle of step 110. The crawler's own server variables say where it is; no lock to add
+    on its side.
+    """
+    strstatus = (cp.f_getservervariable("strwikidatacrawlerstatus", 0) or "").strip()
+    if strstatus != "RUNNING":
+        return ""
+    strcurrent = (cp.f_getservervariable("strwikidatacrawlercurrentprocess", 0) or "").strip()
+    strcode = strcurrent.split(":", 1)[0].strip()
+    if not strcode.isdigit() or int(strcode) not in INT_WIKIDATA_LOAD_STEPS:
+        return ""
+    strstarted = (cp.f_getservervariable("strwikidatacrawlerstep" + strcode + "startedat", 0) or "").strip()
+    try:
+        dtstarted = datetime.strptime(strstarted, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        dtstarted = None
+    if dtstarted is not None:
+        fltage = (datetime.now(cp.paris_tz).replace(tzinfo=None) - dtstarted).total_seconds() / 3600
+        if fltage > INT_WIKIDATA_LOAD_STALE_HOURS:
+            print(f"72: wikidata-crawler says RUNNING step {strcurrent} since {strstarted}, "
+                  f"{fltage:.0f} h ago: treated as a stale flag, the rebuild runs")
+            return ""
+    return f"wikidata-crawler is loading the Wikidata tables (step {strcurrent}, started {strstarted or 'at an unknown time'})"
+
+
 def f_buildlocationclasstable():
     """Construit la table de classement des classes de lieux, un cone par type.
 

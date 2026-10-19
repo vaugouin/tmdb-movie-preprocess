@@ -34,6 +34,7 @@ from tmdb_preprocess_helpers import (
     f_awardconeguard,
     f_buildlocationclasstable,
     f_buildlocationtables,
+    f_wikidataloadbusy,
     f_buildsourceworkclasstable,
     f_buildsourceworktables,
     f_buildgroupworktables,
@@ -7581,8 +7582,18 @@ ORDER BY COMPTE DESC
                     print("T2S_LOCATION processing")
                     tellocation = EntityTelemetry("location", 72, "location", kind="copy")
                     tellocation.begin()
-                    cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Building the location class cones","Current sub process in the TMDb database movie preprocess",0)
-                    arrconecounts = f_buildlocationclasstable()
+                    # TMDB-MOVIE-PREPROCESS-063 : pas de reconstruction pendant que wikidata-crawler
+                    # ecrit les tables Wikidata (etapes 110 a 114). Un instantane partiel passerait
+                    # des lieux en DELETED = 1 pour une nuit. La table servie reste celle de la
+                    # veille, et la raison part en variable serveur, vide quand 72 a tourne.
+                    strwikidataloadbusy = f_wikidataloadbusy()
+                    cp.f_setservervariable("strtmdbmoviepreprocesslocationskipped", strwikidataloadbusy, "Why the location rebuild (process 72) was skipped in the last run, empty when it ran", 0)
+                    arrconecounts = {}
+                    if strwikidataloadbusy:
+                        print(f"72: SKIPPED, {strwikidataloadbusy}. The served location tables are unchanged; the next night rebuilds them.")
+                    else:
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Building the location class cones","Current sub process in the TMDb database movie preprocess",0)
+                        arrconecounts = f_buildlocationclasstable()
                     for strconetype, lngconecount in arrconecounts.items():
                         print(f"72: cone {strconetype}: {lngconecount} classes")
                         cp.f_setservervariable("strtmdbmoviepreprocesslocationcone" + strconetype, str(lngconecount), f"Number of P279 classes in the {strconetype} location cone", 0)
@@ -7610,8 +7621,9 @@ ORDER BY COMPTE DESC
                     # le silence ne passe pas pour un succes.
                     arrlocationcounts = {}
                     try:
-                        arrlocationcounts = f_buildlocationtables()
-                        cp.f_setservervariable("strtmdbmoviepreprocesslocationerror", "", "Last error of the location rebuild (process 72), empty when it succeeded", 0)
+                        if not strwikidataloadbusy:
+                            arrlocationcounts = f_buildlocationtables()
+                            cp.f_setservervariable("strtmdbmoviepreprocesslocationerror", "", "Last error of the location rebuild (process 72), empty when it succeeded", 0)
                     except Exception as locationerror:
                         strlocationerror = f"{type(locationerror).__name__}: {locationerror}"
                         print(f"72: FAILED, the served tables are unchanged: {strlocationerror}")
