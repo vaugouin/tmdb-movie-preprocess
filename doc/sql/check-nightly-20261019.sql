@@ -1,0 +1,41 @@
+-- Nightly run of 2026-10-19 (cron 01:00, scope main), first night of 1.1.15. READ-ONLY.
+-- 1. every tmdb-movie-preprocess server variable written since yesterday 20:00 (errors,
+--    counts, durations); 2. error variables, whatever their date; 3. stale variables;
+-- 4. process 72: image coverage (TMDB-MOVIE-PREPROCESS-065) and the Los Angeles card.
+
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+SELECT '1. Variables written tonight' AS SECTION;
+SELECT VAR_NAME, LEFT(VAR_VALUE, 90) AS VAR_VALUE, TIM_UPDATED
+FROM T_WC_SERVER_VARIABLE
+WHERE DELETED = 0 AND VAR_NAME LIKE 'strtmdbmoviepreprocess%'
+  AND TIM_UPDATED >= CONCAT(CURDATE() - INTERVAL 1 DAY, ' 20:00:00')
+ORDER BY TIM_UPDATED;
+
+SELECT '2. Error variables (any date)' AS SECTION;
+SELECT VAR_NAME, LEFT(VAR_VALUE, 160) AS VAR_VALUE, TIM_UPDATED
+FROM T_WC_SERVER_VARIABLE
+WHERE DELETED = 0 AND VAR_NAME LIKE 'strtmdbmoviepreprocess%' AND VAR_NAME LIKE '%error%'
+ORDER BY VAR_NAME;
+
+SELECT '3. Variables not written for 2 days or more (stale processes?)' AS SECTION;
+SELECT VAR_NAME, LEFT(VAR_VALUE, 60) AS VAR_VALUE, TIM_UPDATED
+FROM T_WC_SERVER_VARIABLE
+WHERE DELETED = 0 AND VAR_NAME LIKE 'strtmdbmoviepreprocess%'
+  AND TIM_UPDATED < CURDATE() - INTERVAL 1 DAY
+ORDER BY TIM_UPDATED DESC
+LIMIT 40;
+
+SELECT '4a. Locations: image coverage' AS SECTION;
+SELECT COUNT(*) AS LIVING,
+       SUM(WIKIPEDIA_IMAGE_PATH IS NOT NULL AND WIKIPEDIA_IMAGE_PATH <> '') AS WITH_IMAGE,
+       SUM(CHAR_LENGTH(WIKIPEDIA_IMAGE_PATH) > 500) AS OVER_500,
+       SUM(DAT_CREAT >= CURDATE()) AS NEW_TODAY,
+       MAX(TIM_UPDATED) AS LAST_UPDATE
+FROM T_WC_T2S_LOCATION WHERE DELETED = 0;
+
+SELECT '4b. Los Angeles, London, Paris' AS SECTION;
+SELECT ID_LOCATION, ID_WIKIDATA, LOCATION_NAME, MOVIE_COUNT, SERIE_COUNT, EPISODE_COUNT,
+       LEFT(WIKIPEDIA_IMAGE_PATH, 110) AS WIKIPEDIA_IMAGE_PATH
+FROM T_WC_T2S_LOCATION
+WHERE ID_WIKIDATA IN ('Q65', 'Q84', 'Q90') AND DELETED = 0;
