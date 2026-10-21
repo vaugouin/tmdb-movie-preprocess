@@ -11,6 +11,8 @@
 --      2022-03-26, United States 760 507 625 USD, United Kingdom 93 442 625 GBP;
 --   E. Inception (Q25188): worldwide 836 848 102 (the deprecated 829 895 144 absent),
 --      United States 292 587 330.
+--   G (1.1.24, audit of 2026-10-21). No DAT_* outside its precision contract; ROWS_ equal
+--      to the dry run check-066-work-finance-dry-run-audit.sql, section A.
 
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -55,3 +57,15 @@ FROM T_WC_T2S_WORK_FINANCE f
 JOIN T_WC_T2S_MOVIE m ON f.ITEM_TYPE = 'movie' AND m.ID_MOVIE = f.ID_ITEM
 WHERE f.CURRENCY_CODE = 'USD' AND (f.FINANCE_KIND = 'budget' OR f.IS_WORLDWIDE = 1)
 GROUP BY f.FINANCE_KIND;
+
+-- G. Dates against their precision (1.1.24): a date at precision 9 is a 1 January, at 10 a
+-- first of the month; the BAD_* counts must be 0.
+SELECT COUNT(*) AS ROWS_, COUNT(DISTINCT ID_STATEMENT) AS STATEMENTS,
+       SUM(DAT_POINT IS NOT NULL AND POINT_PRECISION NOT IN (9, 10, 11)) AS BAD_POINT_PRECISION,
+       SUM(POINT_PRECISION = 9 AND DAT_POINT IS NOT NULL AND DATE_FORMAT(DAT_POINT, '%m-%d') <> '01-01') AS BAD_POINT_YEAR,
+       SUM(POINT_PRECISION = 10 AND DAT_POINT IS NOT NULL AND DAY(DAT_POINT) <> 1) AS BAD_POINT_MONTH,
+       SUM(DAT_START IS NOT NULL AND START_PRECISION NOT IN (9, 10, 11)) AS BAD_START_PRECISION,
+       SUM(DAT_END IS NOT NULL AND END_PRECISION NOT IN (9, 10, 11)) AS BAD_END_PRECISION,
+       SUM(POINT_PRECISION IS NOT NULL AND DAT_POINT IS NULL) AS POINT_LEFT_NULL,
+       SUM(N_PLACES > 1) AS SEVERAL_PLACES, SUM(N_POINTS > 1) AS SEVERAL_POINTS
+FROM T_WC_T2S_WORK_FINANCE;

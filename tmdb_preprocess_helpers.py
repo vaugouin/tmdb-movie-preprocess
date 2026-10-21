@@ -3771,6 +3771,10 @@ def f_buildgroupworktables():
 # 7 858 box office statements on movies; the place is almost always P3005 (valid in place,
 # 4 679 box office statements, Q13780930 = worldwide), the date P585 (797), the period P1264
 # (41), the rank on a chart P1352 (247), the method P459 (1 529 budgets).
+# Audit of 2026-10-21 (1.1.24): one row per statement AND work (a Q-id shared by two T2S
+# works lost the second under INSERT IGNORE), the dates only when their parts are valid,
+# each with its precision, the amount at the source scale, and N_PLACES / N_POINTS to show
+# what the first-qualifier pick leaves out. Requests: doc/sql/check-066-audit-*.sql.
 # ---------------------------------------------------------------------------------------
 
 STR_WORK_FINANCE_TABLE = "T_WC_T2S_WORK_FINANCE"
@@ -3790,16 +3794,20 @@ STR_WORK_FINANCE_DDL = (
     "  `ID_ITEM` int(11) NOT NULL,\n"
     "  `ID_WIKIDATA` varchar(20) NOT NULL,\n"
     "  `FINANCE_KIND` varchar(20) NOT NULL,\n"
-    "  `AMOUNT` decimal(20,2) DEFAULT NULL,\n"
+    "  `AMOUNT` decimal(30,10) DEFAULT NULL,\n"
     "  `ID_CURRENCY` varchar(20) DEFAULT NULL,\n"
     "  `CURRENCY_CODE` char(3) DEFAULT NULL,\n"
     "  `ID_PLACE_WIKIDATA` varchar(20) DEFAULT NULL,\n"
     "  `ID_LOCATION` int(11) DEFAULT NULL,\n"
     "  `IS_WORLDWIDE` tinyint(1) NOT NULL DEFAULT 0,\n"
+    "  `N_PLACES` int(11) NOT NULL DEFAULT 0,\n"
     "  `DAT_POINT` date DEFAULT NULL,\n"
     "  `POINT_PRECISION` int(11) DEFAULT NULL,\n"
+    "  `N_POINTS` int(11) NOT NULL DEFAULT 0,\n"
     "  `DAT_START` date DEFAULT NULL,\n"
+    "  `START_PRECISION` int(11) DEFAULT NULL,\n"
     "  `DAT_END` date DEFAULT NULL,\n"
+    "  `END_PRECISION` int(11) DEFAULT NULL,\n"
     "  `ID_PERIOD_WIKIDATA` varchar(20) DEFAULT NULL,\n"
     "  `CHART_RANK` int(11) DEFAULT NULL,\n"
     "  `ID_METHOD_WIKIDATA` varchar(20) DEFAULT NULL,\n"
@@ -3811,7 +3819,7 @@ STR_WORK_FINANCE_DDL = (
     "  `ID_OWNER` int(5) DEFAULT NULL,\n"
     "  `TIM_UPDATED` datetime DEFAULT NULL,\n"
     "  `ID_USER_UPDATED` int(5) DEFAULT NULL,\n"
-    "  PRIMARY KEY (`ID_STATEMENT`),\n"
+    "  PRIMARY KEY (`ID_STATEMENT`, `ITEM_TYPE`, `ID_ITEM`),\n"
     "  KEY `ITEM` (`ITEM_TYPE`, `ID_ITEM`),\n"
     "  KEY `ID_WIKIDATA` (`ID_WIKIDATA`),\n"
     "  KEY `FINANCE_KIND` (`FINANCE_KIND`),\n"
@@ -3826,8 +3834,32 @@ STR_WORK_FINANCE_DDL = (
 
 ARR_WORK_FINANCE_COLUMNS = (
     "ITEM_TYPE", "ID_ITEM", "ID_WIKIDATA", "FINANCE_KIND", "AMOUNT", "ID_CURRENCY", "CURRENCY_CODE",
-    "ID_PLACE_WIKIDATA", "ID_LOCATION", "IS_WORLDWIDE", "DAT_POINT", "POINT_PRECISION", "DAT_START",
-    "DAT_END", "ID_PERIOD_WIKIDATA", "CHART_RANK", "ID_METHOD_WIKIDATA", "WIKIDATA_RANK", "DISPLAY_ORDER",
+    "ID_PLACE_WIKIDATA", "ID_LOCATION", "IS_WORLDWIDE", "N_PLACES", "DAT_POINT", "POINT_PRECISION",
+    "N_POINTS", "DAT_START", "START_PRECISION", "DAT_END", "END_PRECISION", "ID_PERIOD_WIKIDATA",
+    "CHART_RANK", "ID_METHOD_WIKIDATA", "WIKIDATA_RANK", "DISPLAY_ORDER",
+)
+
+# The qualifier child table of each value kind, and the VALUE_TYPE its parent must carry.
+ARR_WORK_FINANCE_QUALIFIER_TABLES = {
+    "item": ("T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE", "item"),
+    "time": ("T_WC_WIKIDATA_QUALIFIER_TIME_VALUE", "time"),
+    "quantity": ("T_WC_WIKIDATA_QUALIFIER_QUANTITY_VALUE", "quantity"),
+}
+
+# A qualifier date, only when its parts make a real Gregorian day at precision 9 (year),
+# 10 (month) or 11 (day), years 1000 to 9999, no time zone: the first day of the year or
+# month at precisions 9 and 10, to be read with its precision column. Anything else
+# (31 February, month 13, Julian calendar, decade, a zone) gives NULL rather than a date
+# shifted by MAKEDATE + INTERVAL. DATE_START of the qualifier rows is empty (dry run of
+# 2026-10-20) and is not read.
+STR_WORK_FINANCE_DATE = (
+    "CASE WHEN qv.TIME_PRECISION IN (9, 10, 11) AND qv.YEAR_VALUE BETWEEN 1000 AND 9999"
+    " AND SUBSTRING_INDEX(qv.CALENDAR_MODEL, '/', -1) = 'Q1985727' AND COALESCE(qv.TIMEZONE_OFFSET, 0) = 0"
+    " AND (qv.TIME_PRECISION = 9 OR qv.MONTH_VALUE BETWEEN 1 AND 12)"
+    " AND (qv.TIME_PRECISION < 11 OR qv.DAY_VALUE BETWEEN 1 AND"
+    " DAY(LAST_DAY(MAKEDATE(qv.YEAR_VALUE, 1) + INTERVAL (qv.MONTH_VALUE - 1) MONTH)))"
+    " THEN MAKEDATE(qv.YEAR_VALUE, 1) + INTERVAL IF(qv.TIME_PRECISION = 9, 0, qv.MONTH_VALUE - 1) MONTH"
+    " + INTERVAL IF(qv.TIME_PRECISION = 11, qv.DAY_VALUE - 1, 0) DAY END"
 )
 
 
@@ -3840,22 +3872,32 @@ def _f_workfinancestep(cursor, strstep, strsql, params=None):
 
 def _f_workfinancequalifier(strproperty, strvalue):
     """Correlated subquery: the first value of one qualifier of statement s."""
-    arrvalue = {
-        "item": ("T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE", "qv.ID_ITEM"),
-        # DATE_START is empty on the qualifier rows (dry run of 2026-10-20): the date is
-        # rebuilt from its parts, month and day 0 (year or month precision) read as 1.
-        "date": ("T_WC_WIKIDATA_QUALIFIER_TIME_VALUE",
-                 "COALESCE(qv.DATE_START, IF(qv.YEAR_VALUE BETWEEN 1000 AND 9999, "
-                 "MAKEDATE(qv.YEAR_VALUE, 1) + INTERVAL (COALESCE(NULLIF(qv.MONTH_VALUE, 0), 1) - 1) MONTH "
-                 "+ INTERVAL (COALESCE(NULLIF(qv.DAY_VALUE, 0), 1) - 1) DAY, NULL))"),
-        "precision": ("T_WC_WIKIDATA_QUALIFIER_TIME_VALUE", "qv.TIME_PRECISION"),
-        "amount": ("T_WC_WIKIDATA_QUALIFIER_QUANTITY_VALUE", "qv.AMOUNT"),
+    strkind, strexpr = {
+        "item": ("item", "qv.ID_ITEM"),
+        "date": ("time", STR_WORK_FINANCE_DATE),
+        "precision": ("time", "qv.TIME_PRECISION"),
+        "amount": ("quantity", "qv.AMOUNT"),
     }[strvalue]
+    strtable, strtype = ARR_WORK_FINANCE_QUALIFIER_TABLES[strkind]
     return (
-        f"(SELECT {arrvalue[1]} FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq "
-        f"JOIN {arrvalue[0]} qv ON qv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER "
+        f"(SELECT {strexpr} FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq "
+        f"JOIN {strtable} qv ON qv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER "
         f"WHERE sq.ID_STATEMENT = s.ID_STATEMENT AND sq.ID_QUALIFIER_PROPERTY = '{strproperty}' "
+        f"AND sq.VALUE_TYPE = '{strtype}' "
         "ORDER BY sq.DISPLAY_ORDER, sq.ID_STATEMENT_QUALIFIER LIMIT 1)"
+    )
+
+
+def _f_workfinancequalifiercount(arrproperties, strkind):
+    """Correlated subquery: how many qualifiers of these properties statement s carries
+    (with a value), so that a row whose first pick hides others can be found."""
+    strtable, strtype = ARR_WORK_FINANCE_QUALIFIER_TABLES[strkind]
+    strin = ", ".join(f"'{p}'" for p in arrproperties)
+    return (
+        f"(SELECT COUNT(*) FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq "
+        f"JOIN {strtable} qv ON qv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER "
+        f"WHERE sq.ID_STATEMENT = s.ID_STATEMENT AND sq.ID_QUALIFIER_PROPERTY IN ({strin}) "
+        f"AND sq.VALUE_TYPE = '{strtype}')"
     )
 
 
@@ -3863,8 +3905,9 @@ def f_buildworkfinancetable():
     """Rebuild T_WC_T2S_WORK_FINANCE from the V2 statements P2130 and P2142 of the T2S
     movies and series. Set-based, idempotent: a full recompute, an upsert that moves
     TIM_UPDATED only when a row changes, and the removal of the statements gone from
-    Wikidata. Deprecated statements are left out; no DELETED filter on the V2 reads
-    (house rule, see f_wikidatabestvaluesql).
+    Wikidata. One row per statement and T2S work. Deprecated statements are left out;
+    no DELETED filter on the V2 reads (house rule, see f_wikidatabestvaluesql, kept
+    after the audit of 2026-10-21).
 
     Returns the counts: 'rows', 'budget', 'box_office', 'worldwide', 'dated',
     'upserted', 'deleted'.
@@ -3881,39 +3924,59 @@ def f_buildworkfinancetable():
     try:
         cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
         _f_readwithoutlocking(cursor, "75")
+        # A table created by 1.1.22 or 1.1.23 (key on ID_STATEMENT alone, no precision or
+        # count columns) is dropped and recreated: it is fully recomputed below and nothing
+        # points to its rows.
+        cursor.execute(
+            "SELECT COUNT(*) AS N_COLUMNS, SUM(COLUMN_NAME = 'END_PRECISION') AS HAS_PRECISIONS "
+            "FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s",
+            (STR_WORK_FINANCE_TABLE,))
+        arrshape = cursor.fetchone() or {}
+        if int(arrshape.get("N_COLUMNS") or 0) > 0 and not int(arrshape.get("HAS_PRECISIONS") or 0):
+            _f_workfinancestep(cursor, "0. DROP the 1.1.22 shape of " + STR_WORK_FINANCE_TABLE,
+                               "DROP TABLE `" + STR_WORK_FINANCE_TABLE + "`")
         _f_workfinancestep(cursor, "0. CREATE TABLE IF NOT EXISTS " + STR_WORK_FINANCE_TABLE, STR_WORK_FINANCE_DDL)
 
         cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_work_finance")
         cursor.execute(
             "CREATE TEMPORARY TABLE tmp_work_finance ("
-            " ID_STATEMENT BIGINT NOT NULL PRIMARY KEY,"
+            " ID_STATEMENT BIGINT NOT NULL,"
             " ITEM_TYPE VARCHAR(10) NOT NULL, ID_ITEM INT NOT NULL, ID_WIKIDATA VARCHAR(20) NOT NULL,"
-            " FINANCE_KIND VARCHAR(20) NOT NULL, AMOUNT DECIMAL(20,2) NULL,"
+            " FINANCE_KIND VARCHAR(20) NOT NULL, AMOUNT DECIMAL(30,10) NULL,"
             " ID_CURRENCY VARCHAR(20) NULL, CURRENCY_CODE CHAR(3) NULL,"
             " ID_PLACE_WIKIDATA VARCHAR(20) NULL, ID_LOCATION INT NULL, IS_WORLDWIDE TINYINT(1) NOT NULL DEFAULT 0,"
-            " DAT_POINT DATE NULL, POINT_PRECISION INT NULL, DAT_START DATE NULL, DAT_END DATE NULL,"
+            " N_PLACES INT NOT NULL DEFAULT 0, DAT_POINT DATE NULL, POINT_PRECISION INT NULL,"
+            " N_POINTS INT NOT NULL DEFAULT 0, DAT_START DATE NULL, START_PRECISION INT NULL,"
+            " DAT_END DATE NULL, END_PRECISION INT NULL,"
             " ID_PERIOD_WIKIDATA VARCHAR(20) NULL, CHART_RANK INT NULL, ID_METHOD_WIKIDATA VARCHAR(20) NULL,"
-            " WIKIDATA_RANK VARCHAR(20) NULL, DISPLAY_ORDER INT NULL"
+            " WIKIDATA_RANK VARCHAR(20) NULL, DISPLAY_ORDER INT NULL,"
+            " PRIMARY KEY (ID_STATEMENT, ITEM_TYPE, ID_ITEM)"
             ") " + strtablecharset)
         lngread = 0
         for stritemtype, strt2s, strid in (("movie", "T_WC_T2S_MOVIE", "ID_MOVIE"), ("serie", "T_WC_T2S_SERIE", "ID_SERIE")):
+            # A plain INSERT, no IGNORE: the key is the statement AND the work, so a
+            # duplicate can only be a bug, and it must stop the step rather than vanish.
             lngread += _f_workfinancestep(cursor, f"1. INSERT the {stritemtype} statements (tmp_work_finance)", (
-                "INSERT IGNORE INTO tmp_work_finance (ID_STATEMENT, ITEM_TYPE, ID_ITEM, ID_WIKIDATA, FINANCE_KIND,"
-                " AMOUNT, ID_CURRENCY, CURRENCY_CODE, ID_PLACE_WIKIDATA, DAT_POINT, POINT_PRECISION, DAT_START,"
-                " DAT_END, ID_PERIOD_WIKIDATA, CHART_RANK, ID_METHOD_WIKIDATA, WIKIDATA_RANK, DISPLAY_ORDER)\n"
+                "INSERT INTO tmp_work_finance (ID_STATEMENT, ITEM_TYPE, ID_ITEM, ID_WIKIDATA, FINANCE_KIND,"
+                " AMOUNT, ID_CURRENCY, CURRENCY_CODE, ID_PLACE_WIKIDATA, N_PLACES, DAT_POINT, POINT_PRECISION,"
+                " N_POINTS, DAT_START, START_PRECISION, DAT_END, END_PRECISION,"
+                " ID_PERIOD_WIKIDATA, CHART_RANK, ID_METHOD_WIKIDATA, WIKIDATA_RANK, DISPLAY_ORDER)\n"
                 f"SELECT s.ID_STATEMENT, '{stritemtype}' AS ITEM_TYPE, w.{strid} AS ID_ITEM, s.ID_WIKIDATA,\n"
                 "       IF(s.ID_PROPERTY = 'P2130', 'budget', 'box_office') AS FINANCE_KIND,\n"
                 f"       q.AMOUNT, q.UNIT_ID_WIKIDATA AS ID_CURRENCY, {strcurrency} AS CURRENCY_CODE,\n"
                 f"       {strplace} AS ID_PLACE_WIKIDATA,\n"
+                f"       {_f_workfinancequalifiercount(ARR_WORK_FINANCE_PLACE_PROPERTIES, 'item')} AS N_PLACES,\n"
                 f"       {_f_workfinancequalifier('P585', 'date')} AS DAT_POINT, {_f_workfinancequalifier('P585', 'precision')} AS POINT_PRECISION,\n"
-                f"       {_f_workfinancequalifier('P580', 'date')} AS DAT_START, {_f_workfinancequalifier('P582', 'date')} AS DAT_END,\n"
+                f"       {_f_workfinancequalifiercount(('P585',), 'time')} AS N_POINTS,\n"
+                f"       {_f_workfinancequalifier('P580', 'date')} AS DAT_START, {_f_workfinancequalifier('P580', 'precision')} AS START_PRECISION,\n"
+                f"       {_f_workfinancequalifier('P582', 'date')} AS DAT_END, {_f_workfinancequalifier('P582', 'precision')} AS END_PRECISION,\n"
                 f"       {_f_workfinancequalifier('P1264', 'item')} AS ID_PERIOD_WIKIDATA, {_f_workfinancequalifier('P1352', 'amount')} AS CHART_RANK,\n"
                 f"       {_f_workfinancequalifier('P459', 'item')} AS ID_METHOD_WIKIDATA,\n"
                 "       s.`RANK` AS WIKIDATA_RANK, s.DISPLAY_ORDER\n"
                 "FROM T_WC_WIKIDATA_STATEMENT s\n"
                 "JOIN T_WC_WIKIDATA_QUANTITY_VALUE q ON q.ID_STATEMENT = s.ID_STATEMENT\n"
                 f"JOIN `{strt2s}` w ON w.ID_WIKIDATA = s.ID_WIKIDATA AND COALESCE(w.DELETED, 0) = 0\n"
-                "WHERE s.ID_PROPERTY IN ('P2130', 'P2142')\n"
+                "WHERE s.ID_PROPERTY IN ('P2130', 'P2142') AND s.VALUE_TYPE = 'quantity'\n"
                 "  AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')\n"
                 "  AND q.AMOUNT IS NOT NULL"))
         _f_workfinancestep(cursor, "2. UPDATE the place to its T2S location and the worldwide flag", (
@@ -3939,10 +4002,11 @@ def f_buildworkfinancetable():
             f"  DAT_CREAT = COALESCE({STR_WORK_FINANCE_TABLE}.DAT_CREAT, VALUES(DAT_CREAT))"),
             (cp.lnguseridsession, strtoday, cp.lnguseridsession, strnow, cp.lnguseridsession))
         # A statement gone from Wikidata (or turned deprecated, or whose work left T2S) is
-        # removed: the key is the Wikidata statement, nobody keeps a reference to it.
+        # removed: the key is the Wikidata statement and its work, nobody keeps a reference to it.
         arrresult["deleted"] = _f_workfinancestep(cursor, "4. DELETE the statements no longer read", (
             f"DELETE x FROM {STR_WORK_FINANCE_TABLE} x\n"
             "LEFT JOIN tmp_work_finance t ON t.ID_STATEMENT = x.ID_STATEMENT\n"
+            "  AND t.ITEM_TYPE = x.ITEM_TYPE AND t.ID_ITEM = x.ID_ITEM\n"
             "WHERE t.ID_STATEMENT IS NULL"))
         connection.commit()
 
