@@ -2235,6 +2235,38 @@ STR_LOCATION_ANCESTOR_TABLE = "T_WC_T2S_LOCATION_ANCESTOR"
 # profondeur 7 (Angleterre). 12 laisse de la marge ; la borne n'est la que pour les cycles,
 # que Wikidata n'interdit pas.
 INT_LOCATION_ANCESTOR_MAX_DEPTH = 12
+# TMDB-MOVIE-PREPROCESS-067 : un lieu a cheval sur plusieurs pays (les Appalaches, la
+# Mediterranee) n'est dans aucun. Mesure et regles : doc/sql/test-067-cross-border-places.sql
+# et ses check-067-*, resultats du 2026-10-21.
+# Classes P31 d'un parent passe : l'arete qui y monte tombe. Wikidata ne date presque jamais
+# ces aretes (2 qualificatifs P582 sur 510 974) et la base ne tient que 135 P576.
+TUPLE_LOCATION_ENDED_CLASSES = (
+    "Q3024240",   # historical country (622 des 1 944 parents P17, l'URSS comprise)
+    "Q11514315",  # historical period
+    "Q19953632",  # former administrative territorial entity
+    "Q50068795",  # historical Chinese state
+    "Q12857432",  # Chinese dynasty
+    "Q182547",    # Roman province (la Judee de Massada)
+)
+# historical unrecognized state, au rang preferred seulement : la Premiere Republique de
+# Hongrie et les Etats confederes la portent preferred, les Etats-Unis et l'Indonesie normal.
+# Prise a tout rang, la fiche des Etats-Unis tombait de 15 556 films a 420.
+STR_LOCATION_ENDED_IF_PREFERRED = "Q99541706"
+# occupied territory : un parent passe (le Gouvernement general du ghetto de Varsovie), sauf
+# s'il est aussi disputed territory (la Cisjordanie, Gaza restent des parents vivants).
+STR_LOCATION_OCCUPIED = "Q2577883"
+STR_LOCATION_DISPUTED = "Q15239622"
+# Decision de Philippe du 2026-10-21 : un lieu dispute va sous chacun des pays revendiques.
+# Est dispute un lieu (D1) de classe disputed ou occupied territory (Jerusalem, la Crimee,
+# la Cisjordanie, le Golan) ; (D2) au meme ensemble P17 qu'un lieu T2S de D1 (Yalta,
+# Sebastopol : leurs parents P131 manquent presque tous a la base) ; (D3) a deux P17 dont
+# l'un est un regime de facto ou un territoire dispute (Laayoune, Savur-Mohyla). Pas
+# Q10711424, state with limited recognition : la Chine la porte, et l'Everest passait dispute.
+TUPLE_LOCATION_DISPUTED_CLASSES = (STR_LOCATION_DISPUTED, STR_LOCATION_OCCUPIED)
+TUPLE_LOCATION_DISPUTED_PARENT_CLASSES = ("Q1179466", STR_LOCATION_DISPUTED)
+# Decision de Philippe du 2026-10-21 : la Normandie (Q15878) reste sous la France. Wikidata
+# lui donne aussi Guernesey et Jersey (la Normandie historique) ; seule exception nommee.
+TUPLE_LOCATION_P17_DROP = (("Q15878", "Q25230"), ("Q15878", "Q785"))
 
 
 def _f_buildlocationancestor(cursor, connection):
@@ -2260,18 +2292,44 @@ def _f_buildlocationancestor(cursor, connection):
     JAMAIS LOCATION_TYPE. La classification des lieux est fausse par endroits (Marseille est
     une region) et la hierarchie ne doit pas en dependre.
 
+    UN LIEU A CHEVAL SUR PLUSIEURS PAYS N'EST DANS AUCUN (-067). Les Appalaches ont pour pays
+    les Etats-Unis, le Canada et la France (Saint-Pierre-et-Miquelon) et apportaient 51 films
+    a la fiche France. Deux temps, etapes 3d-0a a 3d-0e : (a) l'arete qui monte vers un parent
+    passe tombe (qualificatif P582, P576, ou les classes TUPLE_LOCATION_ENDED_CLASSES : sans
+    elles Edo, Bangkok, Sobibor passaient transfrontaliers) ; (b) un item qui garde deux P17
+    ou plus, parents connus de la base seulement, ne monte plus du tout, P131 compris (sinon
+    Saint-Pierre-et-Miquelon, en P131, ramene la France). Il garde sa ligne 0 et ses enfants.
+    Les lieux disputes y echappent (decision de Philippe, voir TUPLE_LOCATION_DISPUTED_CLASSES)
+    et vont sous chaque pays revendique ; la Normandie reste sous la France
+    (TUPLE_LOCATION_P17_DROP). Mesure du 2026-10-21 : 1 268 paires sur 37 155 tombent, aucune
+    n'apparait ; France 1 797 a 1 792 films tournes, 3 753 a 3 608 qui s'y passent.
+
     Parcours en largeur, une instruction par profondeur : INSERT IGNORE sur la cle
     (lieu, ancetre) garde la premiere profondeur atteinte, la plus petite, et coupe les
     cycles. Rend (lignes, lignes au-dessus de 0, profondeur atteinte).
     """
-    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_arete")
-    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_arete ("
-                   "ID_CHILD VARCHAR(50) NOT NULL, ID_PARENT VARCHAR(50) NOT NULL, "
-                   "PRIMARY KEY (ID_CHILD, ID_PARENT)) "
-                   "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")
-    _f_locationstep(cursor, "3d-0. INSERT des aretes P131 / P17 au meilleur rang (tmp_lieu_arete)", (
-        "INSERT IGNORE INTO tmp_lieu_arete (ID_CHILD, ID_PARENT)\n"
-        "SELECT st.ID_WIKIDATA, iv.ID_ITEM\n"
+    strcharset = " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    strended = ", ".join("'" + strclass + "'" for strclass in TUPLE_LOCATION_ENDED_CLASSES)
+    strdisputed = ", ".join("'" + strclass + "'" for strclass in TUPLE_LOCATION_DISPUTED_CLASSES)
+    strdisputedparent = ", ".join("'" + strclass + "'" for strclass in TUPLE_LOCATION_DISPUTED_PARENT_CLASSES)
+    strdrop = " OR ".join(f"(ID_CHILD = '{strchild}' AND ID_PARENT = '{strparent}')"
+                          for strchild, strparent in TUPLE_LOCATION_P17_DROP)
+    # Une arete ouverte : ni datee, ni vers un parent passe, ni retiree par nom.
+    stropen = "HAS_END = 0 AND PARENT_ENDED = 0 AND EDITORIAL_DROP = 0"
+    for strtable in ("tmp_lieu_arete", "tmp_lieu_arete_e", "tmp_lieu_passe", "tmp_lieu_multi",
+                     "tmp_lieu_dispute", "tmp_lieu_dispute_set", "tmp_lieu_transfrontalier"):
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS " + strtable)
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_arete_e ("
+                   "ID_CHILD VARCHAR(50) NOT NULL, ID_PARENT VARCHAR(50) NOT NULL, PROP VARCHAR(10) NOT NULL, "
+                   "HAS_END TINYINT NOT NULL, PARENT_ENDED TINYINT NOT NULL DEFAULT 0, "
+                   "EDITORIAL_DROP TINYINT NOT NULL DEFAULT 0, PARENT_KNOWN TINYINT NOT NULL DEFAULT 0, "
+                   "PRIMARY KEY (ID_CHILD, ID_PARENT, PROP), KEY (ID_PARENT))" + strcharset)
+    _f_locationstep(cursor, "3d-0a. INSERT des aretes P131 / P17 au meilleur rang (tmp_lieu_arete_e)", (
+        "INSERT INTO tmp_lieu_arete_e (ID_CHILD, ID_PARENT, PROP, HAS_END)\n"
+        "SELECT st.ID_WIKIDATA, iv.ID_ITEM, st.ID_PROPERTY,\n"
+        "       MAX(EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER q\n"
+        "                   WHERE q.ID_STATEMENT = st.ID_STATEMENT AND q.ID_QUALIFIER_PROPERTY = 'P582'\n"
+        "                     AND COALESCE(q.DELETED, 0) = 0))\n"
         "FROM T_WC_WIKIDATA_STATEMENT st\n"
         "INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
         "WHERE st.ID_PROPERTY IN ('P131', 'P17')\n"
@@ -2281,8 +2339,95 @@ def _f_buildlocationancestor(cursor, connection):
         "       OR NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT p\n"
         "                      WHERE p.ID_WIKIDATA = st.ID_WIKIDATA AND p.ID_PROPERTY = st.ID_PROPERTY\n"
         "                        AND p.`RANK` = 'preferred' AND p.DELETED = 0))\n"
-        "  AND iv.ID_ITEM <> st.ID_WIKIDATA"))
+        "  AND iv.ID_ITEM <> st.ID_WIKIDATA\n"
+        "GROUP BY st.ID_WIKIDATA, iv.ID_ITEM, st.ID_PROPERTY"))
     connection.commit()
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_passe (ID_ITEM VARCHAR(50) NOT NULL PRIMARY KEY)" + strcharset)
+    _f_locationstep(cursor, "3d-0b. INSERT des parents passes (tmp_lieu_passe)", (
+        "INSERT IGNORE INTO tmp_lieu_passe\n"
+        "SELECT DISTINCT st.ID_WIKIDATA FROM T_WC_WIKIDATA_STATEMENT st\n"
+        "WHERE st.ID_PROPERTY = 'P576' AND st.DELETED = 0 AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+        "  AND st.ID_WIKIDATA IN (SELECT ID_PARENT FROM tmp_lieu_arete_e)"))
+    _f_locationstep(cursor, "3d-0b. INSERT des parents de classe passee (tmp_lieu_passe)", (
+        "INSERT IGNORE INTO tmp_lieu_passe\n"
+        "SELECT DISTINCT st.ID_WIKIDATA FROM T_WC_WIKIDATA_STATEMENT st\n"
+        "INNER JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT\n"
+        "WHERE st.ID_PROPERTY = 'P31' AND st.DELETED = 0 AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+        f"  AND (iv.ID_ITEM IN ({strended})\n"
+        f"       OR (iv.ID_ITEM = '{STR_LOCATION_ENDED_IF_PREFERRED}' AND st.`RANK` = 'preferred')\n"
+        f"       OR (iv.ID_ITEM = '{STR_LOCATION_OCCUPIED}'\n"
+        "           AND NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s2\n"
+        "                           INNER JOIN T_WC_WIKIDATA_ITEM_VALUE v2 ON v2.ID_STATEMENT = s2.ID_STATEMENT\n"
+        "                           WHERE s2.ID_WIKIDATA = st.ID_WIKIDATA AND s2.ID_PROPERTY = 'P31' AND s2.DELETED = 0\n"
+        "                             AND (s2.`RANK` IS NULL OR s2.`RANK` <> 'deprecated')\n"
+        f"                             AND v2.ID_ITEM = '{STR_LOCATION_DISPUTED}')))\n"
+        "  AND st.ID_WIKIDATA IN (SELECT ID_PARENT FROM tmp_lieu_arete_e)"))
+    _f_locationstep(cursor, "3d-0b. UPDATE des drapeaux d'arete (passe, connu, retrait nomme)", (
+        "UPDATE tmp_lieu_arete_e e INNER JOIN tmp_lieu_passe d ON d.ID_ITEM = e.ID_PARENT SET e.PARENT_ENDED = 1"))
+    cursor.execute("UPDATE tmp_lieu_arete_e e INNER JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = e.ID_PARENT "
+                   "SET e.PARENT_KNOWN = 1")
+    cursor.execute(f"UPDATE tmp_lieu_arete_e SET EDITORIAL_DROP = 1 WHERE PROP = 'P17' AND ({strdrop})")
+    connection.commit()
+    # L'ensemble P17 ouvert de chaque item qui en garde deux ou plus, parents connus seulement
+    # (decision de Philippe : un parent sans ligne T_WC_WIKIDATA_ITEM ne compte pas).
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_multi (ID_CHILD VARCHAR(50) NOT NULL PRIMARY KEY, "
+                   "N_P17 INT NOT NULL, P17_SET VARCHAR(2000) NOT NULL, KEY (P17_SET(200)))" + strcharset)
+    _f_locationstep(cursor, "3d-0c. INSERT des items a deux P17 ou plus (tmp_lieu_multi)", (
+        "INSERT INTO tmp_lieu_multi (ID_CHILD, N_P17, P17_SET)\n"
+        "SELECT ID_CHILD, COUNT(DISTINCT ID_PARENT),\n"
+        "       GROUP_CONCAT(DISTINCT ID_PARENT ORDER BY ID_PARENT SEPARATOR ' ')\n"
+        "FROM tmp_lieu_arete_e\n"
+        f"WHERE PROP = 'P17' AND {stropen} AND PARENT_KNOWN = 1\n"
+        "GROUP BY ID_CHILD HAVING COUNT(DISTINCT ID_PARENT) >= 2"))
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_dispute (ID_CHILD VARCHAR(50) NOT NULL PRIMARY KEY)" + strcharset)
+    _f_locationstep(cursor, "3d-0d. INSERT des items disputes, D1 par la classe (tmp_lieu_dispute)", (
+        "INSERT IGNORE INTO tmp_lieu_dispute\n"
+        "SELECT DISTINCT m.ID_CHILD FROM tmp_lieu_multi m\n"
+        "INNER JOIN T_WC_WIKIDATA_STATEMENT s ON s.ID_WIKIDATA = m.ID_CHILD AND s.ID_PROPERTY = 'P31' AND s.DELETED = 0\n"
+        "  AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')\n"
+        "INNER JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT\n"
+        f"WHERE v.ID_ITEM IN ({strdisputed})"))
+    # MariaDB ne rouvre pas une table temporaire dans la meme instruction : les ensembles P17
+    # des lieux D1 passent par leur propre table avant D2.
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_dispute_set (P17_SET VARCHAR(2000) NOT NULL, "
+                   "KEY (P17_SET(200)))" + strcharset)
+    cursor.execute(
+        "INSERT INTO tmp_lieu_dispute_set\n"
+        "SELECT DISTINCT m.P17_SET FROM tmp_lieu_dispute d\n"
+        "INNER JOIN tmp_lieu_multi m ON m.ID_CHILD = d.ID_CHILD\n"
+        "WHERE EXISTS (SELECT 1 FROM T_WC_T2S_LOCATION_BUILD l WHERE l.ID_WIKIDATA = d.ID_CHILD AND l.DELETED = 0)")
+    _f_locationstep(cursor, "3d-0d. INSERT des items disputes, D2 par l'ensemble P17", (
+        "INSERT IGNORE INTO tmp_lieu_dispute\n"
+        "SELECT m.ID_CHILD FROM tmp_lieu_multi m\n"
+        "INNER JOIN tmp_lieu_dispute_set x ON x.P17_SET = m.P17_SET"))
+    _f_locationstep(cursor, "3d-0d. INSERT des items disputes, D3 par le parent", (
+        "INSERT IGNORE INTO tmp_lieu_dispute\n"
+        "SELECT DISTINCT m.ID_CHILD FROM tmp_lieu_multi m\n"
+        "INNER JOIN tmp_lieu_arete_e e ON e.ID_CHILD = m.ID_CHILD AND e.PROP = 'P17'\n"
+        f"  AND e.{stropen.replace(' AND ', ' AND e.')} AND e.PARENT_KNOWN = 1\n"
+        "INNER JOIN T_WC_WIKIDATA_STATEMENT s ON s.ID_WIKIDATA = e.ID_PARENT AND s.ID_PROPERTY = 'P31' AND s.DELETED = 0\n"
+        "  AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')\n"
+        "INNER JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT\n"
+        f"WHERE m.N_P17 = 2 AND v.ID_ITEM IN ({strdisputedparent})"))
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_transfrontalier (ID_CHILD VARCHAR(50) NOT NULL PRIMARY KEY)"
+                   + strcharset)
+    _f_locationstep(cursor, "3d-0e. INSERT des items transfrontaliers (tmp_lieu_transfrontalier)", (
+        "INSERT INTO tmp_lieu_transfrontalier\n"
+        "SELECT m.ID_CHILD FROM tmp_lieu_multi m\n"
+        "WHERE NOT EXISTS (SELECT 1 FROM tmp_lieu_dispute d WHERE d.ID_CHILD = m.ID_CHILD)"))
+    connection.commit()
+    cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_arete ("
+                   "ID_CHILD VARCHAR(50) NOT NULL, ID_PARENT VARCHAR(50) NOT NULL, "
+                   "PRIMARY KEY (ID_CHILD, ID_PARENT))" + strcharset)
+    _f_locationstep(cursor, "3d-0f. INSERT des aretes gardees (tmp_lieu_arete)", (
+        "INSERT IGNORE INTO tmp_lieu_arete (ID_CHILD, ID_PARENT)\n"
+        "SELECT e.ID_CHILD, e.ID_PARENT FROM tmp_lieu_arete_e e\n"
+        f"WHERE e.{stropen.replace(' AND ', ' AND e.')}\n"
+        "  AND NOT EXISTS (SELECT 1 FROM tmp_lieu_transfrontalier c WHERE c.ID_CHILD = e.ID_CHILD)"))
+    connection.commit()
+    for strtable in ("tmp_lieu_arete_e", "tmp_lieu_passe", "tmp_lieu_multi", "tmp_lieu_dispute",
+                     "tmp_lieu_dispute_set", "tmp_lieu_transfrontalier"):
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS " + strtable)
     cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_ancetre")
     cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_ancetre ("
                    "ID_LIEU VARCHAR(50) NOT NULL, ID_ANCETRE VARCHAR(50) NOT NULL, DEPTH INT NOT NULL, "
