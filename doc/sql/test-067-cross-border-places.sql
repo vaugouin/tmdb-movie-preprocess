@@ -3,8 +3,10 @@
 -- Read-only (SELECT and temporary tables), voie 1. Written 2026-10-21.
 -- The live hierarchy (T_WC_T2S_LOCATION_ANCESTOR, process 72 since -048) is the transitive
 -- closure of P131 and P17 at best rank. The rule under test changes the edges only:
---   (a) an edge whose statement carries an end time (qualifier P582) is dropped
---       (historical states: Athens under Ancient Rome, Ljubljana under Yugoslavia);
+--   (a) an edge whose statement carries an end time (qualifier P582) is dropped, and so is
+--       an edge whose parent has a dissolution date (P576: Tokugawa shogunate, Nazi Germany,
+--       Yugoslavia, the Ottoman Empire). Run of 2026-10-21 10:28 without the P576 half: only
+--       2 of 510 974 edges carry a P582, so Bangkok, Edo, Sobibor came out cross-border;
 --   (b) an item that keeps two P17 values or more after (a) is cross-border: none of its
 --       edges goes up, P131 included (the Appalachians reach France through
 --       Saint-Pierre-and-Miquelon, a P131). It keeps its depth-0 row.
@@ -18,9 +20,10 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- ---------------------------------------------------------------------------
 -- Edges, best rank as in step 3d-0, with the property and an end-time flag.
 -- ---------------------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_ended;
 DROP TEMPORARY TABLE IF EXISTS tmp_e;
 CREATE TEMPORARY TABLE tmp_e (
-  ID_CHILD VARCHAR(50) NOT NULL, ID_PARENT VARCHAR(50) NOT NULL, PROP VARCHAR(10) NOT NULL, HAS_END TINYINT NOT NULL,
+  ID_CHILD VARCHAR(50) NOT NULL, ID_PARENT VARCHAR(50) NOT NULL, PROP VARCHAR(10) NOT NULL, HAS_END TINYINT NOT NULL, PARENT_ENDED TINYINT NOT NULL DEFAULT 0,
   PRIMARY KEY (ID_CHILD, ID_PARENT, PROP), KEY (ID_PARENT)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -41,13 +44,22 @@ WHERE st.ID_PROPERTY IN ('P131', 'P17')
   AND iv.ID_ITEM <> st.ID_WIKIDATA
 GROUP BY st.ID_WIKIDATA, iv.ID_ITEM, st.ID_PROPERTY;
 
+DROP TEMPORARY TABLE IF EXISTS tmp_ended;
+CREATE TEMPORARY TABLE tmp_ended (ID_ITEM VARCHAR(50) NOT NULL PRIMARY KEY)
+  ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT IGNORE INTO tmp_ended
+SELECT DISTINCT st.ID_WIKIDATA FROM T_WC_WIKIDATA_STATEMENT st
+WHERE st.ID_PROPERTY = 'P576' AND st.DELETED = 0 AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
+  AND st.ID_WIKIDATA IN (SELECT ID_PARENT FROM tmp_e);
+UPDATE tmp_e e JOIN tmp_ended d ON d.ID_ITEM = e.ID_PARENT SET e.PARENT_ENDED = 1;
+
 -- MIN(HAS_END): an edge stated twice, once closed and once open, stays open.
 DROP TEMPORARY TABLE IF EXISTS tmp_cross;
 CREATE TEMPORARY TABLE tmp_cross (ID_CHILD VARCHAR(50) NOT NULL PRIMARY KEY, N_P17 INT NOT NULL)
   ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 INSERT INTO tmp_cross
 SELECT ID_CHILD, COUNT(DISTINCT ID_PARENT) FROM tmp_e
-WHERE PROP = 'P17' AND HAS_END = 0
+WHERE PROP = 'P17' AND HAS_END = 0 AND PARENT_ENDED = 0
 GROUP BY ID_CHILD HAVING COUNT(DISTINCT ID_PARENT) >= 2;
 
 DROP TEMPORARY TABLE IF EXISTS tmp_cross_noa;
@@ -63,12 +75,14 @@ CREATE TEMPORARY TABLE tmp_arete (ID_CHILD VARCHAR(50) NOT NULL, ID_PARENT VARCH
   ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 INSERT IGNORE INTO tmp_arete
 SELECT e.ID_CHILD, e.ID_PARENT FROM tmp_e e
-WHERE e.HAS_END = 0 AND NOT EXISTS (SELECT 1 FROM tmp_cross c WHERE c.ID_CHILD = e.ID_CHILD);
+WHERE e.HAS_END = 0 AND e.PARENT_ENDED = 0 AND NOT EXISTS (SELECT 1 FROM tmp_cross c WHERE c.ID_CHILD = e.ID_CHILD);
 
 SELECT '1. Edges and cross-border items, all Wikidata items and living T2S places' AS SECTION;
 
 SELECT (SELECT COUNT(*) FROM tmp_e) AS EDGES_BEST_RANK,
        (SELECT COUNT(*) FROM tmp_e WHERE HAS_END = 1) AS EDGES_WITH_END,
+       (SELECT COUNT(*) FROM tmp_e WHERE PARENT_ENDED = 1) AS EDGES_TO_DISSOLVED,
+       (SELECT COUNT(*) FROM tmp_ended) AS DISSOLVED_PARENTS,
        (SELECT COUNT(*) FROM tmp_arete) AS EDGES_KEPT,
        (SELECT COUNT(*) FROM tmp_cross_noa) AS CROSS_ITEMS_WITHOUT_A,
        (SELECT COUNT(*) FROM tmp_cross) AS CROSS_ITEMS_WITH_A,
@@ -131,7 +145,7 @@ SELECT '3. The cross-border living places, best known first, with their open P17
 SELECT l.ID_LOCATION, l.ID_WIKIDATA, l.LOCATION_NAME, l.LOCATION_TYPE, c.N_P17, l.MOVIE_COUNT, l.SERIE_COUNT,
        (SELECT GROUP_CONCAT(COALESCE(pl.LOCATION_NAME, e.ID_PARENT) ORDER BY 1 SEPARATOR ', ')
           FROM tmp_e e LEFT JOIN T_WC_T2S_LOCATION pl ON pl.ID_WIKIDATA = e.ID_PARENT
-         WHERE e.ID_CHILD = l.ID_WIKIDATA AND e.PROP = 'P17' AND e.HAS_END = 0) AS P17_OPEN
+         WHERE e.ID_CHILD = l.ID_WIKIDATA AND e.PROP = 'P17' AND e.HAS_END = 0 AND e.PARENT_ENDED = 0) AS P17_OPEN
 FROM tmp_cross c JOIN T_WC_T2S_LOCATION l ON l.ID_WIKIDATA = c.ID_CHILD AND l.DELETED = 0
 ORDER BY l.MOVIE_COUNT + l.SERIE_COUNT DESC
 LIMIT 80;
@@ -145,12 +159,13 @@ SELECT l.ID_LOCATION, l.ID_WIKIDATA, l.LOCATION_NAME,
        (SELECT GROUP_CONCAT(c.LOCATION_NAME ORDER BY c.LOCATION_NAME SEPARATOR ', ')
           FROM tmp_new n JOIN T_WC_T2S_LOCATION c ON c.ID_LOCATION = n.ID_ANCESTOR
          WHERE n.ID_LOCATION = l.ID_LOCATION AND n.DEPTH > 0 AND c.LOCATION_TYPE = 'country') AS COUNTRIES_NEW,
-       (SELECT GROUP_CONCAT(CONCAT(COALESCE(pl.LOCATION_NAME, e.ID_PARENT), IF(e.HAS_END = 1, ' (ended)', '')) ORDER BY 1 SEPARATOR ', ')
+       (SELECT GROUP_CONCAT(CONCAT(COALESCE(pl.LOCATION_NAME, e.ID_PARENT), IF(e.HAS_END = 1 OR e.PARENT_ENDED = 1, ' (ended)', '')) ORDER BY 1 SEPARATOR ', ')
           FROM tmp_e e LEFT JOIN T_WC_T2S_LOCATION pl ON pl.ID_WIKIDATA = e.ID_PARENT
          WHERE e.ID_CHILD = l.ID_WIKIDATA AND e.PROP = 'P17') AS P17_EDGES
 FROM T_WC_T2S_LOCATION l
 WHERE l.ID_WIKIDATA IN ('Q90', 'Q84', 'Q1348', 'Q456', 'Q1524', 'Q215646', 'Q437', 'Q15878', 'Q1218', 'Q93332',
-                        'Q4918', 'Q34617', 'Q7835', 'Q18097', 'Q7204', 'Q1530', 'Q1462', 'Q23792', 'Q4093', 'Q1794')
+                        'Q4918', 'Q34617', 'Q7835', 'Q18097', 'Q7204', 'Q1530', 'Q1462', 'Q23792', 'Q4093', 'Q1794',
+                        'Q1861', 'Q152658', 'Q154607', 'Q56036', 'Q130212', 'Q7525', 'Q22890', 'Q47588')
 ORDER BY l.MOVIE_COUNT + l.SERIE_COUNT DESC;
 
 SELECT '5. France (126): movies per role, live and with the rule' AS SECTION;
@@ -195,4 +210,5 @@ DROP TEMPORARY TABLE IF EXISTS tmp_anc;
 DROP TEMPORARY TABLE IF EXISTS tmp_arete;
 DROP TEMPORARY TABLE IF EXISTS tmp_cross_noa;
 DROP TEMPORARY TABLE IF EXISTS tmp_cross;
+DROP TEMPORARY TABLE IF EXISTS tmp_ended;
 DROP TEMPORARY TABLE IF EXISTS tmp_e;
