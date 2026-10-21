@@ -5,8 +5,14 @@
 -- closure of P131 and P17 at best rank. The rule under test changes the edges only:
 --   (a) an edge whose statement carries an end time (qualifier P582) is dropped, and so is
 --       an edge whose parent has a dissolution date (P576: Tokugawa shogunate, Nazi Germany,
---       Yugoslavia, the Ottoman Empire). Run of 2026-10-21 10:28 without the P576 half: only
---       2 of 510 974 edges carry a P582, so Bangkok, Edo, Sobibor came out cross-border;
+--       Yugoslavia, the Ottoman Empire) or a P31 that marks a past or occupied state:
+--       Q3024240 historical country, Q11514315 historical period, Q2577883 occupied territory,
+--       Q99541706 historical unrecognized state, Q19953632 former administrative territorial
+--       entity. Fictional countries (Q1145276) stay: Wakanda holds its fictional cities.
+--       Why the P31 half: only 2 of 510 974 edges carry a P582 and the store holds 135 P576
+--       in all (check-067-historical-parents-20261021.txt), while Q3024240 sits on 622 of the
+--       1 944 P17 parents, the Soviet Union included, so without it Bangkok (Rattanakosin
+--       Kingdom), Edo (Tokugawa shogunate) and Sobibor (Nazi Germany) came out cross-border;
 --   (b) an item that keeps two P17 values or more after (a) is cross-border: none of its
 --       edges goes up, P131 included (the Appalachians reach France through
 --       Saint-Pierre-and-Miquelon, a P131). It keeps its depth-0 row.
@@ -50,6 +56,12 @@ CREATE TEMPORARY TABLE tmp_ended (ID_ITEM VARCHAR(50) NOT NULL PRIMARY KEY)
 INSERT IGNORE INTO tmp_ended
 SELECT DISTINCT st.ID_WIKIDATA FROM T_WC_WIKIDATA_STATEMENT st
 WHERE st.ID_PROPERTY = 'P576' AND st.DELETED = 0 AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
+  AND st.ID_WIKIDATA IN (SELECT ID_PARENT FROM tmp_e);
+INSERT IGNORE INTO tmp_ended
+SELECT DISTINCT st.ID_WIKIDATA FROM T_WC_WIKIDATA_STATEMENT st
+JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT
+WHERE st.ID_PROPERTY = 'P31' AND st.DELETED = 0 AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
+  AND iv.ID_ITEM IN ('Q3024240', 'Q11514315', 'Q2577883', 'Q99541706', 'Q19953632')
   AND st.ID_WIKIDATA IN (SELECT ID_PARENT FROM tmp_e);
 UPDATE tmp_e e JOIN tmp_ended d ON d.ID_ITEM = e.ID_PARENT SET e.PARENT_ENDED = 1;
 

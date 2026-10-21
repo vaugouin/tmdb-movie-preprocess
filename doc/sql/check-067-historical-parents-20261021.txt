@@ -1,0 +1,96 @@
+-- check-067-historical-parents.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-21 10:36:57 +0200
+--
++-----------------------------------------------+
+| SECTION                                       |
++-----------------------------------------------+
+| 1. P576 and P582 in the whole statement store |
++-----------------------------------------------+
++-----------------+-----------------+---------------------+
+| P576_STATEMENTS | P582_QUALIFIERS | DISTINCT_PROPERTIES |
++-----------------+-----------------+---------------------+
+|             135 |          165478 |                6228 |
++-----------------+-----------------+---------------------+
++--------------------------------------------+
+| SECTION                                    |
++--------------------------------------------+
+| 2. The P17 parents: items, statements, P31 |
++--------------------------------------------+
++-------------+---------------+-----------------+----------+
+| P17_PARENTS | WITH_ITEM_ROW | WITH_STATEMENTS | WITH_P31 |
++-------------+---------------+-----------------+----------+
+|        1944 |          1486 |            1484 |     1480 |
++-------------+---------------+-----------------+----------+
++-------------------------------------------+
+| SECTION                                   |
++-------------------------------------------+
+| 3. Witness parents: living and historical |
++-------------------------------------------+
++----------+-----------------------------+------------+------------+---------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------+
+| ID_ITEM  | LABEL_EN                    | N_CHILDREN | STATEMENTS | P31                                                                                                           | DESCRIPTION_EN                                                 |
++----------+-----------------------------+------------+------------+---------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------+
+| Q1062422 | Konbaung dynasty            |          1 |          6 | Q1250464 Q13417114 Q3024240 Q417175 Q48349 Q836                                                               | Last dynasty of Myanmar, that ruled the Third Empire of Myan   |
+| Q1115291 | Thonburi Kingdom            |          2 |          2 | Q3024240                                                                                                      | former country                                                 |
+| Q1155700 | Rattanakosin Kingdom        |         46 |          4 | Q11514315 Q3024240 Q6256                                                                                      | fourth traditional centre of power in the history of Thailan   |
+| Q12560   | Ottoman Empire              |        693 |          4 | Q12759805 Q3024240 Q48349                                                                                     | empire with the monarchs from the Ottoman dynasty (1299–1922   |
+| Q142     | France                      |      21180 |          6 | Q20181813 Q3624078 Q51576574 Q6256 Q7270                                                                      | country in Western Europe and other continents (through its    |
+| Q145     | United Kingdom              |      18807 |          5 | Q112099 Q20181813 Q3624078 Q6256                                                                              | island country in north-west Europe                            |
+| Q15180   | Soviet Union                |       4354 |         14 | Q113393649 Q1323642 Q1335818 Q160016 Q17007978 Q3024240 Q3624078 Q512187 Q6256 Q6688521 Q7275 Q842112 Q849866 | former country in Eurasia (1922–1991)                          |
+| Q156111  | General Government          |         24 |          3 | Q2577883 Q99541706                                                                                            | German-occupied zone in Poland in World War II                 |
+| Q159     | Russia                      |       7369 |          6 | Q127693126 Q1323642 Q3624078 Q6256 Q859563                                                                    | country in Eastern Europe and Northern Asia, the largest in    |
+| Q16410   | Hungarian People's Republic |         37 |          6 | Q11514315 Q3024240 Q325261 Q465613 Q842112                                                                    | 1949–1989 socialist republic in Central Europe                 |
+| Q17      | Japan                       |      12235 |          4 | Q112099 Q3624078 Q6256                                                                                        | island country in East Asia                                    |
+| Q1747689 | Ancient Rome                |        359 |          5 | Q26907166 Q28171280 Q3024240                                                                                  | country that began growing on the Italian Peninsula from the   |
+| Q183     | Germany                     |      17739 |          6 | Q3624078 Q4209223 Q619610 Q6256 Q63791824                                                                     | country in Central Europe                                      |
+| Q188712  | Empire of Japan             |        183 |          3 | Q3024240 Q48349                                                                                               | empire in the Asia-Pacific region from 1868 to 1947            |
+| Q212     | Ukraine                     |       2966 |          8 | Q179164 Q3624078 Q4209223 Q4835091 Q619610 Q6256 Q7270                                                        | country in Eastern Europe                                      |
+| Q219060  | Palestine                   |        405 |          6 | Q10711424 Q3624078 Q51576574 Q6256 Q82794                                                                     | political entity that enjoys incomplete recognition as a sta   |
+| Q2277    | Roman Empire                |         78 |          3 | Q11514315 Q3024240 Q48349                                                                                     | period of Ancient Rome following the Republic                  |
+| Q2415901 | allied-occupied Germany     |         65 |          3 | Q11514315 Q19953632 Q2577883                                                                                  | post-World War II Allied military occupation of Germany (194   |
+| Q28513   | Austria–Hungary             |        704 |          6 | Q1093720 Q3024240 Q3624078 Q48349 Q6256                                                                       | 1867–1918 empire in Central Europe                             |
+| Q36704   | Yugoslavia                  |        142 |          4 | Q3024240 Q3624078 Q51576574                                                                                   | 1918–1992 country in Southeastern Europe                       |
+| Q713750  | West Germany                |        147 |          4 | Q11514315 Q3024240 Q3624078 Q7275                                                                             | Federal Republic of Germany in the period between its format   |
+| Q7318    | Nazi Germany                |        572 |          5 | Q11514315 Q3024240 Q317 Q3624078                                                                              | Germany from 1933 to 1945 while under control of the Nazi Pa   |
+| Q801     | Israel                      |       2820 |          6 | Q10711424 Q3624078 Q51576574 Q6256 Q82794                                                                     | country in West Asia                                           |
+| Q841364  | Ayutthaya Kingdom           |          1 |          2 | Q3024240                                                                                                      | 1350–1767 Siamese kingdom in Southeast Asia                    |
+| Q869     | Thailand                    |       1204 |          4 | Q179164 Q3624078 Q41614 Q6256                                                                                 | country in Southeast Asia                                      |
++----------+-----------------------------+------------+------------+---------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------+
++--------------------------------------------------------------------------------------------+
+| SECTION                                                                                    |
++--------------------------------------------------------------------------------------------+
+| 4. Is there a P31 class shared by the historical ones? Most frequent P31 among P17 parents |
++--------------------------------------------------------------------------------------------+
++-----------+------------------------------------------+---------+
+| P31_CLASS | LABEL_EN                                 | PARENTS |
++-----------+------------------------------------------+---------+
+| Q3024240  | historical country                       |     622 |
+| Q3624078  | sovereign state                          |     351 |
+| Q6256     | country                                  |     239 |
+| Q1145276  | fictional country                        |     116 |
+| Q11514315 | historical period                        |      75 |
+| Q417175   | kingdom                                  |      64 |
+| Q26830017 | NULL                                     |      60 |
+| Q112099   | island country                           |      55 |
+| Q133156   | colony                                   |      47 |
+| Q10711424 | state with limited recognition           |      45 |
+| Q123480   | landlocked country                       |      44 |
+| Q19953632 | former administrative territorial entity |      44 |
+| Q7270     | republic                                 |      44 |
+| Q48349    | empire                                   |      42 |
+| Q1620908  | historical region                        |      40 |
+| Q1250464  | realm                                    |      35 |
+| Q82794    | region                                   |      32 |
+| Q179164   | unitary state                            |      30 |
+| Q154547   | duchy                                    |      29 |
+| Q2577883  | occupied territory                       |      29 |
+| Q7275     | state                                    |      29 |
+| Q26879769 | NULL                                     |      28 |
+| Q3502482  | cultural region                          |      27 |
+| Q202686   | Commonwealth realm                       |      27 |
+| Q15239622 | disputed territory                       |      25 |
+| Q51576574 | Mediterranean country                    |      25 |
+| Q56061    | administrative territorial entity        |      25 |
+| Q99541706 | historical unrecognized state            |      25 |
+| Q1351282  | crown colony                             |      25 |
+| Q50068795 | historical Chinese state                 |      24 |
++-----------+------------------------------------------+---------+
