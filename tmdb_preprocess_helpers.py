@@ -3616,3 +3616,201 @@ def f_buildgroupworktables():
         return arrresult
     finally:
         cursor.close()
+
+
+# ---------------------------------------------------------------------------------------
+# Process 75, T2S_WORK_FINANCE (TMDB-MOVIE-PREPROCESS-066): budgets (P2130) and box office
+# (P2142) of the T2S movies and series, from the Wikidata V2 statements, one row per
+# statement with its currency and qualifiers. Census of 2026-10-20
+# (wikidata-crawler/doc/sql/check-029-external-id-census-20261020.txt): 7 213 budget and
+# 7 858 box office statements on movies; the place is almost always P3005 (valid in place,
+# 4 679 box office statements, Q13780930 = worldwide), the date P585 (797), the period P1264
+# (41), the rank on a chart P1352 (247), the method P459 (1 529 budgets).
+# ---------------------------------------------------------------------------------------
+
+STR_WORK_FINANCE_TABLE = "T_WC_T2S_WORK_FINANCE"
+STR_WORK_FINANCE_WORLDWIDE = "Q13780930"
+# Place qualifiers, in order of preference when a statement carries several.
+ARR_WORK_FINANCE_PLACE_PROPERTIES = ("P3005", "P17", "P1001", "P276", "P291")
+# ISO 4217 codes of the most used currencies of the census; the others keep their Q-id only.
+ARR_WORK_FINANCE_CURRENCY_CODES = {
+    "Q4917": "USD", "Q4916": "EUR", "Q25224": "GBP", "Q8146": "JPY", "Q41044": "RUB",
+    "Q1104069": "CAD", "Q259502": "AUD", "Q39099": "CNY",
+}
+
+STR_WORK_FINANCE_DDL = (
+    "CREATE TABLE IF NOT EXISTS `" + STR_WORK_FINANCE_TABLE + "` (\n"
+    "  `ID_STATEMENT` bigint(20) NOT NULL,\n"
+    "  `ITEM_TYPE` varchar(10) NOT NULL,\n"
+    "  `ID_ITEM` int(11) NOT NULL,\n"
+    "  `ID_WIKIDATA` varchar(20) NOT NULL,\n"
+    "  `FINANCE_KIND` varchar(20) NOT NULL,\n"
+    "  `AMOUNT` decimal(20,2) DEFAULT NULL,\n"
+    "  `ID_CURRENCY` varchar(20) DEFAULT NULL,\n"
+    "  `CURRENCY_CODE` char(3) DEFAULT NULL,\n"
+    "  `ID_PLACE_WIKIDATA` varchar(20) DEFAULT NULL,\n"
+    "  `ID_LOCATION` int(11) DEFAULT NULL,\n"
+    "  `IS_WORLDWIDE` tinyint(1) NOT NULL DEFAULT 0,\n"
+    "  `DAT_POINT` date DEFAULT NULL,\n"
+    "  `POINT_PRECISION` int(11) DEFAULT NULL,\n"
+    "  `DAT_START` date DEFAULT NULL,\n"
+    "  `DAT_END` date DEFAULT NULL,\n"
+    "  `ID_PERIOD_WIKIDATA` varchar(20) DEFAULT NULL,\n"
+    "  `CHART_RANK` int(11) DEFAULT NULL,\n"
+    "  `ID_METHOD_WIKIDATA` varchar(20) DEFAULT NULL,\n"
+    "  `WIKIDATA_RANK` varchar(20) DEFAULT NULL,\n"
+    "  `DISPLAY_ORDER` int(11) DEFAULT NULL,\n"
+    "  `DELETED` int(5) DEFAULT NULL,\n"
+    "  `ID_CREATOR` int(5) DEFAULT NULL,\n"
+    "  `DAT_CREAT` date DEFAULT NULL,\n"
+    "  `ID_OWNER` int(5) DEFAULT NULL,\n"
+    "  `TIM_UPDATED` datetime DEFAULT NULL,\n"
+    "  `ID_USER_UPDATED` int(5) DEFAULT NULL,\n"
+    "  PRIMARY KEY (`ID_STATEMENT`),\n"
+    "  KEY `ITEM` (`ITEM_TYPE`, `ID_ITEM`),\n"
+    "  KEY `ID_WIKIDATA` (`ID_WIKIDATA`),\n"
+    "  KEY `FINANCE_KIND` (`FINANCE_KIND`),\n"
+    "  KEY `AMOUNT` (`AMOUNT`),\n"
+    "  KEY `CURRENCY_CODE` (`CURRENCY_CODE`),\n"
+    "  KEY `ID_LOCATION` (`ID_LOCATION`),\n"
+    "  KEY `IS_WORLDWIDE` (`IS_WORLDWIDE`),\n"
+    "  KEY `DAT_POINT` (`DAT_POINT`),\n"
+    "  KEY `TIM_UPDATED` (`TIM_UPDATED`)\n"
+    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+)
+
+ARR_WORK_FINANCE_COLUMNS = (
+    "ITEM_TYPE", "ID_ITEM", "ID_WIKIDATA", "FINANCE_KIND", "AMOUNT", "ID_CURRENCY", "CURRENCY_CODE",
+    "ID_PLACE_WIKIDATA", "ID_LOCATION", "IS_WORLDWIDE", "DAT_POINT", "POINT_PRECISION", "DAT_START",
+    "DAT_END", "ID_PERIOD_WIKIDATA", "CHART_RANK", "ID_METHOD_WIKIDATA", "WIKIDATA_RANK", "DISPLAY_ORDER",
+)
+
+
+def _f_workfinancestep(cursor, strstep, strsql, params=None):
+    """One step of process 75, named before it runs (lesson of process 72)."""
+    print(f"75:   {strstep} ...", flush=True)
+    cursor.execute(strsql, params)
+    return cursor.rowcount
+
+
+def _f_workfinancequalifier(strproperty, strvalue):
+    """Correlated subquery: the first value of one qualifier of statement s."""
+    arrvalue = {
+        "item": ("T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE", "qv.ID_ITEM"),
+        # DATE_START is empty on the qualifier rows (dry run of 2026-10-20): the date is
+        # rebuilt from its parts, month and day 0 (year or month precision) read as 1.
+        "date": ("T_WC_WIKIDATA_QUALIFIER_TIME_VALUE",
+                 "COALESCE(qv.DATE_START, IF(qv.YEAR_VALUE BETWEEN 1000 AND 9999, "
+                 "MAKEDATE(qv.YEAR_VALUE, 1) + INTERVAL (COALESCE(NULLIF(qv.MONTH_VALUE, 0), 1) - 1) MONTH "
+                 "+ INTERVAL (COALESCE(NULLIF(qv.DAY_VALUE, 0), 1) - 1) DAY, NULL))"),
+        "precision": ("T_WC_WIKIDATA_QUALIFIER_TIME_VALUE", "qv.TIME_PRECISION"),
+        "amount": ("T_WC_WIKIDATA_QUALIFIER_QUANTITY_VALUE", "qv.AMOUNT"),
+    }[strvalue]
+    return (
+        f"(SELECT {arrvalue[1]} FROM T_WC_WIKIDATA_STATEMENT_QUALIFIER sq "
+        f"JOIN {arrvalue[0]} qv ON qv.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER "
+        f"WHERE sq.ID_STATEMENT = s.ID_STATEMENT AND sq.ID_QUALIFIER_PROPERTY = '{strproperty}' "
+        "ORDER BY sq.DISPLAY_ORDER, sq.ID_STATEMENT_QUALIFIER LIMIT 1)"
+    )
+
+
+def f_buildworkfinancetable():
+    """Rebuild T_WC_T2S_WORK_FINANCE from the V2 statements P2130 and P2142 of the T2S
+    movies and series. Set-based, idempotent: a full recompute, an upsert that moves
+    TIM_UPDATED only when a row changes, and the removal of the statements gone from
+    Wikidata. Deprecated statements are left out; no DELETED filter on the V2 reads
+    (house rule, see f_wikidatabestvaluesql).
+
+    Returns the counts: 'rows', 'budget', 'box_office', 'worldwide', 'dated',
+    'upserted', 'deleted'.
+    """
+    connection = cp.connectioncp
+    cursor = connection.cursor()
+    arrresult = {}
+    strnow = datetime.now(cp.paris_tz).strftime("%Y-%m-%d %H:%M:%S")
+    strtoday = strnow[:10]
+    strtablecharset = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    strcurrency = "CASE q.UNIT_ID_WIKIDATA " + " ".join(
+        f"WHEN '{strqid}' THEN '{strcode}'" for strqid, strcode in ARR_WORK_FINANCE_CURRENCY_CODES.items()) + " END"
+    strplace = "COALESCE(" + ", ".join(_f_workfinancequalifier(p, "item") for p in ARR_WORK_FINANCE_PLACE_PROPERTIES) + ")"
+    try:
+        cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
+        _f_readwithoutlocking(cursor, "75")
+        _f_workfinancestep(cursor, "0. CREATE TABLE IF NOT EXISTS " + STR_WORK_FINANCE_TABLE, STR_WORK_FINANCE_DDL)
+
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_work_finance")
+        cursor.execute(
+            "CREATE TEMPORARY TABLE tmp_work_finance ("
+            " ID_STATEMENT BIGINT NOT NULL PRIMARY KEY,"
+            " ITEM_TYPE VARCHAR(10) NOT NULL, ID_ITEM INT NOT NULL, ID_WIKIDATA VARCHAR(20) NOT NULL,"
+            " FINANCE_KIND VARCHAR(20) NOT NULL, AMOUNT DECIMAL(20,2) NULL,"
+            " ID_CURRENCY VARCHAR(20) NULL, CURRENCY_CODE CHAR(3) NULL,"
+            " ID_PLACE_WIKIDATA VARCHAR(20) NULL, ID_LOCATION INT NULL, IS_WORLDWIDE TINYINT(1) NOT NULL DEFAULT 0,"
+            " DAT_POINT DATE NULL, POINT_PRECISION INT NULL, DAT_START DATE NULL, DAT_END DATE NULL,"
+            " ID_PERIOD_WIKIDATA VARCHAR(20) NULL, CHART_RANK INT NULL, ID_METHOD_WIKIDATA VARCHAR(20) NULL,"
+            " WIKIDATA_RANK VARCHAR(20) NULL, DISPLAY_ORDER INT NULL"
+            ") " + strtablecharset)
+        lngread = 0
+        for stritemtype, strt2s, strid in (("movie", "T_WC_T2S_MOVIE", "ID_MOVIE"), ("serie", "T_WC_T2S_SERIE", "ID_SERIE")):
+            lngread += _f_workfinancestep(cursor, f"1. INSERT the {stritemtype} statements (tmp_work_finance)", (
+                "INSERT IGNORE INTO tmp_work_finance (ID_STATEMENT, ITEM_TYPE, ID_ITEM, ID_WIKIDATA, FINANCE_KIND,"
+                " AMOUNT, ID_CURRENCY, CURRENCY_CODE, ID_PLACE_WIKIDATA, DAT_POINT, POINT_PRECISION, DAT_START,"
+                " DAT_END, ID_PERIOD_WIKIDATA, CHART_RANK, ID_METHOD_WIKIDATA, WIKIDATA_RANK, DISPLAY_ORDER)\n"
+                f"SELECT s.ID_STATEMENT, '{stritemtype}' AS ITEM_TYPE, w.{strid} AS ID_ITEM, s.ID_WIKIDATA,\n"
+                "       IF(s.ID_PROPERTY = 'P2130', 'budget', 'box_office') AS FINANCE_KIND,\n"
+                f"       q.AMOUNT, q.UNIT_ID_WIKIDATA AS ID_CURRENCY, {strcurrency} AS CURRENCY_CODE,\n"
+                f"       {strplace} AS ID_PLACE_WIKIDATA,\n"
+                f"       {_f_workfinancequalifier('P585', 'date')} AS DAT_POINT, {_f_workfinancequalifier('P585', 'precision')} AS POINT_PRECISION,\n"
+                f"       {_f_workfinancequalifier('P580', 'date')} AS DAT_START, {_f_workfinancequalifier('P582', 'date')} AS DAT_END,\n"
+                f"       {_f_workfinancequalifier('P1264', 'item')} AS ID_PERIOD_WIKIDATA, {_f_workfinancequalifier('P1352', 'amount')} AS CHART_RANK,\n"
+                f"       {_f_workfinancequalifier('P459', 'item')} AS ID_METHOD_WIKIDATA,\n"
+                "       s.`RANK` AS WIKIDATA_RANK, s.DISPLAY_ORDER\n"
+                "FROM T_WC_WIKIDATA_STATEMENT s\n"
+                "JOIN T_WC_WIKIDATA_QUANTITY_VALUE q ON q.ID_STATEMENT = s.ID_STATEMENT\n"
+                f"JOIN `{strt2s}` w ON w.ID_WIKIDATA = s.ID_WIKIDATA AND COALESCE(w.DELETED, 0) = 0\n"
+                "WHERE s.ID_PROPERTY IN ('P2130', 'P2142')\n"
+                "  AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')\n"
+                "  AND q.AMOUNT IS NOT NULL"))
+        _f_workfinancestep(cursor, "2. UPDATE the place to its T2S location and the worldwide flag", (
+            "UPDATE tmp_work_finance t\n"
+            "LEFT JOIN T_WC_T2S_LOCATION l ON l.ID_WIKIDATA = t.ID_PLACE_WIKIDATA\n"
+            "SET t.ID_LOCATION = l.ID_LOCATION,\n"
+            "    t.IS_WORLDWIDE = (t.ID_PLACE_WIKIDATA <=> %s)"), (STR_WORK_FINANCE_WORLDWIDE,))
+        connection.commit()
+        print(f"75:   {lngread} statement(s) read")
+
+        strcolumns = ", ".join(ARR_WORK_FINANCE_COLUMNS)
+        strunchanged = " AND ".join(f"{STR_WORK_FINANCE_TABLE}.{c} <=> VALUES({c})" for c in ARR_WORK_FINANCE_COLUMNS)
+        strupdates = ",\n".join(f"  {c} = VALUES({c})" for c in ARR_WORK_FINANCE_COLUMNS)
+        # TIM_UPDATED first: it must compare the OLD values, before the assignments below.
+        arrresult["upserted"] = _f_workfinancestep(cursor, "3. UPSERT into " + STR_WORK_FINANCE_TABLE, (
+            f"INSERT INTO {STR_WORK_FINANCE_TABLE} (ID_STATEMENT, {strcolumns}, DELETED, ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED)\n"
+            f"SELECT ID_STATEMENT, {strcolumns}, 0, %s, %s, %s, %s, %s FROM tmp_work_finance\n"
+            "ON DUPLICATE KEY UPDATE\n"
+            f"  TIM_UPDATED = IF({strunchanged} AND {STR_WORK_FINANCE_TABLE}.DELETED <=> 0,\n"
+            f"                   {STR_WORK_FINANCE_TABLE}.TIM_UPDATED, VALUES(TIM_UPDATED)),\n"
+            f"{strupdates},\n"
+            "  DELETED = 0,\n"
+            f"  DAT_CREAT = COALESCE({STR_WORK_FINANCE_TABLE}.DAT_CREAT, VALUES(DAT_CREAT))"),
+            (cp.lnguseridsession, strtoday, cp.lnguseridsession, strnow, cp.lnguseridsession))
+        # A statement gone from Wikidata (or turned deprecated, or whose work left T2S) is
+        # removed: the key is the Wikidata statement, nobody keeps a reference to it.
+        arrresult["deleted"] = _f_workfinancestep(cursor, "4. DELETE the statements no longer read", (
+            f"DELETE x FROM {STR_WORK_FINANCE_TABLE} x\n"
+            "LEFT JOIN tmp_work_finance t ON t.ID_STATEMENT = x.ID_STATEMENT\n"
+            "WHERE t.ID_STATEMENT IS NULL"))
+        connection.commit()
+
+        cursor.execute(
+            "SELECT COUNT(*) AS ROWS_, SUM(FINANCE_KIND = 'budget') AS BUDGET, SUM(FINANCE_KIND = 'box_office') AS BOX_OFFICE, "
+            "SUM(IS_WORLDWIDE = 1) AS WORLDWIDE, SUM(DAT_POINT IS NOT NULL OR DAT_START IS NOT NULL OR ID_PERIOD_WIKIDATA IS NOT NULL) AS DATED "
+            f"FROM {STR_WORK_FINANCE_TABLE}")
+        arrrow = cursor.fetchone() or {}
+        for strkey, strcol in (("rows", "ROWS_"), ("budget", "BUDGET"), ("box_office", "BOX_OFFICE"),
+                               ("worldwide", "WORLDWIDE"), ("dated", "DATED")):
+            arrresult[strkey] = int(arrrow.get(strcol) or 0)
+        cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_work_finance")
+        connection.commit()
+        return arrresult
+    finally:
+        cursor.close()

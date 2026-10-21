@@ -38,6 +38,7 @@ from tmdb_preprocess_helpers import (
     f_buildsourceworkclasstable,
     f_buildsourceworktables,
     f_buildgroupworktables,
+    f_buildworkfinancetable,
     INT_GROUP_WORK_MIN_MEMBERS,
     DBL_GROUP_WORK_MIN_SHARE,
     f_awarddrivingsql,
@@ -137,7 +138,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 73: 'T2S_SOURCE_WORK', 74: 'T2S_GROUP_WORK', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 73: 'T2S_SOURCE_WORK', 74: 'T2S_GROUP_WORK', 75: 'T2S_WORK_FINANCE', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -196,6 +197,11 @@ try:
             # 9, 10, 29, 31 (person credits), so it runs after them in main.
             # Run with TMDB_PREPROCESS_SCOPE=group-works.
             arrprocessscopegroupworks = {74: 'T2S_GROUP_WORK'}
+            # Budgets and box office only (Process 75, TMDB-MOVIE-PREPROCESS-066): rebuild
+            # T_WC_T2S_WORK_FINANCE from the Wikidata P2130 / P2142 statements, on demand.
+            # In main it runs after 72, whose locations it links the places to.
+            # Run with TMDB_PREPROCESS_SCOPE=finance.
+            arrprocessscopefinance = {75: 'T2S_WORK_FINANCE'}
             # Process 64 alone, for the first backfill and for reruns on demand
             # (TMDB-MOVIE-PREPROCESS-049). In main it sits between 1 and 2.
             arrprocessscopewikidatacolour = {64: 'WIKIDATA_COLOR'}
@@ -222,6 +228,8 @@ try:
                 arrprocessscope = arrprocessscopesourceworks
             elif strprocessscope in ("group-works", "group-work"):
                 arrprocessscope = arrprocessscopegroupworks
+            elif strprocessscope in ("finance", "work-finance", "box-office"):
+                arrprocessscope = arrprocessscopefinance
             elif strprocessscope in ("wikidata-colour", "wikidata-color"):
                 arrprocessscope = arrprocessscopewikidatacolour
             elif strprocessscope in ("genre-alias", "genres-aliases"):
@@ -7813,6 +7821,53 @@ ORDER BY COMPTE DESC
                     telgroupwork.set_processed(lnggroupworkrowstotal)
                     telgroupwork.finish()
 
+                elif intindex == 75:
+                    #----------------------------------------------------
+                    # T2S_WORK_FINANCE : budgets and box office (TMDB-MOVIE-PREPROCESS-066)
+                    #
+                    # One row per Wikidata P2130 (cost) or P2142 (box office) statement of a
+                    # T2S movie or series, with its currency, its place (P3005 valid in place,
+                    # Q13780930 = worldwide), its date (P585, or P580 / P582, or the period
+                    # P1264) and its rank on a chart (P1352). TMDb BUDGET / REVENUE stay as
+                    # they are: this table adds the figures by country and over time.
+                    #
+                    # PLACE: after 72 (the places link to T_WC_T2S_LOCATION). Skipped while
+                    # wikidata-crawler loads, like 72 and 73. A failure is isolated.
+                    print("T2S_WORK_FINANCE processing")
+                    telworkfinance = EntityTelemetry("workfinance", 75, "work finance", kind="derivation")
+                    telworkfinance.begin()
+                    arrworkfinancecounts = {}
+                    strworkfinancebusy = f_wikidataloadbusy("75")
+                    if strworkfinancebusy:
+                        print(f"75: SKIPPED: {strworkfinancebusy}")
+                        cp.f_setservervariable("strtmdbmoviepreprocessworkfinanceskipped", strworkfinancebusy, "Why the last work-finance rebuild (process 75) was skipped, empty when it ran", 0)
+                    else:
+                        cp.f_setservervariable("strtmdbmoviepreprocessworkfinanceskipped", "", "Why the last work-finance rebuild (process 75) was skipped, empty when it ran", 0)
+                        try:
+                            arrworkfinancecounts = f_buildworkfinancetable()
+                            cp.f_setservervariable("strtmdbmoviepreprocessworkfinanceerror", "", "Last error of the work-finance rebuild (process 75), empty when it succeeded", 0)
+                        except Exception as workfinanceerror:
+                            strworkfinanceerror = f"{type(workfinanceerror).__name__}: {workfinanceerror}"
+                            print(f"75: FAILED: {strworkfinanceerror}")
+                            print("75: the rest of the pipeline continues. Re-run with TMDB_PREPROCESS_SCOPE=finance.")
+                            try:
+                                cp.connectioncp.rollback()
+                            except Exception:
+                                pass
+                            cp.f_setservervariable("strtmdbmoviepreprocessworkfinanceerror", strworkfinanceerror, "Last error of the work-finance rebuild (process 75), empty when it succeeded", 0)
+                    print(f"75: {arrworkfinancecounts.get('rows', 0)} rows "
+                          f"({arrworkfinancecounts.get('budget', 0)} budget, {arrworkfinancecounts.get('box_office', 0)} box office, "
+                          f"{arrworkfinancecounts.get('worldwide', 0)} worldwide, {arrworkfinancecounts.get('dated', 0)} dated), "
+                          f"{arrworkfinancecounts.get('deleted', 0)} deleted")
+                    # strworkfinancedesc and not strdesc, which is the pipeline loop variable (AGENTS.md).
+                    for strkey, strworkfinancedesc in (("rows", "rows stored"), ("budget", "budget rows"),
+                                                       ("box_office", "box office rows"), ("worldwide", "worldwide rows"),
+                                                       ("dated", "dated rows"), ("deleted", "rows deleted by the last run")):
+                        cp.f_setservervariable("strtmdbmoviepreprocessworkfinance" + strkey.replace("_", "") + "count", str(arrworkfinancecounts.get(strkey, 0)), f"T_WC_T2S_WORK_FINANCE {strworkfinancedesc} (process 75)", 0)
+                    telworkfinance.created(arrworkfinancecounts.get("upserted", 0))
+                    telworkfinance.deleted(arrworkfinancecounts.get("deleted", 0))
+                    telworkfinance.set_processed(arrworkfinancecounts.get("rows", 0))
+                    telworkfinance.finish()
                 elif intindex == 64:
                     #----------------------------------------------------
                     # WIKIDATA_COLOR : les flags couleur depuis Wikidata P462 quand la
