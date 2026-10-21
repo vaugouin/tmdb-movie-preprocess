@@ -13,8 +13,9 @@
 --       unrecognized state only at preferred rank: the First Hungarian Republic and the
 --       Confederate States carry it preferred, the United States and Indonesia at normal rank
 --       (check-067-ended-classes and check-067-unmarked-historical, 20261021); taken at any
---       rank, the US sheet fell from 15 556 movies to 420. Not Q2577883 occupied territory
---       any more: the West Bank, Gaza, the Golan Heights carry it and stay living parents
+--       rank, the US sheet fell from 15 556 movies to 420. Q2577883 occupied territory
+--       counts only without Q15239622 disputed territory on the same item: the General
+--       Government (Warsaw Ghetto) is ended, the West Bank and Gaza stay living parents
 --       (decision 1). Fictional countries (Q1145276) stay: Wakanda holds its fictional cities.
 --       Why the P31 half: only 2 of 510 974 edges carry a P582 and the store holds 135 P576
 --       in all (check-067-historical-parents-20261021.txt), while Q3024240 sits on 622 of the
@@ -29,9 +30,9 @@
 --      Crimea, the West Bank, the Golan Heights), or (D2) the same set of P17 values as a T2S
 --      place of D1 (Yalta, Sevastopol and the other Crimean towns: Russia and Ukraine; their
 --      P131 parents are mostly not in the store, check-067-disputed-chain-20261021.txt), or
---      (D3) exactly two P17 values, one of them a state with limited recognition (Q10711424),
---      a de facto regime (Q1179466) or a disputed territory (Mitrovica, Laayoune,
---      Savur-Mohyla). Wikidata puts no qualifier on these P17 statements
+--      (D3) exactly two P17 values, one of them a de facto regime (Q1179466) or a disputed
+--      territory (Laayoune, Savur-Mohyla). Not Q10711424 state with limited recognition:
+--      the People's Republic of China carries it, and Everest and the Gobi came out disputed. Wikidata puts no qualifier on these P17 statements
 --      (check-067-disputed-signals-20261021.txt), hence the classes;
 --   2. Normandy (Q15878) stays under France: its P17 edges to Guernsey and Jersey are
 --      dropped by name, the one editorial exception;
@@ -83,7 +84,12 @@ SELECT DISTINCT st.ID_WIKIDATA FROM T_WC_WIKIDATA_STATEMENT st
 JOIN T_WC_WIKIDATA_ITEM_VALUE iv ON iv.ID_STATEMENT = st.ID_STATEMENT
 WHERE st.ID_PROPERTY = 'P31' AND st.DELETED = 0 AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')
   AND (iv.ID_ITEM IN ('Q3024240', 'Q11514315', 'Q19953632', 'Q50068795', 'Q12857432', 'Q182547')
-       OR (iv.ID_ITEM = 'Q99541706' AND st.`RANK` = 'preferred'))
+       OR (iv.ID_ITEM = 'Q99541706' AND st.`RANK` = 'preferred')
+       OR (iv.ID_ITEM = 'Q2577883'
+           AND NOT EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s2
+                           JOIN T_WC_WIKIDATA_ITEM_VALUE v2 ON v2.ID_STATEMENT = s2.ID_STATEMENT
+                           WHERE s2.ID_WIKIDATA = st.ID_WIKIDATA AND s2.ID_PROPERTY = 'P31' AND s2.DELETED = 0
+                             AND (s2.`RANK` IS NULL OR s2.`RANK` <> 'deprecated') AND v2.ID_ITEM = 'Q15239622')))
   AND st.ID_WIKIDATA IN (SELECT ID_PARENT FROM tmp_e);
 UPDATE tmp_e e JOIN tmp_ended d ON d.ID_ITEM = e.ID_PARENT SET e.PARENT_ENDED = 1;
 UPDATE tmp_e e JOIN T_WC_WIKIDATA_ITEM wi ON wi.ID_WIKIDATA = e.ID_PARENT SET e.PARENT_KNOWN = 1;
@@ -125,7 +131,7 @@ JOIN tmp_e e ON e.ID_CHILD = m.ID_CHILD AND e.PROP = 'P17' AND e.HAS_END = 0 AND
 JOIN T_WC_WIKIDATA_STATEMENT s ON s.ID_WIKIDATA = e.ID_PARENT AND s.ID_PROPERTY = 'P31' AND s.DELETED = 0
   AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')
 JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
-WHERE m.N_P17 = 2 AND v.ID_ITEM IN ('Q10711424', 'Q1179466', 'Q15239622');
+WHERE m.N_P17 = 2 AND v.ID_ITEM IN ('Q1179466', 'Q15239622');
 
 DROP TEMPORARY TABLE IF EXISTS tmp_cross;
 CREATE TEMPORARY TABLE tmp_cross (ID_CHILD VARCHAR(50) NOT NULL PRIMARY KEY, N_P17 INT NOT NULL)
