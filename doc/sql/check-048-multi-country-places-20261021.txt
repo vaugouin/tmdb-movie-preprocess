@@ -1,0 +1,114 @@
+-- check-048-multi-country-places.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-21 07:47:52 +0200
+--
++-------------------+
+| SECTION           |
++-------------------+
+| 1. Type of France |
++-------------------+
++-------------+---------------+---------------+
+| ID_LOCATION | LOCATION_NAME | LOCATION_TYPE |
++-------------+---------------+---------------+
+|         126 | France        | country       |
++-------------+---------------+---------------+
++------------------------------------------------+
+| SECTION                                        |
++------------------------------------------------+
+| 2. Places under two countries or more, by type |
++------------------------------------------------+
++---------------+--------+-------------+-------------+---------------+
+| LOCATION_TYPE | PLACES | MOVIE_LINKS | SERIE_LINKS | MAX_COUNTRIES |
++---------------+--------+-------------+-------------+---------------+
+| city          |    401 |        4132 |         811 |             6 |
+| region        |    367 |         867 |         235 |            22 |
+| structure     |    349 |        1050 |         108 |             4 |
+| NULL          |     82 |          87 |          18 |            13 |
+| nature        |     68 |         165 |          18 |             8 |
+| country       |     15 |          86 |          30 |            10 |
+| island        |     12 |          14 |           6 |             3 |
+| fiction       |      5 |           1 |           4 |             2 |
++---------------+--------+-------------+-------------+---------------+
++--------------------------+
+| SECTION                  |
++--------------------------+
+| 2b. The forty best known |
++--------------------------+
++-------------+-------------+-----------------------+---------------+-------------+-------------+-------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| ID_LOCATION | ID_WIKIDATA | LOCATION_NAME         | LOCATION_TYPE | N_COUNTRIES | MOVIE_COUNT | SERIE_COUNT | COUNTRIES                                                                                                                                                                                               |
++-------------+-------------+-----------------------+---------------+-------------+-------------+-------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|          21 | Q84         | London                | city          |           2 |        2518 |         411 | England, United Kingdom                                                                                                                                                                                 |
+|        4558 | Q661896     | Pinewood Studios      | structure     |           2 |         658 |          12 | England, United Kingdom                                                                                                                                                                                 |
+|          35 | Q1348       | Kolkata               | city          |           2 |         206 |           1 | India, West Bengal                                                                                                                                                                                      |
+|        4547 | Q9888       | Ooty                  | city          |           2 |         184 |           0 | India, Tamil Nadu                                                                                                                                                                                       |
+|         181 | Q1352       | Chennai               | city          |           2 |         147 |           0 | India, Tamil Nadu                                                                                                                                                                                       |
+|         125 | Q18125      | Manchester            | city          |           2 |          39 |          64 | England, United Kingdom                                                                                                                                                                                 |
+|         214 | Q163        | Yorkshire             | region        |           3 |          55 |          46 | England, Kingdom of England, United Kingdom                                                                                                                                                             |
+|         186 | Q23436      | Edinburgh             | city          |           2 |          73 |          26 | Scotland, United Kingdom                                                                                                                                                                                |
+|         372 | Q1218       | Jerusalem             | city          |           3 |          86 |          10 | Israel, Jordan, Palestine                                                                                                                                                                               |
+|         271 | Q24826      | Liverpool             | city          |           2 |          52 |          28 | England, United Kingdom                                                                                                                                                                                 |
+|          84 | Q1361       | Hyderabad             | city          |           2 |          76 |           0 | India, Telangana                                                                                                                                                                                        |
+|         157 | Q4918       | Mediterranean Sea     | region        |          22 |          61 |           2 | Albania, Algeria, Bosnia and Herzegovina, Croatia, Cyprus, Egypt, France, Greece, Israel, Italy, Lebanon, Libya, Malta, Monaco, Montenegro, Morocco, Palestine, Slovenia, Spain, Syria, Tunisia, Turkey |
+|         561 | Q1524       | Athens                | city          |           2 |          51 |          12 | Ancient Rome, Greece                                                                                                                                                                                    |
+|          74 | Q4093       | Glasgow               | city          |           2 |          53 |           6 | Scotland, United Kingdom                                                                                                                                                                                |
+|         402 | Q93332      | Appalachian Mountains | nature        |           3 |          51 |           3 | Canada, France, United States                                                                                                                                                                           |
+|          73 | Q1462       | Sardinia              | region        |           2 |          47 |           2 | Italy, Roman Empire                                                                                                                                                                                     |
+|         373 | Q131491     | Brighton              | city          |           2 |          43 |           4 | England, United Kingdom                                                                                                                                                                                 |
+|         397 | Q23148      | Cornwall              | country       |           2 |          42 |           4 | England, United Kingdom                                                                                                                                                                                 |
+|          66 | Q3410       | Hertfordshire         | region        |           2 |          30 |          15 | England, United Kingdom                                                                                                                                                                                 |
+|         534 | Q10686      | Belfast               | city          |           2 |          40 |           5 | Northern Ireland, United Kingdom                                                                                                                                                                        |
+|         413 | Q215646     | Edo                   | city          |           2 |          39 |           3 | Japan, Tokugawa shogunate                                                                                                                                                                               |
+|         288 | Q23156      | Devon                 | region        |           2 |          33 |           7 | England, United Kingdom                                                                                                                                                                                 |
+|         412 | Q1425428    | Newcastle upon Tyne   | city          |           2 |          17 |          19 | England, United Kingdom                                                                                                                                                                                 |
+|         681 | Q23154      | Bristol               | city          |           2 |          10 |          20 | England, United Kingdom                                                                                                                                                                                 |
+|         336 | Q18097      | Korea                 | country       |           5 |          13 |          16 | Empire of Japan, Goryeo, Japan, Joseon, Silla                                                                                                                                                           |
+|         891 | Q7204       | Middle East           | region        |          19 |          26 |           2 | Afghanistan, Bahrain, Cyprus, Egypt, Iran, Iraq, Israel, Jordan, Kuwait, Lebanon, Northern Cyprus, Oman, Palestine, Qatar, Saudi Arabia, Syria, Turkey, United Arab Emirates, Yemen                     |
+|         245 | Q23298      | Kent                  | region        |           2 |          23 |           4 | England, United Kingdom                                                                                                                                                                                 |
+|        1173 | Q23066      | Cumbria               | region        |           2 |          16 |          10 | England, United Kingdom                                                                                                                                                                                 |
+|        1653 | Q39121      | Leeds                 | city          |           2 |           5 |          21 | England, United Kingdom                                                                                                                                                                                 |
+|         861 | Q1530       | Baghdad               | city          |           3 |          23 |           2 | Iraq, Jordan, United Kingdom                                                                                                                                                                            |
+|         875 | Q23792      | Palestine             | region        |           3 |          22 |           1 | Israel, Jordan, Palestine                                                                                                                                                                               |
+|        1334 | Q10690      | Cardiff               | city          |           2 |          10 |          13 | United Kingdom, Wales                                                                                                                                                                                   |
+|        2355 | Q200016     | Visakhapatnam         | city          |           2 |          22 |           0 | Andhra Pradesh, India                                                                                                                                                                                   |
+|         237 | Q1794       | Frankfurt             | country       |           2 |          19 |           2 | Germany, Hesse                                                                                                                                                                                          |
+|         533 | Q15878      | Normandy              | region        |           2 |          19 |           0 | France, United Kingdom                                                                                                                                                                                  |
+|        2227 | Q34217      | Oxford                | city          |           2 |          16 |           3 | England, United Kingdom                                                                                                                                                                                 |
+|         358 | Q7835       | Crimea                | region        |           2 |          12 |           5 | Russia, Ukraine                                                                                                                                                                                         |
+|         557 | Q23240      | Essex                 | region        |           2 |           8 |           9 | England, United Kingdom                                                                                                                                                                                 |
+|        1073 | Q23109      | Norfolk               | region        |           2 |          10 |           7 | England, United Kingdom                                                                                                                                                                                 |
+|        1086 | Q437        | Ljubljana             | city          |           2 |          11 |           6 | Slovenia, Yugoslavia                                                                                                                                                                                    |
++-------------+-------------+-----------------------+---------------+-------------+-------------+-------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++-----------------------------------------------------------------------------+
+| SECTION                                                                     |
++-----------------------------------------------------------------------------+
+| 3. France: movies on the sheet only through a multi-country place, per role |
++-----------------------------------------------------------------------------+
++---------------+---------------+-----------------------+
+| LOCATION_ROLE | ALL_CONTAINED | WITHOUT_MULTI_COUNTRY |
++---------------+---------------+-----------------------+
+| filming       |          1797 |                  1783 |
+| narrative     |          3753 |                  3602 |
++---------------+---------------+-----------------------+
++----------------------------------------------------------------------+
+| SECTION                                                              |
++----------------------------------------------------------------------+
+| 4. Every country: movies added through multi-country places (top 15) |
++----------------------------------------------------------------------+
++-------------+----------------+---------------+-----------------------+-------+
+| ID_LOCATION | LOCATION_NAME  | ALL_CONTAINED | WITHOUT_MULTI_COUNTRY | ADDED |
++-------------+----------------+---------------+-----------------------+-------+
+|         258 | United Kingdom |          5160 |                  1922 |  3238 |
+|         112 | England        |          4568 |                  1357 |  3211 |
+|         106 | India          |          2077 |                  1450 |   627 |
+|         310 | Tamil Nadu     |           368 |                    40 |   328 |
+|         710 | Palestine      |           216 |                     2 |   214 |
+|         239 | Israel         |           357 |                   150 |   207 |
+|        1359 | West Bengal    |           229 |                    22 |   207 |
+|         879 | Jordan         |           211 |                    35 |   176 |
+|         126 | France         |          4700 |                  4542 |   158 |
+|          56 | Spain          |          2079 |                  1959 |   120 |
+|          45 | Italy          |          3885 |                  3767 |   118 |
+|          22 | Scotland       |           350 |                   238 |   112 |
+|          58 | Egypt          |           363 |                   261 |   102 |
+|         224 | Greece         |           507 |                   412 |    95 |
+|         375 | Syria          |           130 |                    35 |    95 |
++-------------+----------------+---------------+-----------------------+-------+
