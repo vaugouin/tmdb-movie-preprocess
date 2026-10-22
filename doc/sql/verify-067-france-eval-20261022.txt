@@ -1,0 +1,48 @@
+-- verify-067-france-eval.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-22 13:29:19 +0200
+--
++------------------------------------------------------------------------+
+| SECTION                                                                |
++------------------------------------------------------------------------+
+| 1. Filming places of the three movies, and whether each reaches France |
++------------------------------------------------------------------------+
++----------+-------------+-----------------------------------------+---------------+----------------+
+| ID_MOVIE | ID_LOCATION | LOCATION_NAME                           | LOCATION_TYPE | REACHES_FRANCE |
++----------+-------------+-----------------------------------------+---------------+----------------+
+|      857 |        6985 | Calvados                                | region        |              1 |
+|      857 |       11220 | Normandy American Cemetery and Memorial | NULL          |              1 |
+|      857 |        6993 | County Wexford                          | region        |              0 |
+|      857 |       11132 | Curracloe                               | city          |              0 |
+|      857 |       12113 | Hatfield                                | city          |              0 |
+|      857 |         370 | Ireland                                 | country       |              0 |
+|      857 |        5710 | Thame                                   | city          |              0 |
+|    27205 |        7687 | Palais Galliera                         | structure     |              1 |
+|    27205 |          38 | Paris                                   | city          |              1 |
+|    27205 |        9741 | pont de Bir-Hakeim                      | region        |              1 |
+|    27205 |         368 | Alberta                                 | region        |              0 |
+|    27205 |           5 | California                              | region        |              0 |
+|    27205 |       11284 | Commodore Schuyler F. Heim Bridge       | region        |              0 |
+|    27205 |        7551 | Farnborough Airport                     | region        |              0 |
+|    27205 |        9516 | Fortress Mountain Resort                | city          |              0 |
+|    27205 |          32 | Japan                                   | country       |              0 |
+|    27205 |          88 | Malibu                                  | city          |              0 |
+|    27205 |         416 | Morocco                                 | country       |              0 |
+|    27205 |        6177 | RAF Cardington                          | region        |              0 |
+|    27205 |         810 | Tangier                                 | city          |              0 |
+|    27205 |         202 | Tokyo                                   | city          |              0 |
+|    27205 |       11853 | University College London               | NULL          |              0 |
+|    77338 |       11556 | Merville-Franceville-Plage              | region        |              1 |
+|    77338 |          38 | Paris                                   | city          |              1 |
++----------+-------------+-----------------------------------------+---------------+----------------+
++------------------------------------------------------+
+| SECTION                                              |
++------------------------------------------------------+
+| 2. Per movie: filmed in France through the hierarchy |
++------------------------------------------------------+
++----------+------------------+
+| ID_MOVIE | FILMED_IN_FRANCE |
++----------+------------------+
+|    27205 |                1 |
+|      857 |                1 |
+|    77338 |                1 |
++----------+------------------+
