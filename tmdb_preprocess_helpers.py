@@ -2236,7 +2236,7 @@ STR_LOCATION_ANCESTOR_TABLE = "T_WC_T2S_LOCATION_ANCESTOR"
 # que Wikidata n'interdit pas.
 INT_LOCATION_ANCESTOR_MAX_DEPTH = 12
 # TMDB-MOVIE-PREPROCESS-067 : un lieu a cheval sur plusieurs pays (les Appalaches, la
-# Mediterranee) n'est dans aucun. Mesure et regles : doc/sql/test-067-cross-border-places.sql
+# Mediterranee) n'est dans aucun. Mesure et regles : doc/sql/archive/test-067-cross-border-places.sql
 # et ses check-067-*, resultats du 2026-10-21.
 # Classes P31 d'un parent passe : l'arete qui y monte tombe. Wikidata ne date presque jamais
 # ces aretes (2 qualificatifs P582 sur 510 974) et la base ne tient que 135 P576.
