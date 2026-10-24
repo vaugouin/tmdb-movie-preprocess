@@ -179,7 +179,7 @@ All source and target data is multilingual (English + French labels, accented an
 ---
 
 **Last Updated**: 2026-10-22
-**Current Version**: 1.1.25
+**Current Version**: 1.1.26
 
 ## Backlog (Nestor second-brain)
 

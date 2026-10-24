@@ -1,0 +1,86 @@
+-- test-066-work-finance.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-22 15:37:45 +0200
+--
++-----------+--------------+-------+-------+-----------+-------------------+------------------+-----------------+
+| ITEM_TYPE | FINANCE_KIND | ROWS_ | WORKS | WITH_DATE | WITH_PERIOD_DATES | WITH_PERIOD_ITEM | WITH_CHART_RANK |
++-----------+--------------+-------+-------+-----------+-------------------+------------------+-----------------+
+| movie     | box_office   |  7717 |  5913 |       786 |                45 |               41 |             231 |
+| movie     | budget       |  7195 |  7137 |         3 |                 0 |                0 |               0 |
+| serie     | box_office   |     4 |     4 |         1 |                 0 |                0 |               1 |
+| serie     | budget       |    26 |    26 |         0 |                 0 |                0 |               0 |
++-----------+--------------+-------+-------+-----------+-------------------+------------------+-----------------+
++--------------+-------------+---------------+-------+
+| FINANCE_KIND | ID_CURRENCY | CURRENCY_CODE | ROWS_ |
++--------------+-------------+---------------+-------+
+| box_office   | Q4917       | USD           |  6259 |
+| budget       | Q4917       | USD           |  5346 |
+| budget       | Q4916       | EUR           |   838 |
+| box_office   | Q259502     | AUD           |   583 |
+| box_office   | Q4916       | EUR           |   267 |
+| budget       | Q25224      | GBP           |   211 |
+| budget       | Q41044      | RUB           |   152 |
+| box_office   | Q41044      | RUB           |   108 |
+| box_office   | Q8146       | JPY           |    95 |
+| budget       | Q1104069    | CAD           |    78 |
+| box_office   | Q31015      | NULL          |    67 |
+| box_office   | Q203567     | NULL          |    45 |
+| budget       | Q8146       | JPY           |    42 |
+| budget       | Q259502     | AUD           |    40 |
+| budget       | Q203354     | NULL          |    39 |
++--------------+-------------+---------------+-------+
++-------------------+----------------------------+--------------+-------+--------+
+| ID_PLACE_WIKIDATA | LOCATION_NAME              | IS_WORLDWIDE | ROWS_ | LINKED |
++-------------------+----------------------------+--------------+-------+--------+
+| NULL              | NULL                       |            0 | 10275 |      0 |
+| Q13780930         | NULL                       |            1 |  1754 |      0 |
+| Q30               | United States              |            0 |  1675 |   1675 |
+| Q408              | Australia                  |            0 |   581 |    581 |
+| Q17               | Japan                      |            0 |   134 |    134 |
+| Q145              | United Kingdom             |            0 |    74 |     74 |
+| Q49               | North America              |            0 |    68 |     68 |
+| Q142              | France                     |            0 |    64 |     64 |
+| Q884              | South Korea                |            0 |    40 |     40 |
+| Q29               | Spain                      |            0 |    39 |     39 |
+| Q148              | People's Republic of China |            0 |    35 |     35 |
+| Q38               | Italy                      |            0 |    30 |     30 |
+| Q183              | Germany                    |            0 |    27 |     27 |
+| Q2017699          | NULL                       |            0 |    18 |      0 |
+| Q159              | Russia                     |            0 |    18 |     18 |
+| Q8646             | Hong Kong                  |            0 |    15 |     15 |
+| Q96               | Mexico                     |            0 |     9 |      9 |
+| Q155              | Brazil                     |            0 |     8 |      8 |
+| Q31               | Belgium                    |            0 |     6 |      6 |
+| Q794              | Iran                       |            0 |     6 |      6 |
++-------------------+----------------------------+--------------+-------+--------+
++-------------+-----------------+--------------+-----------------------+---------------+-------------+-------------------+----------------+--------------+------------+-----------+---------+--------------------+------------+---------------+
+| ID_WIKIDATA | MOVIE_TITLE     | FINANCE_KIND | AMOUNT                | CURRENCY_CODE | ID_CURRENCY | ID_PLACE_WIKIDATA | LOCATION_NAME  | IS_WORLDWIDE | DAT_POINT  | DAT_START | DAT_END | ID_PERIOD_WIKIDATA | CHART_RANK | WIKIDATA_RANK |
++-------------+-----------------+--------------+-----------------------+---------------+-------------+-------------------+----------------+--------------+------------+-----------+---------+--------------------+------------+---------------+
+| Q163872     | The Dark Knight | box_office   | 1006234167.0000000000 | USD           | Q4917       | Q13780930         | NULL           |            1 | NULL       | NULL      | NULL    | NULL               |         50 | normal        |
+| Q163872     | The Dark Knight | box_office   |  534987076.0000000000 | USD           | Q4917       | Q49               | North America  |            0 | NULL       | NULL      | NULL    | NULL               |       NULL | normal        |
+| Q163872     | The Dark Knight | box_office   |  158411483.0000000000 | USD           | Q4917       | Q49               | North America  |            0 | NULL       | NULL      | NULL    | Q116779966         |       NULL | normal        |
+| Q163872     | The Dark Knight | budget       |  185000000.0000000000 | USD           | Q4917       | NULL              | NULL           |            0 | NULL       | NULL      | NULL    | NULL               |       NULL | normal        |
+| Q24871      | Avatar          | box_office   | 2847379794.0000000000 | USD           | Q4917       | Q13780930         | NULL           |            1 | 2022-03-26 | NULL      | NULL    | NULL               |          1 | normal        |
+| Q24871      | Avatar          | box_office   |  760507625.0000000000 | USD           | Q4917       | Q30               | United States  |            0 | NULL       | NULL      | NULL    | NULL               |          4 | normal        |
+| Q24871      | Avatar          | box_office   |   93442625.0000000000 | GBP           | Q25224      | Q145              | United Kingdom |            0 | NULL       | NULL      | NULL    | NULL               |          4 | normal        |
+| Q24871      | Avatar          | budget       |  237000000.0000000000 | USD           | Q4917       | NULL              | NULL           |            0 | NULL       | NULL      | NULL    | NULL               |       NULL | normal        |
+| Q25188      | Inception       | box_office   |  836848102.0000000000 | USD           | Q4917       | Q13780930         | NULL           |            1 | NULL       | NULL      | NULL    | NULL               |         84 | normal        |
+| Q25188      | Inception       | box_office   |  292587330.0000000000 | USD           | Q4917       | Q30               | United States  |            0 | NULL       | NULL      | NULL    | NULL               |        100 | normal        |
+| Q25188      | Inception       | budget       |  160000000.0000000000 | USD           | Q4917       | NULL              | NULL           |            0 | NULL       | NULL      | NULL    | NULL               |       NULL | normal        |
+| Q44578      | Titanic         | box_office   | 1850197130.0000000000 | USD           | Q4917       | Q13780930         | NULL           |            1 | 2020-03-17 | NULL      | NULL    | NULL               |          3 | normal        |
+| Q44578      | Titanic         | box_office   |  659363944.0000000000 | USD           | Q4917       | Q30               | United States  |            0 | NULL       | NULL      | NULL    | NULL               |          6 | normal        |
+| Q44578      | Titanic         | budget       |  200000000.0000000000 | USD           | Q4917       | NULL              | NULL           |            0 | NULL       | NULL      | NULL    | NULL               |       NULL | normal        |
+| Q83495      | The Matrix      | box_office   |  467222728.0000000000 | USD           | Q4917       | Q13780930         | NULL           |            1 | NULL       | NULL      | NULL    | NULL               |       NULL | normal        |
+| Q83495      | The Matrix      | box_office   |  172076928.0000000000 | USD           | Q4917       | Q30               | United States  |            0 | NULL       | NULL      | NULL    | NULL               |       NULL | normal        |
+| Q83495      | The Matrix      | budget       |   63000000.0000000000 | USD           | Q4917       | NULL              | NULL           |            0 | NULL       | NULL      | NULL    | NULL               |       NULL | normal        |
++-------------+-----------------+--------------+-----------------------+---------------+-------------+-------------------+----------------+--------------+------------+-----------+---------+--------------------+------------+---------------+
++--------------+----------+------------------+------------+
+| FINANCE_KIND | COMPARED | WITHIN_5_PERCENT | TMDB_EMPTY |
++--------------+----------+------------------+------------+
+| box_office   |     1742 |             1313 |        128 |
+| budget       |     5336 |             3578 |       1050 |
++--------------+----------+------------------+------------+
++-------+------------+---------------------+----------------+-----------------+---------------------+-------------------+-----------------+----------------+----------------+
+| ROWS_ | STATEMENTS | BAD_POINT_PRECISION | BAD_POINT_YEAR | BAD_POINT_MONTH | BAD_START_PRECISION | BAD_END_PRECISION | POINT_LEFT_NULL | SEVERAL_PLACES | SEVERAL_POINTS |
++-------+------------+---------------------+----------------+-----------------+---------------------+-------------------+-----------------+----------------+----------------+
+| 14942 |      14935 |                   0 |              0 |               0 |                   0 |                 0 |               0 |             32 |              0 |
++-------+------------+---------------------+----------------+-----------------+---------------------+-------------------+-----------------+----------------+----------------+
