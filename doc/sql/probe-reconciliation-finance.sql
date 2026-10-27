@@ -54,7 +54,8 @@ c_wd AS (
 ),
 c_omdb AS (
     SELECT p.ID_MOVIE, p.TITLE, 'box_office_us' AS ATTRIBUTE, 'omdb' AS SOURCE, 1 AS N_ROWS,
-           NULLIF(o.BOX_OFFICE_USD,0), NULLIF(o.BOX_OFFICE_USD,0), 'USD', 'US'
+           NULLIF(o.BOX_OFFICE_USD,0) AS AMOUNT_MIN, NULLIF(o.BOX_OFFICE_USD,0) AS AMOUNT_MAX,
+           'USD' AS CURRENCY, 'US' AS PLACE
     FROM   pivot p
     JOIN   T_WC_OMDB_TITLE o ON o.ID_IMDB = p.ID_IMDB
 )
