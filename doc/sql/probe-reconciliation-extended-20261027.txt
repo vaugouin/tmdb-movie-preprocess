@@ -1,0 +1,234 @@
+-- probe-reconciliation-extended.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-27 14:27:45 +0100
+--
+-- VUE 1 : attributs numeriques (budget, box office worldwide/US, duree)
++-------------------------------------------------------------------------------+----------------------+------------+------------+-----------+------+-----------+-------------+-------------+
+| TITLE                                                                         | ATTRIBUTE            | TMDB       | WIKIDATA   | OMDB      | WD_N | WD_SPREAD | PCT_TMDB_WD | PCT_OMDB_WD |
++-------------------------------------------------------------------------------+----------------------+------------+------------+-----------+------+-----------+-------------+-------------+
+| A Chinese Ghost Story                                                         | box_office_worldwide |       NULL |    3783972 |      NULL |    1 | NULL      |        NULL |        NULL |
+| A Chinese Ghost Story                                                         | budget               |    1250000 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| A Chinese Ghost Story                                                         | runtime              |         95 |         94 |      NULL |    2 | 92..94    |         1.1 |        NULL |
+| Asterix & Obelix: The Middle Kingdom                                          | box_office_worldwide |   46497678 |   46497678 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Asterix & Obelix: The Middle Kingdom                                          | budget               |   72000000 |   72000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Asterix & Obelix: The Middle Kingdom                                          | runtime              |        111 |        111 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Avatar                                                                        | box_office_us        |       NULL |  760507625 | 785221649 |    1 | NULL      |        NULL |         3.1 |
+| Avatar                                                                        | box_office_worldwide | 2923706026 | 2847379794 |      NULL |    1 | NULL      |         2.6 |        NULL |
+| Avatar                                                                        | budget               |  237000000 |  237000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Avatar                                                                        | runtime              |        162 |        162 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Avatar: Fire and Ash                                                          | box_office_us        |       NULL |       NULL | 404340010 | NULL | NULL      |        NULL |        NULL |
+| Avatar: Fire and Ash                                                          | box_office_worldwide | 1485999890 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Avatar: Fire and Ash                                                          | budget               |  350000000 |  250000000 |      NULL |    1 | NULL      |        28.6 |        NULL |
+| Avatar: Fire and Ash                                                          | runtime              |        198 |        197 |      NULL |    1 | NULL      |         0.5 |        NULL |
+| Avatar: The Way of Water                                                      | box_office_us        |       NULL |  622024190 | 688459501 |    1 | NULL      |        NULL |         9.6 |
+| Avatar: The Way of Water                                                      | box_office_worldwide | 2334484620 | 2176229105 |      NULL |    1 | NULL      |         6.8 |        NULL |
+| Avatar: The Way of Water                                                      | budget               |  460000000 |  250000000 |      NULL |    1 | NULL      |        45.7 |        NULL |
+| Avatar: The Way of Water                                                      | runtime              |        192 |        195 |      NULL |    3 | 190..195  |         1.5 |        NULL |
+| Avengers: Endgame                                                             | box_office_us        |       NULL |  858373000 | 896057355 |    1 | NULL      |        NULL |         4.2 |
+| Avengers: Endgame                                                             | box_office_worldwide | 2938567784 | 2797501328 |      NULL |    1 | NULL      |         4.8 |        NULL |
+| Avengers: Endgame                                                             | budget               |  356000000 |  356000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Avengers: Endgame                                                             | runtime              |        181 |        181 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Avengers: Infinity War                                                        | box_office_us        |       NULL |  678815482 | 678815482 |    1 | NULL      |        NULL |         0.0 |
+| Avengers: Infinity War                                                        | box_office_worldwide | 2052415039 | 2048359754 |      NULL |    1 | NULL      |         0.2 |        NULL |
+| Avengers: Infinity War                                                        | budget               |  300000000 |  400000000 |      NULL |    1 | NULL      |        25.0 |        NULL |
+| Avengers: Infinity War                                                        | runtime              |        149 |        149 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Barbie                                                                        | box_office_us        |       NULL |       NULL | 636238421 | NULL | NULL      |        NULL |        NULL |
+| Barbie                                                                        | box_office_worldwide | 1447138421 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Barbie                                                                        | budget               |  145000000 |  145000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Barbie                                                                        | runtime              |        114 |        114 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Dickson Greeting                                                              | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Dickson Greeting                                                              | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Dickson Greeting                                                              | runtime              |          1 |          0 |      NULL |    1 | NULL      |        95.0 |        NULL |
+| Elle                                                                          | box_office_us        |       NULL |    2000000 |   2341534 |    1 | NULL      |        NULL |        14.6 |
+| Elle                                                                          | box_office_worldwide |    2341534 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Elle                                                                          | budget               |    9800000 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Elle                                                                          | runtime              |        131 |        130 |      NULL |    1 | NULL      |         0.8 |        NULL |
+| Frozen II                                                                     | box_office_us        |       NULL |  399249034 | 477373578 |    1 | NULL      |        NULL |        16.4 |
+| Frozen II                                                                     | box_office_worldwide | 1453683476 | 1119151068 |      NULL |    1 | NULL      |        23.0 |        NULL |
+| Frozen II                                                                     | budget               |  150000000 |  150000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Frozen II                                                                     | runtime              |        103 |        103 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Gallipoli                                                                     | box_office_us        |       NULL |    5732587 |      NULL |    1 | NULL      |        NULL |        NULL |
+| Gallipoli                                                                     | box_office_worldwide |   17400000 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Gallipoli                                                                     | budget               |    2600000 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Gallipoli                                                                     | runtime              |        112 |        111 |      NULL |    1 | NULL      |         0.9 |        NULL |
+| Inside Out 2                                                                  | box_office_us        |       NULL |       NULL | 652980194 | NULL | NULL      |        NULL |        NULL |
+| Inside Out 2                                                                  | box_office_worldwide | 1698863816 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Inside Out 2                                                                  | budget               |  200000000 |  200000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Inside Out 2                                                                  | runtime              |         97 |         96 |      NULL |    1 | NULL      |         1.0 |        NULL |
+| Jurassic World                                                                | box_office_us        |       NULL |  652270625 | 653406625 |    1 | NULL      |        NULL |         0.2 |
+| Jurassic World                                                                | box_office_worldwide | 1671537444 | 1670400637 |      NULL |    1 | NULL      |         0.1 |        NULL |
+| Jurassic World                                                                | budget               |  150000000 |  150000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Jurassic World                                                                | runtime              |        124 |        124 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Leisurely Pedestrians, Open Topped Buses and Hansom Cabs with Trotting Horses | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Leisurely Pedestrians, Open Topped Buses and Hansom Cabs with Trotting Horses | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Leisurely Pedestrians, Open Topped Buses and Hansom Cabs with Trotting Horses | runtime              |          1 |          1 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| London's Trafalgar Square                                                     | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| London's Trafalgar Square                                                     | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| London's Trafalgar Square                                                     | runtime              |          1 |          0 |      NULL |    1 | NULL      |        96.7 |        NULL |
+| Men Boxing                                                                    | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Men Boxing                                                                    | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Men Boxing                                                                    | runtime              |          1 |          0 |      NULL |    1 | NULL      |        91.7 |        NULL |
+| Monkeyshines, No. 1                                                           | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Monkeyshines, No. 1                                                           | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Monkeyshines, No. 1                                                           | runtime              |          1 |          1 |      NULL |    1 | NULL      |         6.7 |        NULL |
+| Newark Athlete                                                                | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Newark Athlete                                                                | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Newark Athlete                                                                | runtime              |          1 |          0 |      NULL |    1 | NULL      |        80.0 |        NULL |
+| Passage of Venus                                                              | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Passage of Venus                                                              | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Passage of Venus                                                              | runtime              |          1 |          0 |      NULL |    1 | NULL      |        91.7 |        NULL |
+| Planet of the Vampires                                                        | box_office_worldwide |    1035156 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Planet of the Vampires                                                        | budget               |     200000 |     200000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Planet of the Vampires                                                        | runtime              |         88 |         88 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Roundhay Garden Scene                                                         | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Roundhay Garden Scene                                                         | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Roundhay Garden Scene                                                         | runtime              |          1 |          0 |      NULL |    1 | NULL      |        97.2 |        NULL |
+| RTT                                                                           | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| RTT                                                                           | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| RTT                                                                           | runtime              |         88 |         98 |      NULL |    1 | NULL      |        10.2 |        NULL |
+| Spider-Man: Brand New Day                                                     | box_office_us        |       NULL |       NULL | 954994964 | NULL | NULL      |        NULL |        NULL |
+| Spider-Man: Brand New Day                                                     | box_office_worldwide | 2517281128 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Spider-Man: Brand New Day                                                     | budget               |  225000000 |  225000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Spider-Man: Brand New Day                                                     | runtime              |        145 |        145 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Spider-Man: No Way Home                                                       | box_office_us        |       NULL |  814115070 | 814866759 |    1 | NULL      |        NULL |         0.1 |
+| Spider-Man: No Way Home                                                       | box_office_worldwide | 1921426073 | 1921847111 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Spider-Man: No Way Home                                                       | budget               |  200000000 |  200000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Spider-Man: No Way Home                                                       | runtime              |        148 |        148 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Star Wars: The Force Awakens                                                  | box_office_us        |       NULL |  936662225 | 936662225 |    1 | NULL      |        NULL |         0.0 |
+| Star Wars: The Force Awakens                                                  | box_office_worldwide | 2068223624 | 2068223624 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Star Wars: The Force Awakens                                                  | budget               |  245000000 |  245000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Star Wars: The Force Awakens                                                  | runtime              |        136 |        138 |      NULL |    1 | NULL      |         1.4 |        NULL |
+| T2 Trainspotting                                                              | box_office_us        |       NULL |       NULL |   2402004 | NULL | NULL      |        NULL |        NULL |
+| T2 Trainspotting                                                              | box_office_worldwide |   41681746 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| T2 Trainspotting                                                              | budget               |   18000000 |   18000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| T2 Trainspotting                                                              | runtime              |        117 |        117 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| The Avengers                                                                  | box_office_us        |       NULL |  623357910 | 623357910 |    1 | NULL      |        NULL |         0.0 |
+| The Avengers                                                                  | box_office_worldwide | 1518815515 | 1518812988 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| The Avengers                                                                  | budget               |  220000000 |  220000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| The Avengers                                                                  | runtime              |        143 |        142 |      NULL |    1 | NULL      |         0.7 |        NULL |
+| The Lion King                                                                 | box_office_us        |       NULL |  543041133 | 543638043 |    1 | NULL      |        NULL |         0.1 |
+| The Lion King                                                                 | box_office_worldwide | 1662020819 | 1654735262 |      NULL |    1 | NULL      |         0.4 |        NULL |
+| The Lion King                                                                 | budget               |  260000000 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| The Lion King                                                                 | runtime              |        118 |        118 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| The Odyssey                                                                   | box_office_us        |       NULL |       NULL | 588976965 | NULL | NULL      |        NULL |        NULL |
+| The Odyssey                                                                   | box_office_worldwide | 1794403000 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| The Odyssey                                                                   | budget               |  250000000 |  250000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| The Odyssey                                                                   | runtime              |        173 |        172 |      NULL |    1 | NULL      |         0.6 |        NULL |
+| Titanic                                                                       | box_office_us        |       NULL |  659363944 | 674354882 |    1 | NULL      |        NULL |         2.2 |
+| Titanic                                                                       | box_office_worldwide | 2264162353 | 1850197130 |      NULL |    1 | NULL      |        18.3 |        NULL |
+| Titanic                                                                       | budget               |  200000000 |  200000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Titanic                                                                       | runtime              |        194 |        194 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Top Gun: Maverick                                                             | box_office_us        |       NULL |  702480344 | 721996984 |    1 | NULL      |        NULL |         2.7 |
+| Top Gun: Maverick                                                             | box_office_worldwide | 1488732821 | 1443725344 |      NULL |    1 | NULL      |         3.0 |        NULL |
+| Top Gun: Maverick                                                             | budget               |  170000000 |  152000000 |      NULL |    1 | NULL      |        10.6 |        NULL |
+| Top Gun: Maverick                                                             | runtime              |        131 |        131 |      NULL |    2 | 130..131  |         0.0 |        NULL |
+| Toy Story 4                                                                   | box_office_us        |       NULL |  167582696 | 434038008 |    1 | NULL      |        NULL |        61.4 |
+| Toy Story 4                                                                   | box_office_worldwide | 1073841394 | 1073166397 |      NULL |    1 | NULL      |         0.1 |        NULL |
+| Toy Story 4                                                                   | budget               |  175000000 |  200000000 |      NULL |    1 | NULL      |        12.5 |        NULL |
+| Toy Story 4                                                                   | runtime              |        100 |        100 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Traffic Crossing Leeds Bridge                                                 | box_office_worldwide |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Traffic Crossing Leeds Bridge                                                 | budget               |       NULL |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Traffic Crossing Leeds Bridge                                                 | runtime              |          1 |          0 |      NULL |    1 | NULL      |        95.4 |        NULL |
+| Twilight                                                                      | box_office_us        |       NULL |       NULL | 195553813 | NULL | NULL      |        NULL |        NULL |
+| Twilight                                                                      | box_office_worldwide |  393616788 |  393600000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Twilight                                                                      | budget               |   37000000 |   37000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Twilight                                                                      | runtime              |        122 |        122 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Zootopia 2                                                                    | box_office_us        |       NULL |       NULL | 428130160 | NULL | NULL      |        NULL |        NULL |
+| Zootopia 2                                                                    | box_office_worldwide | 1868208796 |       NULL |      NULL | NULL | NULL      |        NULL |        NULL |
+| Zootopia 2                                                                    | budget               |  150000000 |  150000000 |      NULL |    1 | NULL      |         0.0 |        NULL |
+| Zootopia 2                                                                    | runtime              |        108 |        108 |      NULL |    1 | NULL      |         0.0 |        NULL |
++-------------------------------------------------------------------------------+----------------------+------------+------------+-----------+------+-----------+-------------+-------------+
+-- VUE 2 : realisateur par identite (ensembles de Q)
++-------------------------------------------------------------------------------+--------+-----------+---------------------+------+---------------------+---------+
+| TITLE                                                                         | TMDB_N | TMDB_NO_Q | TMDB_DIR_Q          | WD_N | WD_DIR_Q            | VERDICT |
++-------------------------------------------------------------------------------+--------+-----------+---------------------+------+---------------------+---------+
+| Dickson Greeting                                                              |      2 |         0 | Q2151113,Q465350    |    1 | Q465350             | differ  |
+| Men Boxing                                                                    |      2 |         0 | Q2151113,Q465350    |    1 | Q465350             | differ  |
+| Newark Athlete                                                                |      2 |         0 | Q2151113,Q465350    |    1 | Q465350             | differ  |
+| Passage of Venus                                                              |      2 |         1 | ,Q298581            |    1 | Q298581             | differ  |
+| Toy Story 4                                                                   |      1 |         0 | Q22073999           |    2 | Q22073999,Q269214   | differ  |
+| A Chinese Ghost Story                                                         |      1 |         0 | Q532263             |    1 | Q532263             | equal   |
+| Asterix & Obelix: The Middle Kingdom                                          |      1 |         0 | Q314403             |    1 | Q314403             | equal   |
+| Avatar                                                                        |      1 |         0 | Q42574              |    1 | Q42574              | equal   |
+| Avatar: Fire and Ash                                                          |      1 |         0 | Q42574              |    1 | Q42574              | equal   |
+| Avatar: The Way of Water                                                      |      1 |         0 | Q42574              |    1 | Q42574              | equal   |
+| Avengers: Endgame                                                             |      2 |         0 | Q18018415,Q20675767 |    2 | Q18018415,Q20675767 | equal   |
+| Avengers: Infinity War                                                        |      2 |         0 | Q18018415,Q20675767 |    2 | Q18018415,Q20675767 | equal   |
+| Barbie                                                                        |      1 |         0 | Q271967             |    1 | Q271967             | equal   |
+| Elle                                                                          |      1 |         0 | Q129079             |    1 | Q129079             | equal   |
+| Frozen II                                                                     |      2 |         0 | Q156596,Q5929198    |    2 | Q156596,Q5929198    | equal   |
+| Gallipoli                                                                     |      1 |         0 | Q55424              |    1 | Q55424              | equal   |
+| Inside Out 2                                                                  |      1 |         0 | Q58640889           |    1 | Q58640889           | equal   |
+| Jurassic World                                                                |      1 |         0 | Q5145625            |    1 | Q5145625            | equal   |
+| Leisurely Pedestrians, Open Topped Buses and Hansom Cabs with Trotting Horses |      1 |         0 | Q1363897            |    1 | Q1363897            | equal   |
+| London's Trafalgar Square                                                     |      2 |         0 | Q1584954,Q8006585   |    2 | Q1584954,Q8006585   | equal   |
+| Monkeyshines, No. 1                                                           |      2 |         0 | Q2151113,Q465350    |    2 | Q2151113,Q465350    | equal   |
+| Planet of the Vampires                                                        |      1 |         0 | Q55438              |    1 | Q55438              | equal   |
+| Roundhay Garden Scene                                                         |      1 |         0 | Q421675             |    1 | Q421675             | equal   |
+| RTT                                                                           |      1 |         0 | Q3089624            |    1 | Q3089624            | equal   |
+| Spider-Man: Brand New Day                                                     |      1 |         0 | Q15972939           |    1 | Q15972939           | equal   |
+| Spider-Man: No Way Home                                                       |      1 |         0 | Q18519749           |    1 | Q18519749           | equal   |
+| Star Wars: The Force Awakens                                                  |      1 |         0 | Q188137             |    1 | Q188137             | equal   |
+| T2 Trainspotting                                                              |      1 |         0 | Q134867             |    1 | Q134867             | equal   |
+| The Avengers                                                                  |      1 |         0 | Q298025             |    1 | Q298025             | equal   |
+| The Lion King                                                                 |      1 |         0 | Q295964             |    1 | Q295964             | equal   |
+| The Odyssey                                                                   |      1 |         0 | Q25191              |    1 | Q25191              | equal   |
+| Titanic                                                                       |      1 |         0 | Q42574              |    1 | Q42574              | equal   |
+| Top Gun: Maverick                                                             |      1 |         0 | Q2444076            |    1 | Q2444076            | equal   |
+| Traffic Crossing Leeds Bridge                                                 |      1 |         0 | Q421675             |    1 | Q421675             | equal   |
+| Twilight                                                                      |      1 |         0 | Q229598             |    1 | Q229598             | equal   |
+| Zootopia 2                                                                    |      2 |         0 | Q1018606,Q20995253  |    2 | Q1018606,Q20995253  | equal   |
++-------------------------------------------------------------------------------+--------+-----------+---------------------+------+---------------------+---------+
+-- VUE 3 : pays d'origine (ISO TMDb vs Q Wikidata mappe en ISO)
++-------------------------------------------------------------------------------+----------+----------------+---------------+---------+
+| TITLE                                                                         | TMDB_ISO | WD_ISO         | WD_Q_UNMAPPED | VERDICT |
++-------------------------------------------------------------------------------+----------+----------------+---------------+---------+
+| Asterix & Obelix: The Middle Kingdom                                          | BE,FR    | FR             |             0 | differ  |
+| Avatar                                                                        | GB,US    | US             |             0 | differ  |
+| Passage of Venus                                                              | FR       | FR,JP          |             0 | differ  |
+| Roundhay Garden Scene                                                         | GB       | GB,Q174193,Q21 |             2 | differ  |
+| Spider-Man: Brand New Day                                                     | US       | CA,DE,GB,US    |             0 | differ  |
+| T2 Trainspotting                                                              | GB,US    | GB             |             0 | differ  |
+| Twilight                                                                      | GB,US    | US             |             0 | differ  |
+| Zootopia 2                                                                    | CA,US    | US             |             0 | differ  |
+| A Chinese Ghost Story                                                         | HK       | HK             |             0 | equal   |
+| Avatar: Fire and Ash                                                          | US       | US             |             0 | equal   |
+| Avatar: The Way of Water                                                      | US       | US             |             0 | equal   |
+| Avengers: Endgame                                                             | US       | US             |             0 | equal   |
+| Avengers: Infinity War                                                        | US       | US             |             0 | equal   |
+| Barbie                                                                        | GB,US    | GB,US          |             0 | equal   |
+| Dickson Greeting                                                              | US       | US             |             0 | equal   |
+| Elle                                                                          | BE,DE,FR | BE,DE,FR       |             0 | equal   |
+| Frozen II                                                                     | US       | US             |             0 | equal   |
+| Gallipoli                                                                     | AU       | AU             |             0 | equal   |
+| Inside Out 2                                                                  | US       | US             |             0 | equal   |
+| Jurassic World                                                                | US       | US             |             0 | equal   |
+| Leisurely Pedestrians, Open Topped Buses and Hansom Cabs with Trotting Horses | GB       | GB             |             0 | equal   |
+| London's Trafalgar Square                                                     | GB       | GB             |             0 | equal   |
+| Men Boxing                                                                    | US       | US             |             0 | equal   |
+| Monkeyshines, No. 1                                                           | US       | US             |             0 | equal   |
+| Newark Athlete                                                                | US       | US             |             0 | equal   |
+| Planet of the Vampires                                                        | ES,IT    | ES,IT          |             0 | equal   |
+| RTT                                                                           | FR       | FR             |             0 | equal   |
+| Spider-Man: No Way Home                                                       | US       | US             |             0 | equal   |
+| Star Wars: The Force Awakens                                                  | US       | US             |             0 | equal   |
+| The Avengers                                                                  | US       | US             |             0 | equal   |
+| The Lion King                                                                 | US       | US             |             0 | equal   |
+| The Odyssey                                                                   | GB,US    | GB,US          |             0 | equal   |
+| Titanic                                                                       | US       | US             |             0 | equal   |
+| Top Gun: Maverick                                                             | US       | US             |             0 | equal   |
+| Toy Story 4                                                                   | US       | US             |             0 | equal   |
+| Traffic Crossing Leeds Bridge                                                 | GB       | GB             |             0 | equal   |
++-------------------------------------------------------------------------------+----------+----------------+---------------+---------+
+-- VUE 4 : series, finance seule (TMDb muet par construction)
++----------------------+----------------+--------------+----------+-----------+--------+----------------------+----------------------+
+| TITLE                | FIRST_AIR_YEAR | FINANCE_KIND | CURRENCY | PLACE     | N_ROWS | AMOUNT_MIN           | AMOUNT_MAX           |
++----------------------+----------------+--------------+----------+-----------+--------+----------------------+----------------------+
+| Battalion            |           2016 | box_office   | USD      | NULL      |      1 |   8903193.0000000000 |   8903193.0000000000 |
+| Battalion            |           2016 | budget       | USD      | NULL      |      1 |  10000000.0000000000 |  10000000.0000000000 |
+| Christopher Columbus |           1985 | budget       | USD      | NULL      |      1 |  14000000.0000000000 |  14000000.0000000000 |
+| Generation War       |           2013 | budget       | EUR      | NULL      |      1 |  10000000.0000000000 |  10000000.0000000000 |
+| Masha and the Bear   |           2009 | box_office   | USD      | NULL      |      1 |    147174.0000000000 |    147174.0000000000 |
+| Roots                |           2016 | budget       | USD      | NULL      |      1 |  50000000.0000000000 |  50000000.0000000000 |
+| The Smurfs           |           2021 | box_office   | USD      | worldwide |      1 | 563749323.0000000000 | 563749323.0000000000 |
+| The Smurfs           |           2021 | budget       | USD      | NULL      |      1 | 110000000.0000000000 | 110000000.0000000000 |
++----------------------+----------------+--------------+----------+-----------+--------+----------------------+----------------------+
