@@ -1,0 +1,56 @@
+-- probe-reconciliation-finance.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-27 08:45:14 +0100
+--
++-----------------+----------------------+----------+--------+------------+------------+-----------+
+| TITLE           | ATTRIBUTE            | SOURCE   | N_ROWS | AMOUNT_MIN | AMOUNT_MAX | PLACE     |
++-----------------+----------------------+----------+--------+------------+------------+-----------+
+| Avatar          | box_office_us        | omdb     |      1 |  785221649 |  785221649 | US        |
+| Avatar          | box_office_us        | wikidata |      1 |  760507625 |  760507625 | US        |
+| Avatar          | box_office_worldwide | tmdb     |      1 | 2923706026 | 2923706026 | worldwide |
+| Avatar          | box_office_worldwide | wikidata |      1 | 2847379794 | 2847379794 | worldwide |
+| Avatar          | budget               | tmdb     |      1 |  237000000 |  237000000 | worldwide |
+| Avatar          | budget               | wikidata |      1 |  237000000 |  237000000 | worldwide |
+| Inception       | box_office_us        | omdb     |      1 |  292587330 |  292587330 | US        |
+| Inception       | box_office_us        | wikidata |      1 |  292587330 |  292587330 | US        |
+| Inception       | box_office_worldwide | tmdb     |      1 |  839030630 |  839030630 | worldwide |
+| Inception       | box_office_worldwide | wikidata |      1 |  836848102 |  836848102 | worldwide |
+| Inception       | budget               | tmdb     |      1 |  160000000 |  160000000 | worldwide |
+| Inception       | budget               | wikidata |      1 |  160000000 |  160000000 | worldwide |
+| The Dark Knight | box_office_other     | wikidata |      2 |  158411483 |  534987076 | other     |
+| The Dark Knight | box_office_us        | omdb     |      1 |  534987076 |  534987076 | US        |
+| The Dark Knight | box_office_worldwide | tmdb     |      1 | 1008480529 | 1008480529 | worldwide |
+| The Dark Knight | box_office_worldwide | wikidata |      1 | 1006234167 | 1006234167 | worldwide |
+| The Dark Knight | budget               | tmdb     |      1 |  185000000 |  185000000 | worldwide |
+| The Dark Knight | budget               | wikidata |      1 |  185000000 |  185000000 | worldwide |
+| The Matrix      | box_office_us        | omdb     |      1 |  177559005 |  177559005 | US        |
+| The Matrix      | box_office_us        | wikidata |      1 |  172076928 |  172076928 | US        |
+| The Matrix      | box_office_worldwide | tmdb     |      1 |  463517383 |  463517383 | worldwide |
+| The Matrix      | box_office_worldwide | wikidata |      1 |  467222728 |  467222728 | worldwide |
+| The Matrix      | budget               | tmdb     |      1 |   63000000 |   63000000 | worldwide |
+| The Matrix      | budget               | wikidata |      1 |   63000000 |   63000000 | worldwide |
+| Titanic         | box_office_us        | omdb     |      1 |  674354882 |  674354882 | US        |
+| Titanic         | box_office_us        | wikidata |      1 |  659363944 |  659363944 | US        |
+| Titanic         | box_office_worldwide | tmdb     |      1 | 2264162353 | 2264162353 | worldwide |
+| Titanic         | box_office_worldwide | wikidata |      1 | 1850197130 | 1850197130 | worldwide |
+| Titanic         | budget               | tmdb     |      1 |  200000000 |  200000000 | worldwide |
+| Titanic         | budget               | wikidata |      1 |  200000000 |  200000000 | worldwide |
++-----------------+----------------------+----------+--------+------------+------------+-----------+
++-----------------+----------------------+------------+------------+-----------+-------------+-------------+
+| TITLE           | ATTRIBUTE            | TMDB       | WIKIDATA   | OMDB      | PCT_TMDB_WD | PCT_OMDB_WD |
++-----------------+----------------------+------------+------------+-----------+-------------+-------------+
+| Avatar          | box_office_us        |       NULL |  760507625 | 785221649 |        NULL |         3.1 |
+| Avatar          | box_office_worldwide | 2923706026 | 2847379794 |      NULL |         2.6 |        NULL |
+| Avatar          | budget               |  237000000 |  237000000 |      NULL |         0.0 |        NULL |
+| Inception       | box_office_us        |       NULL |  292587330 | 292587330 |        NULL |         0.0 |
+| Inception       | box_office_worldwide |  839030630 |  836848102 |      NULL |         0.3 |        NULL |
+| Inception       | budget               |  160000000 |  160000000 |      NULL |         0.0 |        NULL |
+| The Dark Knight | box_office_us        |       NULL |       NULL | 534987076 |        NULL |        NULL |
+| The Dark Knight | box_office_worldwide | 1008480529 | 1006234167 |      NULL |         0.2 |        NULL |
+| The Dark Knight | budget               |  185000000 |  185000000 |      NULL |         0.0 |        NULL |
+| The Matrix      | box_office_us        |       NULL |  172076928 | 177559005 |        NULL |         3.1 |
+| The Matrix      | box_office_worldwide |  463517383 |  467222728 |      NULL |         0.8 |        NULL |
+| The Matrix      | budget               |   63000000 |   63000000 |      NULL |         0.0 |        NULL |
+| Titanic         | box_office_us        |       NULL |  659363944 | 674354882 |        NULL |         2.2 |
+| Titanic         | box_office_worldwide | 2264162353 | 1850197130 |      NULL |        18.3 |        NULL |
+| Titanic         | budget               |  200000000 |  200000000 |      NULL |         0.0 |        NULL |
++-----------------+----------------------+------------+------------+-----------+-------------+-------------+

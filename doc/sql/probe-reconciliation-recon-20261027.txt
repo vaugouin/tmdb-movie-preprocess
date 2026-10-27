@@ -1,0 +1,221 @@
+-- probe-reconciliation-recon.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-27 14:14:04 +0100
+--
++------------------------------+-----------------------------+----------------------------------------------------------------------------+
+| TABLE_NAME                   | COLUMN_NAME                 | COLUMN_TYPE                                                                |
++------------------------------+-----------------------------+----------------------------------------------------------------------------+
+| T_WC_T2S_LOCATION            | ID_LOCATION                 | int(11)                                                                    |
+| T_WC_T2S_LOCATION            | ID_WIKIDATA                 | varchar(20)                                                                |
+| T_WC_T2S_LOCATION            | LOCATION_NAME               | varchar(250)                                                               |
+| T_WC_T2S_LOCATION            | LOCATION_NAME_FR            | varchar(250)                                                               |
+| T_WC_T2S_LOCATION            | OVERVIEW                    | mediumtext                                                                 |
+| T_WC_T2S_LOCATION            | OVERVIEW_FR                 | mediumtext                                                                 |
+| T_WC_T2S_LOCATION            | LOCATION_SOURCE             | varchar(20)                                                                |
+| T_WC_T2S_LOCATION            | LOCATION_TYPE               | varchar(20)                                                                |
+| T_WC_T2S_LOCATION            | DELETED                     | int(5)                                                                     |
+| T_WC_T2S_LOCATION            | DISPLAY_ORDER               | int(5)                                                                     |
+| T_WC_T2S_LOCATION            | ID_CREATOR                  | int(5)                                                                     |
+| T_WC_T2S_LOCATION            | DAT_CREAT                   | date                                                                       |
+| T_WC_T2S_LOCATION            | ID_OWNER                    | int(5)                                                                     |
+| T_WC_T2S_LOCATION            | TIM_UPDATED                 | datetime                                                                   |
+| T_WC_T2S_LOCATION            | ID_USER_UPDATED             | int(5)                                                                     |
+| T_WC_T2S_LOCATION            | MOVIE_COUNT                 | int(11)                                                                    |
+| T_WC_T2S_LOCATION            | SERIE_COUNT                 | int(11)                                                                    |
+| T_WC_T2S_LOCATION            | EPISODE_COUNT               | int(11)                                                                    |
+| T_WC_T2S_LOCATION            | POSTER_PATH                 | varchar(200)                                                               |
+| T_WC_T2S_LOCATION            | WIKIPEDIA_IMAGE_PATH        | varchar(500)                                                               |
+| T_WC_T2S_LOCATION            | IMDB_RATING                 | double                                                                     |
+| T_WC_T2S_LOCATION            | IMDB_RATING_WEIGHTED        | double                                                                     |
+| T_WC_T2S_LOCATION            | POPULARITY                  | double                                                                     |
+| T_WC_T2S_LOCATION            | TIM_WIKIDATA_COMPLETED      | datetime                                                                   |
+| T_WC_T2S_LOCATION            | WIKIPEDIA_MAIN_IMAGE_URL    | varchar(1000)                                                              |
+| T_WC_T2S_LOCATION            | WIKIPEDIA_MAIN_IMAGE_URL_FR | varchar(1000)                                                              |
+| T_WC_TMDB_MOVIE              | ID_MOVIE                    | int(11)                                                                    |
+| T_WC_TMDB_MOVIE              | RELEASE_YEAR                | int(5)                                                                     |
+| T_WC_TMDB_MOVIE              | ID_IMDB                     | varchar(20)                                                                |
+| T_WC_TMDB_MOVIE              | ID_WIKIDATA                 | varchar(50)                                                                |
+| T_WC_TMDB_MOVIE              | BUDGET                      | double                                                                     |
+| T_WC_TMDB_MOVIE              | RUNTIME                     | int(11)                                                                    |
+| T_WC_TMDB_MOVIE              | REVENUE                     | double                                                                     |
+| T_WC_TMDB_MOVIE              | COUNTRIES                   | varchar(200)                                                               |
+| T_WC_TMDB_MOVIE              | IS_SILENT                   | int(11)                                                                    |
+| T_WC_TMDB_PERSON             | ID_WIKIDATA                 | varchar(50)                                                                |
+| T_WC_TMDB_PERSON             | TIM_WIKIDATA_COMPLETED      | datetime                                                                   |
+| T_WC_TMDB_PERSON_MOVIE       | ID_TMDB_PERSON_MOVIE        | int(11)                                                                    |
+| T_WC_TMDB_PERSON_MOVIE       | ID_PERSON                   | int(11)                                                                    |
+| T_WC_TMDB_PERSON_MOVIE       | ID_MOVIE                    | int(11)                                                                    |
+| T_WC_TMDB_PERSON_MOVIE       | ID_CREDIT                   | varchar(50)                                                                |
+| T_WC_TMDB_PERSON_MOVIE       | CAST_CHARACTER              | varchar(600)                                                               |
+| T_WC_TMDB_PERSON_MOVIE       | DELETED                     | int(5)                                                                     |
+| T_WC_TMDB_PERSON_MOVIE       | DISPLAY_ORDER               | int(5)                                                                     |
+| T_WC_TMDB_PERSON_MOVIE       | ID_CREATOR                  | int(5)                                                                     |
+| T_WC_TMDB_PERSON_MOVIE       | DAT_CREAT                   | date                                                                       |
+| T_WC_TMDB_PERSON_MOVIE       | ID_OWNER                    | int(5)                                                                     |
+| T_WC_TMDB_PERSON_MOVIE       | TIM_UPDATED                 | datetime                                                                   |
+| T_WC_TMDB_PERSON_MOVIE       | ID_USER_UPDATED             | int(5)                                                                     |
+| T_WC_TMDB_PERSON_MOVIE       | CREDIT_TYPE                 | varchar(10)                                                                |
+| T_WC_TMDB_PERSON_MOVIE       | CREW_DEPARTMENT             | varchar(200)                                                               |
+| T_WC_TMDB_PERSON_MOVIE       | CREW_JOB                    | varchar(200)                                                               |
+| T_WC_WIKIDATA_ITEM_VALUE     | ID_STATEMENT                | bigint(20)                                                                 |
+| T_WC_WIKIDATA_ITEM_VALUE     | ID_ITEM                     | varchar(50)                                                                |
+| T_WC_WIKIDATA_QUANTITY_VALUE | ID_STATEMENT                | bigint(20)                                                                 |
+| T_WC_WIKIDATA_QUANTITY_VALUE | AMOUNT                      | decimal(30,10)                                                             |
+| T_WC_WIKIDATA_QUANTITY_VALUE | UNIT_ID_WIKIDATA            | varchar(50)                                                                |
+| T_WC_WIKIDATA_QUANTITY_VALUE | LOWER_BOUND                 | decimal(30,10)                                                             |
+| T_WC_WIKIDATA_QUANTITY_VALUE | UPPER_BOUND                 | decimal(30,10)                                                             |
+| T_WC_WIKIDATA_QUANTITY_VALUE | AMOUNT_NORMALIZED           | decimal(30,10)                                                             |
+| T_WC_WIKIDATA_QUANTITY_VALUE | DISPLAY_VALUE               | varchar(255)                                                               |
+| T_WC_WIKIDATA_STATEMENT      | ID_STATEMENT                | bigint(20)                                                                 |
+| T_WC_WIKIDATA_STATEMENT      | ID_WIKIDATA                 | varchar(50)                                                                |
+| T_WC_WIKIDATA_STATEMENT      | ID_PROPERTY                 | varchar(50)                                                                |
+| T_WC_WIKIDATA_STATEMENT      | STATEMENT_GUID              | varchar(255)                                                               |
+| T_WC_WIKIDATA_STATEMENT      | STATEMENT_HASH              | varchar(255)                                                               |
+| T_WC_WIKIDATA_STATEMENT      | VALUE_TYPE                  | enum('item','string','external_id','media','time','quantity','coordinate') |
+| T_WC_WIKIDATA_STATEMENT      | WIKIDATA_DATATYPE           | varchar(100)                                                               |
+| T_WC_WIKIDATA_STATEMENT      | RANK                        | enum('preferred','normal','deprecated')                                    |
+| T_WC_WIKIDATA_STATEMENT      | IS_BEST_VALUE               | tinyint(1)                                                                 |
+| T_WC_WIKIDATA_STATEMENT      | DISPLAY_ORDER               | int(11)                                                                    |
+| T_WC_WIKIDATA_STATEMENT      | DELETED                     | tinyint(1)                                                                 |
+| T_WC_WIKIDATA_STATEMENT      | DAT_CREAT                   | datetime                                                                   |
+| T_WC_WIKIDATA_STATEMENT      | TIM_UPDATED                 | datetime                                                                   |
+| T_WC_WIKIDATA_STATEMENT      | ID_CREATOR                  | bigint(20)                                                                 |
+| T_WC_WIKIDATA_STATEMENT      | ID_OWNER                    | bigint(20)                                                                 |
+| T_WC_WIKIDATA_STATEMENT      | ID_USER_UPDATED             | bigint(20)                                                                 |
+| T_WC_WIKIDATA_STATEMENT      | IMPORT_SOURCE               | varchar(100)                                                               |
+| T_WC_WIKIDATA_STATEMENT      | IMPORT_BATCH_ID             | varchar(100)                                                               |
+| T_WC_WIKIDATA_STATEMENT      | LAST_SYNC_AT                | datetime                                                                   |
+| T_WC_WIKIDATA_STATEMENT      | IS_VALID                    | tinyint(1)                                                                 |
+| T_WC_WIKIDATA_STATEMENT      | VALIDATION_ERROR            | text                                                                       |
+| T_WC_WIKIDATA_STATEMENT      | RAW_VALUE_TEXT              | text                                                                       |
++------------------------------+-----------------------------+----------------------------------------------------------------------------+
++-------------+--------------+------------+
+| ID_PROPERTY | N_STATEMENTS | N_SUBJECTS |
++-------------+--------------+------------+
+| P2047       |       225763 |     220768 |
+| P495        |       638955 |     598582 |
+| P57         |       422344 |     388790 |
++-------------+--------------+------------+
++------------------+--------+
+| UNIT_ID_WIKIDATA | N      |
++------------------+--------+
+| Q7727            | 220502 |
+| Q11574           |   4678 |
+| Q25235           |    512 |
+| 1                |     45 |
+| Q11573           |      7 |
+| Q1471447         |      3 |
+| Q209426          |      2 |
+| Q201411          |      1 |
+| Q107424229       |      1 |
+| Q10585927        |      1 |
++------------------+--------+
++----------+-------------+------------+-------------------------------------------------------------------------------+--------------+---------+
+| ID_MOVIE | ID_WIKIDATA | ID_IMDB    | TITLE                                                                         | RELEASE_YEAR | RUNTIME |
++----------+-------------+------------+-------------------------------------------------------------------------------+--------------+---------+
+|  1798195 |             |            | Revolving Portrait                                                            |         1858 |       1 |
+|   315946 | Q20992221   | tt3155794  | Passage of Venus                                                              |         1874 |       1 |
+|   159897 | Q11766965   | tt2075247  | Man Walking Around a Corner                                                   |         1887 |       1 |
+|    16463 | Q267176     | tt0392728  | Roundhay Garden Scene                                                         |         1888 |       1 |
+|    16464 | Q913078     | tt0343112  | Traffic Crossing Leeds Bridge                                                 |         1888 |       1 |
+|    96882 | Q4059640    | tt1758563  | Accordion Player                                                              |         1888 |       1 |
+|   355995 | Q20501358   | tt2116853  | Brighton Street Scene                                                         |         1888 |       1 |
+|  1722613 |             | tt33338297 | Fantascope - The Stereoscopic Phenakistoscope 1852                            |         1888 |       1 |
+|    32406 | Q1989298    | tt0466876  | Leisurely Pedestrians, Open Topped Buses and Hansom Cabs with Trotting Horses |         1889 |       1 |
+|   355764 | Q20501379   | tt2116898  | Hyde Park Corner                                                              |         1889 |       1 |
+|  1726330 |             |            | Promenaders by the Serpentine in Hyde Park                                    |         1889 |       1 |
+|    32571 | Q1854297    | tt0361921  | Monkeyshines, No. 1                                                           |         1890 |       1 |
+|    33315 | Q18476083   | tt0416046  | Monkeyshines, No. 2                                                           |         1890 |       1 |
+|    33316 | Q2913387    | tt1202028  | London's Trafalgar Square                                                     |         1890 |       1 |
+|    33317 | Q18476088   | tt0416047  | Monkeyshines, No. 3                                                           |         1890 |       1 |
+|   355846 | Q18465764   | tt2116968  | Traffic in King's Road, Chelsea                                               |         1890 |       1 |
+|    33229 | Q1210171    | tt0241373  | Dickson Greeting                                                              |         1891 |       1 |
+|    33318 | Q1920204    | tt0241715  | Men Boxing                                                                    |         1891 |       1 |
+|   104852 | Q1983441    | tt0241763  | Newark Athlete                                                                |         1891 |       1 |
+|   355848 | Q17461157   | tt0241735  | Monkey and Another, Boxing                                                    |         1891 |       1 |
++----------+-------------+------------+-------------------------------------------------------------------------------+--------------+---------+
++----------+-------------+-------------------------------------------+--------------+--------------------------------+-----------+
+| ID_MOVIE | ID_WIKIDATA | TITLE                                     | RELEASE_YEAR | CURRENCIES                     | N_FINANCE |
++----------+-------------+-------------------------------------------+--------------+--------------------------------+-----------+
+|    26629 | Q3414948    | RTT                                       |         2009 | Q215627,RUB                    |         7 |
+|   180863 | Q23758755   | T2 Trainspotting                          |         2017 | Q1049963,Q199578,Q202036,Q4730 |         5 |
+|     8966 | Q160071     | Twilight                                  |         2008 | Q1049963,Q199578,Q202036,Q4730 |         4 |
+|    30421 | Q300356     | A Chinese Ghost Story                     |         1987 | GBP,Q202040,Q208526,Q31015     |         4 |
+|    50620 | Q60487      | The Twilight Saga: Breaking Dawn - Part 2 |         2012 | Q1049963,Q199578,Q202036,Q4730 |         4 |
+|   337674 | Q19544495   | Elle                                      |         2016 | Q215627                        |         4 |
+|    11646 | Q1077160    | Gallipoli                                 |         1981 | AUD                            |         3 |
+|    17921 | Q1757747    | Planet of the Vampires                    |         1965 | Q14083,Q189097,Q204992         |         3 |
+|    38919 | Q5291409    | Don's Party                               |         1976 | AUD                            |         3 |
+|    79785 | Q3127478    | Harlequin                                 |         1980 | AUD                            |         3 |
+|   301528 | Q18517638   | Toy Story 4                               |         2019 | AUD,CAD,GBP                    |         3 |
+|   643215 | Q48758615   | Asterix & Obelix: The Middle Kingdom      |         2023 | EUR                            |         3 |
+|   843843 | Q123407929  | Suddenly                                  |         2023 | EUR                            |         3 |
+|   960464 | Q117787387  | Big Kids                                  |         2023 | EUR                            |         3 |
+|   977553 | Q117482154  | The Channel                               |         2023 | EUR                            |         3 |
++----------+-------------+-------------------------------------------+--------------+--------------------------------+-----------+
++----------+-------------+------------------------------+--------------+-----------+------------+----------------+
+| ID_MOVIE | ID_WIKIDATA | TITLE                        | RELEASE_YEAR | BUDGET    | REVENUE    | BOX_OFFICE_USD |
++----------+-------------+------------------------------+--------------+-----------+------------+----------------+
+|   299534 | Q23781155   | Avengers: Endgame            |         2019 | 356000000 | 2938567784 |      896057355 |
+|    19995 | Q24871      | Avatar                       |         2009 | 237000000 | 2923706026 |      785221649 |
+|   969681 | Q113244935  | Spider-Man: Brand New Day    |         2026 | 225000000 | 2517281128 |      954994964 |
+|    76600 | Q3604746    | Avatar: The Way of Water     |         2022 | 460000000 | 2334484620 |      688459501 |
+|      597 | Q44578      | Titanic                      |         1997 | 200000000 | 2264162353 |      674354882 |
+|   140607 | Q6074       | Star Wars: The Force Awakens |         2015 | 245000000 | 2068223624 |      936662225 |
+|   299536 | Q23780914   | Avengers: Infinity War       |         2018 | 300000000 | 2052415039 |      678815482 |
+|   634649 | Q68934496   | Spider-Man: No Way Home      |         2021 | 200000000 | 1921426073 |      814866759 |
+|  1084242 | Q116764712  | Zootopia 2                   |         2025 | 150000000 | 1868208796 |      428130160 |
+|  1368337 | Q131547207  | The Odyssey                  |         2026 | 250000000 | 1794403000 |      588976965 |
+|  1022789 | Q113877606  | Inside Out 2                 |         2024 | 200000000 | 1698863816 |      652980194 |
+|   135397 | Q3512046    | Jurassic World               |         2015 | 150000000 | 1671537444 |      653406625 |
+|   420818 | Q27044293   | The Lion King                |         2019 | 260000000 | 1662020819 |      543638043 |
+|    24428 | Q182218     | The Avengers                 |         2012 | 220000000 | 1518815515 |      623357910 |
+|   168259 | Q14650496   | Furious 7                    |         2015 | 190000000 | 1515400000 |      353007020 |
+|   361743 | Q31202708   | Top Gun: Maverick            |         2022 | 170000000 | 1488732821 |      721996984 |
+|    83533 | Q29580929   | Avatar: Fire and Ash         |         2025 | 350000000 | 1485999890 |      404340010 |
+|   330457 | Q24733929   | Frozen II                    |         2019 | 150000000 | 1453683476 |      477373578 |
+|   346698 | Q55436290   | Barbie                       |         2023 | 145000000 | 1447138421 |      636238421 |
+|    99861 | Q14171368   | Avengers: Age of Ultron      |         2015 | 235000000 | 1405403694 |      459005868 |
++----------+-------------+------------------------------+--------------+-----------+------------+----------------+
++----------+-------------+------------------------------+--------------+-------+-------+-------+
+| ID_MOVIE | ID_WIKIDATA | TITLE                        | RELEASE_YEAR | N_DUR | N_DIR | N_CTY |
++----------+-------------+------------------------------+--------------+-------+-------+-------+
+|   299534 | Q23781155   | Avengers: Endgame            |         2019 |     1 |     2 |     1 |
+|    19995 | Q24871      | Avatar                       |         2009 |     1 |     1 |     1 |
+|   969681 | Q113244935  | Spider-Man: Brand New Day    |         2026 |     1 |     1 |     4 |
+|    76600 | Q3604746    | Avatar: The Way of Water     |         2022 |     3 |     1 |     1 |
+|   980477 | Q131937861  | Ne Zha 2                     |         2025 |     1 |     1 |     1 |
+|      597 | Q44578      | Titanic                      |         1997 |     1 |     1 |     1 |
+|   140607 | Q6074       | Star Wars: The Force Awakens |         2015 |     1 |     1 |     1 |
+|   299536 | Q23780914   | Avengers: Infinity War       |         2018 |     1 |     2 |     1 |
+|   634649 | Q68934496   | Spider-Man: No Way Home      |         2021 |     1 |     1 |     1 |
+|  1084242 | Q116764712  | Zootopia 2                   |         2025 |     1 |     2 |     1 |
+|  1368337 | Q131547207  | The Odyssey                  |         2026 |     1 |     1 |     2 |
+|  1022789 | Q113877606  | Inside Out 2                 |         2024 |     1 |     1 |     1 |
+|   135397 | Q3512046    | Jurassic World               |         2015 |     1 |     1 |     1 |
+|   420818 | Q27044293   | The Lion King                |         2019 |     1 |     1 |     1 |
+|    24428 | Q182218     | The Avengers                 |         2012 |     1 |     1 |     1 |
+|   168259 | Q14650496   | Furious 7                    |         2015 |     1 |     1 |     1 |
+|   361743 | Q31202708   | Top Gun: Maverick            |         2022 |     2 |     1 |     1 |
+|    83533 | Q29580929   | Avatar: Fire and Ash         |         2025 |     1 |     1 |     1 |
+|   330457 | Q24733929   | Frozen II                    |         2019 |     1 |     2 |     1 |
+|   346698 | Q55436290   | Barbie                       |         2023 |     1 |     1 |     2 |
++----------+-------------+------------------------------+--------------+-------+-------+-------+
++----------+-------------+------------+---------------------------------------+----------------+-----------+-------------------+
+| ID_SERIE | ID_WIKIDATA | ID_IMDB    | TITLE                                 | FIRST_AIR_YEAR | N_FINANCE | KINDS             |
++----------+-------------+------------+---------------------------------------+----------------+-----------+-------------------+
+|   277478 | Q19329909   | tt36829843 | Battalion                             |           2016 |         2 | box_office,budget |
+|   123591 | Q454398     | tt14670820 | The Smurfs                            |           2021 |         2 | box_office,budget |
+|    36003 | Q5000367    | tt0331805  | Visions                               |           1976 |         1 | budget            |
+|    48332 | Q504716     | tt0088916  | Christopher Columbus                  |           1985 |         1 | budget            |
+|   208100 | Q7659300    | tt0090532  | Sword of Honour                       |           1986 |         1 | budget            |
+|    63160 | Q132191902  | tt0187629  | CityExpress                           |           1999 |         1 | budget            |
+|     4890 | Q5437219    | tt0244357  | Pizza                                 |           2000 |         1 | box_office        |
+|   103311 | Q12037771   | tt0796575  | Tales from the Endless Roads          |           2001 |         1 | budget            |
+|    20260 | Q3146368    | tt0368542  | Shattered City: The Halifax Explosion |           2003 |         1 | budget            |
+|    82438 | Q4458493    | tt0384712  | Quiet Flows the Don                   |           2006 |         1 | budget            |
+|   294160 | Q1963505    | tt0110476  | Мастер и Маргарита                    |           2006 |         1 | budget            |
+|    43761 | Q18431378   | tt3545288  | Attack on Leningrad                   |           2007 |         1 | budget            |
+|    46080 | Q2667119    | tt1884856  | Masha and the Bear                    |           2009 |         1 | box_office        |
+|    46849 | Q7903650    | tt1883092  | Generation War                        |           2013 |         1 | budget            |
+|    66606 | Q22905755   | tt3315386  | Roots                                 |           2016 |         1 | budget            |
++----------+-------------+------------+---------------------------------------+----------------+-----------+-------------------+
