@@ -37,7 +37,9 @@ WHERE  se.ID_WIKIDATA IN (
 );
 
 -- Petit vocabulaire controle Q -> ISO2 pour les pays du panel (le reste reste en Q).
-CREATE TEMPORARY TABLE tmp_country_iso (ID_WIKIDATA VARCHAR(20) PRIMARY KEY, ISO2 CHAR(2));
+CREATE TEMPORARY TABLE tmp_country_iso (
+  ID_WIKIDATA VARCHAR(20) COLLATE utf8mb4_unicode_ci PRIMARY KEY,
+  ISO2 VARCHAR(2) COLLATE utf8mb4_unicode_ci);
 INSERT INTO tmp_country_iso VALUES
  ('Q30','US'),('Q145','GB'),('Q142','FR'),('Q183','DE'),('Q38','IT'),
  ('Q29','ES'),('Q408','AU'),('Q159','RU'),('Q148','CN'),('Q8646','HK'),
