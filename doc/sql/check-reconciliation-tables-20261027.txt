@@ -1,0 +1,31 @@
+-- check-reconciliation-tables.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-27 19:46:16 +0100
+--
++--------------------------+------------+--------+--------------------+--------+
+| TABLE_NAME               | TABLE_ROWS | ENGINE | TABLE_COLLATION    | N_COLS |
++--------------------------+------------+--------+--------------------+--------+
+| T_WC_T2S_CLAIM_ATTRIBUTE |          5 | InnoDB | utf8mb4_unicode_ci |     11 |
+| T_WC_T2S_SOURCE_CLAIM    |          0 | InnoDB | utf8mb4_unicode_ci |     19 |
+| T_WC_T2S_VOCAB_MAP       |          3 | InnoDB | utf8mb4_unicode_ci |      8 |
++--------------------------+------------+--------+--------------------+--------+
++------------+------------+--------------+--------------+---------------+-----------------+----------------+
+| ATTRIBUTE  | VALUE_KIND | COMPARE_MODE | DEFAULT_UNIT | TOLERANCE_PCT | IS_SCOPED_PLACE | IS_SCOPED_TIME |
++------------+------------+--------------+--------------+---------------+-----------------+----------------+
+| box_office | numeric    | tolerance    | USD          |         5.000 |               1 |              1 |
+| budget     | numeric    | tolerance    | USD          |         5.000 |               0 |              0 |
+| country    | entity     | set          | NULL         |          NULL |               0 |              0 |
+| director   | entity     | set          | NULL         |          NULL |               0 |              0 |
+| runtime    | numeric    | interval     | min          |          NULL |               0 |              0 |
++------------+------------+--------------+--------------+---------------+-----------------+----------------+
++---------------+-------------+----------------+---------------------+---------+
+| DIMENSION     | ID_WIKIDATA | CANONICAL_CODE | FACTOR_TO_CANONICAL | LABEL   |
++---------------+-------------+----------------+---------------------+---------+
+| duration_unit | Q11574      | min            |          0.01666667 | seconde |
+| duration_unit | Q25235      | min            |         60.00000000 | heure   |
+| duration_unit | Q7727       | min            |          1.00000000 | minute  |
++---------------+-------------+----------------+---------------------+---------+
++----------+
+| N_CLAIMS |
++----------+
+|        0 |
++----------+
