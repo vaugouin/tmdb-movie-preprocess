@@ -1,0 +1,117 @@
+-- probe-reconciliation-vocab.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-29 22:48:00 +0100
+--
++------------------+-------------------+-------------------+----------------+-----------------------+
+| N_PAYS_DISTINCTS | N_AVEC_ISO2_LOCAL | N_SANS_ISO2_LOCAL | N_USAGES_TOTAL | N_USAGES_NON_COUVERTS |
++------------------+-------------------+-------------------+----------------+-----------------------+
+|              498 |                 0 |               498 |         638955 |                638955 |
++------------------+-------------------+-------------------+----------------+-----------------------+
++-----------+------------------------------------------+--------+
+| COUNTRY_Q | LABEL_EN                                 | N_USES |
++-----------+------------------------------------------+--------+
+| Q30       | United States                            | 156320 |
+| Q17       | Japan                                    |  49326 |
+| Q183      | Germany                                  |  37007 |
+| Q668      | India                                    |  36099 |
+| Q145      | United Kingdom                           |  33294 |
+| Q142      | France                                   |  32117 |
+| Q38       | Italy                                    |  20591 |
+| Q884      | South Korea                              |  19769 |
+| Q16       | Canada                                   |  19001 |
+| Q35       | Denmark                                  |  14873 |
+| Q408      | Australia                                |  11887 |
+| Q29       | Spain                                    |  11550 |
+| Q801      | Israel                                   |  10480 |
+| Q15180    | Soviet Union                             |  10256 |
+| Q213      | Czech Republic                           |   9529 |
+| Q34       | Sweden                                   |   9169 |
+| Q55       | Netherlands                              |   8244 |
+| Q148      | People's Republic of China               |   7138 |
+| Q252      | Indonesia                                |   5973 |
+| Q414      | Argentina                                |   5846 |
+| Q155      | Brazil                                   |   5527 |
+| Q159      | Russia                                   |   5451 |
+| Q96       | Mexico                                   |   5304 |
+| Q43       | Turkey                                   |   5141 |
+| Q794      | Iran                                     |   5002 |
+| Q31       | Belgium                                  |   4852 |
+| Q36       | Poland                                   |   4722 |
+| Q33       | Finland                                  |   4715 |
+| Q8646     | Hong Kong                                |   4373 |
+| Q928      | Philippines                              |   4211 |
+| Q20       | Norway                                   |   3990 |
+| Q79       | Egypt                                    |   3933 |
+| Q40       | Austria                                  |   3482 |
+| Q865      | Taiwan                                   |   2919 |
+| Q33946    | Czechoslovakia                           |   2797 |
+| Q39       | Switzerland                              |   2427 |
+| Q28       | Hungary                                  |   2387 |
+| Q36704    | Yugoslavia                               |   2386 |
+| Q16957    | East Germany                             |   2183 |
+| Q212      | Ukraine                                  |   2096 |
+| Q218      | Romania                                  |   2072 |
+| Q869      | Thailand                                 |   1973 |
+| Q41       | Greece                                   |   1940 |
+| Q419      | Peru                                     |   1934 |
+| Q1033     | Nigeria                                  |   1888 |
+| Q298      | Chile                                    |   1791 |
+| Q843      | Pakistan                                 |   1733 |
+| Q833      | Malaysia                                 |   1674 |
+| Q129286   | British Raj                              |   1600 |
+| Q45       | Portugal                                 |   1457 |
+| Q739      | Colombia                                 |   1412 |
+| Q27       | Ireland                                  |   1302 |
+| Q258      | South Africa                             |   1068 |
+| Q902      | Bangladesh                               |   1065 |
+| Q664      | New Zealand                              |    977 |
+| Q191      | Estonia                                  |    905 |
+| Q219      | Bulgaria                                 |    882 |
+| Q1206012  | German Reich                             |    864 |
+| Q214      | Slovakia                                 |    829 |
+| Q334      | Singapore                                |    827 |
+| Q121932   | People's Republic of Bulgaria            |    740 |
+| Q717      | Venezuela                                |    736 |
+| Q211      | Latvia                                   |    727 |
+| Q222      | Albania                                  |    721 |
+| Q1028     | Morocco                                  |    704 |
+| Q403      | Serbia                                   |    702 |
+| Q881      | Vietnam                                  |    666 |
+| Q854      | Sri Lanka                                |    642 |
+| Q224      | Croatia                                  |    641 |
+| Q858      | Syria                                    |    556 |
+| Q32       | Luxembourg                               |    511 |
+| Q43287    | German Empire                            |    502 |
+| Q227      | Azerbaijan                               |    501 |
+| Q837      | Nepal                                    |    479 |
+| Q189      | Iceland                                  |    460 |
+| Q713750   | West Germany                             |    457 |
+| Q215      | Slovenia                                 |    412 |
+| Q817      | Kuwait                                   |    393 |
+| Q836      | Myanmar                                  |    392 |
+| Q37       | Lithuania                                |    380 |
+| Q184      | Belarus                                  |    354 |
+| Q77       | Uruguay                                  |    351 |
+| Q1054923  | British Hong Kong                        |    324 |
+| Q822      | Lebanon                                  |    319 |
+| Q711      | Mongolia                                 |    312 |
+| Q34266    | Russian Empire                           |    304 |
+| Q399      | Armenia                                  |    300 |
+| Q262      | Algeria                                  |    294 |
+| Q948      | Tunisia                                  |    293 |
+| Q241      | Cuba                                     |    278 |
+| Q826      | Maldives                                 |    276 |
+| Q7318     | Nazi Germany                             |    259 |
+| Q851      | Saudi Arabia                             |    253 |
+| Q41304    | Weimar Republic                          |    243 |
+| Q130229   | Georgian SSR                             |    231 |
+| Q83286    | Socialist Federal Republic of Yugoslavia |    229 |
+| Q232      | Kazakhstan                               |    214 |
+| Q124943   | Kingdom of Egypt                         |    203 |
+| Q230      | Georgia                                  |    195 |
+| Q29999    | Kingdom of the Netherlands               |    189 |
++-----------+------------------------------------------+--------+
++------------------------------+
+| N_DEVISES_AVEC_ISO4217_LOCAL |
++------------------------------+
+|                            0 |
++------------------------------+
