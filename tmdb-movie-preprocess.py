@@ -35,6 +35,7 @@ from tmdb_preprocess_helpers import (
     f_buildlocationclasstable,
     f_buildlocationtables,
     f_wikidataloadbusy,
+    f_readwithoutlocking,
     f_buildsourceworkclasstable,
     f_buildsourceworktables,
     f_buildgroupworktables,
@@ -2759,9 +2760,24 @@ SET
                         # used to handle before the driving query was pre-filtered. Mirrors the
                         # pre-filter joins so iteration and cleanup stay consistent. Runs over the small
                         # T_WC_T2S_GROUP table, so the correlated subquery executes only a few thousand times.
-                        strsqldelete = f_persongrouppurgesql("T_WC_T2S_GROUP", "GROUP_SOURCE")
-                        print(strsqldelete)
-                        cursor2.execute(strsqldelete)
+                        #
+                        # ⚠ 2026-10-31: this DELETE died on 1205 (lock wait timeout). Under REPEATABLE
+                        # READ its subquery takes shared locks on T_WC_WIKIDATA_STATEMENT and
+                        # ITEM_VALUE and waits on a wikidata-crawler load, as process 72 did on
+                        # 2026-09-12; the connection is not in autocommit, so the whole process 43
+                        # was rolled back. Commit the per-group work first (the new isolation level
+                        # only applies to the next transaction), read without locking, and skip the
+                        # purge while the crawler loads: a partial snapshot would drop live groups
+                        # for a day. The next night purges what was skipped.
+                        cp.connectioncp.commit()
+                        f_readwithoutlocking(cursor2, "43")
+                        strwikidataloadbusy = f_wikidataloadbusy("43")
+                        if strwikidataloadbusy:
+                            print(f"43: stale-group purge SKIPPED, {strwikidataloadbusy}.")
+                        else:
+                            strsqldelete = f_persongrouppurgesql("T_WC_T2S_GROUP", "GROUP_SOURCE")
+                            print(strsqldelete)
+                            cursor2.execute(strsqldelete)
 
                         strsqldelete = ""
                         strsqldelete += "DELETE FROM T_WC_T2S_GROUP "
@@ -3795,14 +3811,21 @@ SET
                         # >=2 to <2 persons" case that the per-item singleton delete used to handle before
                         # the driving query was pre-filtered. Mirrors the pre-filter joins so iteration
                         # and cleanup stay consistent.
-                        strsqldelete = f_persongrouppurgesql(
-                            "T_WC_T2S_DEATH", "DEATH_SOURCE", False,
-                            "      AND NOT (\n"
-                            "          w.ID_PROPERTY = 'P1196'\n"
-                            "          AND wv.ID_ITEM IN (" + strp1196excludeditems + ")\n"
-                            "      )\n")
-                        print(strsqldelete)
-                        cursor2.execute(strsqldelete)
+                        # ⚠ Same lock risk as the process 43 purge (1205 on 2026-10-31), same guard.
+                        cp.connectioncp.commit()
+                        f_readwithoutlocking(cursor2, "46")
+                        strwikidataloadbusy = f_wikidataloadbusy("46")
+                        if strwikidataloadbusy:
+                            print(f"46: stale-death purge SKIPPED, {strwikidataloadbusy}.")
+                        else:
+                            strsqldelete = f_persongrouppurgesql(
+                                "T_WC_T2S_DEATH", "DEATH_SOURCE", False,
+                                "      AND NOT (\n"
+                                "          w.ID_PROPERTY = 'P1196'\n"
+                                "          AND wv.ID_ITEM IN (" + strp1196excludeditems + ")\n"
+                                "      )\n")
+                            print(strsqldelete)
+                            cursor2.execute(strsqldelete)
 
                         strsql = """UPDATE T_WC_T2S_DEATH t
 JOIN (

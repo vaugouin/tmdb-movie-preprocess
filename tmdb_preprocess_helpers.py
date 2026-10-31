@@ -3090,7 +3090,7 @@ def f_sourceworkassociationsql(strmajor):
     )
 
 
-def _f_readwithoutlocking(cursor, strtag):
+def f_readwithoutlocking(cursor, strtag):
     """READ COMMITTED for this session when no binary log needs the source rows locked.
 
     Same reasoning as process 72 (2026-09-12): an INSERT ... SELECT on
@@ -3137,7 +3137,7 @@ def f_buildsourceworktables():
     arrresult = {}
     try:
         cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
-        _f_readwithoutlocking(cursor, "73")
+        f_readwithoutlocking(cursor, "73")
 
         # --- 0. The perimeter, and everything known about each source ---------
         # Materialised once in a temporary table, the driving query being the costly
@@ -3536,7 +3536,7 @@ def f_buildgroupworktables():
         cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
         # The group-credit step reads T_WC_WIKIDATA_STATEMENT in an INSERT ... SELECT:
         # same reasoning as processes 72 and 73.
-        _f_readwithoutlocking(cursor, "74")
+        f_readwithoutlocking(cursor, "74")
 
         # --- 0. The groups in scope ------------------------------------------------
         cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_group_work_scope")
@@ -3923,7 +3923,7 @@ def f_buildworkfinancetable():
     strplace = "COALESCE(" + ", ".join(_f_workfinancequalifier(p, "item") for p in ARR_WORK_FINANCE_PLACE_PROPERTIES) + ")"
     try:
         cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
-        _f_readwithoutlocking(cursor, "75")
+        f_readwithoutlocking(cursor, "75")
         # A table created by 1.1.22 or 1.1.23 (key on ID_STATEMENT alone, no precision or
         # count columns) is dropped and recreated: it is fully recomputed below and nothing
         # points to its rows.
