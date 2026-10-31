@@ -20,19 +20,24 @@ for intindex, strdesc in arrprocessscope.items():
 - `wikidata-companies` — **only** Process 63 (link companies to Wikidata) — **pilot**.
 - `wikidata-all` (alias `wikidata`) — **all** Wikidata linkers run **sequentially in one container** (Process 60 → 63 → future network/genre/character). This is the scope to **schedule**: one process means one Wikimedia request stream, so the linkers never contend for the rate limit. The `wikidata-topics` / `wikidata-companies` scopes remain for targeted single-linker / debug runs.
 - `locations` (alias `location`) — **only** Process 72 (rebuild `T_WC_T2S_LOCATION` and its association tables `T_WC_T2S_MOVIE_LOCATION`, `T_WC_T2S_SERIE_LOCATION` and, once `doc/sql/migration-062-episode-location.sql` is applied, `T_WC_T2S_EPISODE_LOCATION` with `EPISODE_COUNT` (TMDB-MOVIE-PREPROCESS-062, 1.1.8; without the migration the pass skips episodes and says so), from the Wikidata V2 statements `P840` / `P915`, plus the `T_WC_T2S_LOCATION_CLASS` cone table that `LOCATION_TYPE` is derived from). Wrapper: `tmdb-movie-preprocess-locations.sh`. **`ID_LOCATION` is stable across rebuilds** (fixed 2026-09-13): a known place keeps its id and `DAT_CREAT`, a place that left the perimeter stays as a `DELETED = 1` row so its id is never reused, a new place gets an id above `MAX(ID_LOCATION)` of the served table; consumers must filter `DELETED = 0`. Recette: `doc/sql/test-014-location-id-stability.sql`, run before and after a pass. **Does not fill the image columns** — those belong to Process 71, so chain `wikipedia-main-image` after the first pass or `WIKIPEDIA_MAIN_IMAGE_URL` stays NULL, which reads as "no image" when it is in fact "no pass".
-- `source-works` (aliases `source-work`, `based-on`) — **only** Process 73 (TMDB-MOVIE-PREPROCESS-055): rebuild `T_WC_T2S_SOURCE_WORK` and its two link tables `T_WC_T2S_MOVIE_SOURCE_WORK` / `T_WC_T2S_SERIE_SOURCE_WORK` from the Wikidata V2 statements `P144` (based on), plus the `T_WC_T2S_SOURCE_WORK_CLASS` cone table that `SOURCE_WORK_TYPE` / `SOURCE_WORK_FORM` are derived from. Wrapper: `tmdb-movie-preprocess-source-works.sh`. Prerequisite once: `doc/sql/migration-t2s-source-work.sql`. **The shape (method A, 2026-10-09)**: the work studied is carried by the link table (movie or series), the source is always a `SOURCE_WORK` row, whatever its kind, and points to its T2S sheet by `ID_MOVIE` / `ID_SERIE` when it is itself a T2S work. `SOURCE_WORK_TYPE` is one of `literary`, `comic`, `stage`, `game`, `screen`, `folklore`, `other`; `SOURCE_WORK_FORM` is NULL or `manga`, `light_novel`, `play`, `musical` (`novel` / `short_story` once wikidata-crawler caches P7937). `SOURCE_WORK_NAME_FR` falls back to the English name. `ID_SOURCE_WORK` is stable across rebuilds, with the same three-insert rule as `ID_LOCATION`; consumers filter `DELETED = 0`. Acceptance: `doc/sql/test-055-post-run.sql`. Like `locations`, it does not fill the image columns (Process 71 does).- `wikidata-colour` (alias `wikidata-color`), **only** Process 64 (colour flags from Wikidata `P462` for films without a French Format line, TMDB-MOVIE-PREPROCESS-049). For the first backfill and reruns on demand; in `main` it runs between 1 and 2.
+- `source-works` (aliases `source-work`, `based-on`) — **only** Process 73 (TMDB-MOVIE-PREPROCESS-055): rebuild `T_WC_T2S_SOURCE_WORK` and its two link tables `T_WC_T2S_MOVIE_SOURCE_WORK` / `T_WC_T2S_SERIE_SOURCE_WORK` from the Wikidata V2 statements `P144` (based on), plus the `T_WC_T2S_SOURCE_WORK_CLASS` cone table that `SOURCE_WORK_TYPE` / `SOURCE_WORK_FORM` are derived from. Wrapper: `tmdb-movie-preprocess-source-works.sh`. Prerequisite once: `doc/sql/migration-t2s-source-work.sql`. **The shape (method A, 2026-10-09)**: the work studied is carried by the link table (movie or series), the source is always a `SOURCE_WORK` row, whatever its kind, and points to its T2S sheet by `ID_MOVIE` / `ID_SERIE` when it is itself a T2S work. `SOURCE_WORK_TYPE` is one of `literary`, `comic`, `stage`, `game`, `screen`, `folklore`, `other`; `SOURCE_WORK_FORM` is NULL or `manga`, `light_novel`, `play`, `musical` (`novel` / `short_story` once wikidata-crawler caches P7937). `SOURCE_WORK_NAME_FR` falls back to the English name. `ID_SOURCE_WORK` is stable across rebuilds, with the same three-insert rule as `ID_LOCATION`; consumers filter `DELETED = 0`. Acceptance: `doc/sql/test-055-post-run.sql`. Like `locations`, it does not fill the image columns (Process 71 does).
+- `wikidata-colour` (alias `wikidata-color`), **only** Process 64 (colour flags from Wikidata `P462` for films without a French Format line, TMDB-MOVIE-PREPROCESS-049). For the first backfill and reruns on demand; in `main` it runs between 1 and 2.
 - `group-works` (alias `group-work`), **only** Process 74 (TMDB-MOVIE-PREPROCESS-059): rebuild `T_WC_T2S_GROUP_MOVIE` and `T_WC_T2S_GROUP_SERIE`, a group's works. Wrapper: `tmdb-movie-preprocess-group-works.sh`. Prerequisite once: `doc/sql/migration-t2s-group-work.sql`. Acceptance: `doc/sql/test-059-group-work.sql`. In `main` it runs after 73, hence after 43 and 9, 10, 29, 31 whose outputs it reads.
 - `finance` (aliases `work-finance`, `box-office`), **only** Process 75 (TMDB-MOVIE-PREPROCESS-066): rebuild `T_WC_T2S_WORK_FINANCE`, the budgets and box office of the movies and series from Wikidata, by place and date. Wrapper: `tmdb-movie-preprocess-finance.sh`. The table is created by the process. Acceptance: `doc/sql/test-066-work-finance.sql`. In `main` it runs after 74, hence after 72 whose locations it links.
 - `genre-alias` (alias `genres-aliases`), **only** Processes 51 and 50 (`T_WC_T2S_PERSON_ALSO_KNOWN_AS`, then `T_WC_T2S_GENRE` and `T_WC_T2S_GENRE_LANG`). For the first build of the three tables and reruns on demand; in `main`, 51 runs right after 6 and 50 right before 11. Wrapper: `tmdb-movie-preprocess-genre-alias.sh`.
 - `neighbours` (aliases `neighbors`, `similar-recommendations`) — **only** Processes 36-39 (rebuild the T2S `similar` / `recommendation` neighbour tables from the raw `T_WC_TMDB_*` twins). Handy as a **unit test** right after creating the four T2S tables, without the whole pipeline. Wrapper: `tmdb-movie-preprocess-neighbours.sh`.
+- `assertion-refresh` (alias `assertions`), **only** Process 70 (rebuild `ASSERTIONS_QUERY_RESULT` of the living evaluations, e.g. right after seeding new showcase samples). Wrapper: `tmdb-movie-preprocess-assertion-refresh.sh`.
+- `wikipedia-main-image` (alias `wikipedia-image`), **only** Process 71 (re-copy the Wikipedia lead image from `T_WC_WIKIPEDIA_PAGE_LANG` into the T2S serving columns, e.g. right after a wikipedia-crawler pass or a first `locations` / `source-works` pass). Wrapper: `tmdb-movie-preprocess-wikipedia-main-image.sh`.
 
-The `main` scope runs processes: **1, 64, 2, 62, 3, 41, 42, 43, 44, 47, 45, 46, 4, 5, 6, 51, 7, 8, 9, 10, 50, 11, 12, 36, 37, 38, 39, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40, 72, 73, 74, 70, 71**. Process 74 (a group's works) runs after 43 and after the person credits 9, 10, 29, 31, which it reads. Processes 72 (locations) and 73 (source works) sit **before** 71: the image copier fills every T2S entity table and must therefore find the locations already built. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
+The `main` scope runs processes: **0, 1, 64, 2, 62, 3, 41, 61, 42, 43, 44, 47, 45, 46, 4, 5, 6, 51, 7, 8, 9, 10, 50, 11, 12, 36, 37, 38, 39, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 40, 72, 73, 74, 75, 70, 71** (source of truth: `arrprocessscopemain` in `tmdb-movie-preprocess.py`; execution follows dict insertion order, not numeric order). Process 74 (a group's works) runs after 43 and after the person credits 9, 10, 29, 31, which it reads. Processes 72 (locations) and 73 (source works) sit **before** 71: the image copier fills every T2S entity table and must therefore find the locations already built. Process 3 (T2S_TOPIC) only reads the `ID_WIKIDATA` that Process 60 stamps on `T_WC_TMDB_KEYWORD` and is itself a rolling idempotent batch, so the two need not run in the same invocation.
+
+Three `main` processes have no section in the Process Reference below: Process 0 (`T_WC_CUSTOM_LIST_UNESCAPE`) decodes HTML-escaped characters (`&#039;`, `&amp;`, ...) in the text columns of `T_WC_CUSTOM_LIST` before the custom collections, lists and groups copy them; Process 61 (Link Wikidata items to collections), right after 41, fills a missing `ID_WIKIDATA` on `T_WC_T2S_COLLECTION` with the Wikidata item that is the `P179` (part of the series) of exactly the collection's movies, read from the V2 statements; Process 71 (`T2S_WIKIPEDIA_MAIN_IMAGE`), last, copies the Wikipedia lead image into the T2S serving columns.
 
 Progress is tracked server-side via `cp.f_setservervariable()`. Multiple cursor objects (`cursor`, `cursor2` … `cursor5`) allow parallel DB operations within a single process.
 
 Recent performance-sensitive T2S rebuilds now use a **staging-table rebuild + atomic rename swap** pattern instead of chunked upsert/delete synchronization. In those branches, the script builds a full `*_BUILD` table, validates it where needed, atomically swaps it into place with `RENAME TABLE`, and then drops the previous `*_OLD` table automatically after a successful swap.
 
-Wikimedia API calls used by process `60` support the following environment variables: `WIKIMEDIA_USER_AGENT`, `WIKIMEDIA_REQUEST_DELAY_SECONDS`, `WIKIMEDIA_BACKOFF_SECONDS`, `WIKIMEDIA_MAX_RETRIES`, and `WIKIMEDIA_TIMEOUT_SECONDS`.
+Wikimedia API calls used by processes `60`, `62` and `63` support the following environment variables: `WIKIMEDIA_USER_AGENT`, `WIKIMEDIA_REQUEST_DELAY_SECONDS`, `WIKIMEDIA_BACKOFF_SECONDS`, `WIKIMEDIA_MAX_RETRIES`, and `WIKIMEDIA_TIMEOUT_SECONDS`.
 
 ---
 
@@ -46,7 +51,7 @@ Secrets (DB credentials, user agents, etc.) are **never baked into the image**. 
 
 - `.env` is listed in `.dockerignore` so it is excluded from the build context and cannot end up in image layers, build cache, or registries.
 - The `Dockerfile` does **not** `COPY .env` and does **not** declare secrets in `ENV` lines. Only non-sensitive defaults belong in the image.
-- The runtime env file is expected to live **outside the application source tree**, e.g. `/home/debian/docker/tmdb-movie-preprocess/.env`, owned and permissioned by the host operator.
+- The runtime env file is host-managed, e.g. `/home/debian/docker/tmdb-movie-preprocess/.env` at the root of the VPS clone (git-ignored, and kept out of the build context by `.dockerignore`), owned and permissioned by the host operator.
 
 ### Build
 
@@ -349,6 +354,8 @@ Computes movie/serie counts per production company and copies qualifying compani
 ---
 
 ### Process 48 — T2S_CHARACTER
+
+Not in any scope: its entry is commented out in `tmdb-movie-preprocess.py`, so it runs only when wired in by hand.
 
 Builds the character dimension from acting credits in `T_WC_T2S_PERSON_MOVIE` and `T_WC_T2S_PERSON_SERIE`.
 
@@ -878,10 +885,12 @@ Populates `T_WC_T2S_COLLECTION` from TMDb lists and collections, with linked mov
 - For each list/collection record, queries associated movies and series filtered by `ADULT = 0` and `ID_WIKIDATA IS NOT NULL`.
 - **en-list / fr-list:** Movie links in `T_WC_T2S_MOVIE_COLLECTION` are written in `DAT_RELEASE ASC` order; series links in `T_WC_T2S_SERIE_COLLECTION` are written in `DAT_FIRST_AIR DESC` order.
 - **en-collection / fr-collection:** Movie links in `T_WC_T2S_MOVIE_COLLECTION` are written in `DAT_RELEASE ASC` order.
-- **custom-collection:** Processes records from `T_WC_CUSTOM_LIST` where `TARGET_TABLE = 2`. Elements are resolved using up to three cumulative mechanisms:
+- **custom-collection:** Processes records from `T_WC_CUSTOM_LIST` where `TARGET_TABLE = 2`. Elements are resolved using up to four cumulative mechanisms:
   - **Mechanism 1 (IMDb list):** Parses `tt\d+` IDs from the `ID_IMDB_LIST` field; preserves input order via SQL `FIELD()`.
-  - **Mechanism 2 (Wikidata):** Extracts a `P\d+` property and `Q\d+` item from `WIKIDATA_PROPERTIES`; joins against `T_WC_WIKIDATA_ITEM_PROPERTY`.
+  - **Mechanism 2 (Wikidata):** Extracts a `P\d+` property and `Q\d+` item from `WIKIDATA_PROPERTIES`; joins against the V2 statements (`T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE`, deprecated rank excluded).
   - **Mechanism 3 (TMDb keyword):** Parses `T_WC_TMDB_KEYWORD.NAME = '...'` from `TMDB_ELEMENTS`; joins against `T_WC_TMDB_MOVIE_KEYWORD` / `T_WC_TMDB_SERIE_KEYWORD`.
+  - **Mechanism 4 (external-id property, TMDB-MOVIE-PREPROCESS-044):** `WIKIDATA_PROPERTIES` markers `ID:P…` / `ORDER:P…`: membership by the presence of that external-id property, read in the **V2** statements; `ORDER:P…` pours a numeric property into `ORIGINAL_ORDER`. The markers are read and **removed** before the mechanism-2 parse, so a lone `Q…` left beside them keeps an illustrative role (`ID_WIKIDATA`, Wikipedia image) without waking mechanism 2. Wired into Process 41 only for now; `f_customexternalidsourcesql` is entity-agnostic (`movie` / `serie`), so 42 and 45 take two lines each when needed.
+- **custom-collection configuration notes:** only rows with `DELETED = 0` are read (`TARGET_TABLE` routes them: `1` list → 42, `2` collection → 41, `3` group → 43, `4` movement → 45). `DISPLAY_ORDER` in `T_WC_T2S_MOVIE_COLLECTION` / `_SERIE_COLLECTION` is just a 1..N counter following `SORT_BY` (default `4`; `1`/`2` put NULL `ORIGINAL_ORDER` last). A catalogue numbered by its publisher therefore needs no new sort code: `ORDER:P…` plus `SORT_BY = 1`. Worked example, the Criterion Collection: `WIKIDATA_PROPERTIES = 'ID:P9584 ORDER:P12279 Q1204187'`, `SORT_BY = 1`, `TARGET_TABLE = 2` (`P9584` the criterion.com film id for membership, `P12279` the spine number for order, `Q1204187` the company item for `ID_WIKIDATA` and the image). Reconciliation is built in: titles that stopped matching are deleted, a collection falling to one element or none is dropped, and rows whose custom list vanished are purged. `TMDB_TARGET_RECORD` (`ID_COLLECTION = n` / `ID_LIST = n`) pushes the members into an existing TMDb collection instead of creating one, additively and without deletion.
 - **custom-collection ordering:** `SORT_BY` controls display order for both movies and series:
   - `1` = original IMDb list order ascending
   - `2` = original IMDb list order descending
@@ -911,7 +920,7 @@ Populates `T_WC_T2S_LIST` from TMDb lists and custom lists, with linked movies a
 - **en-list / fr-list:** Copies TMDb lists (English and French) with their linked movies and series.
 - **custom-list:** Processes records from `T_WC_CUSTOM_LIST` where `TARGET_TABLE = 1`. Elements are resolved using up to three cumulative mechanisms:
   - **Mechanism 1 (IMDb list):** Parses `tt\d+` IDs from the `ID_IMDB_LIST` field; preserves input order via SQL `FIELD()`.
-  - **Mechanism 2 (Wikidata):** Extracts a `P\d+` property and `Q\d+` item from `WIKIDATA_PROPERTIES`; joins against `T_WC_WIKIDATA_ITEM_PROPERTY`.
+  - **Mechanism 2 (Wikidata):** Extracts a `P\d+` property and `Q\d+` item from `WIKIDATA_PROPERTIES`; joins against the V2 statements (`T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE`, deprecated rank excluded).
   - **Mechanism 3 (TMDb keyword):** Parses `T_WC_TMDB_KEYWORD.NAME = '...'` from `TMDB_ELEMENTS`; joins against `T_WC_TMDB_MOVIE_KEYWORD` / `T_WC_TMDB_SERIE_KEYWORD`.
 - **custom-list ordering:** `SORT_BY` controls display order for both movies and series:
   - `1` = original IMDb list order ascending
@@ -933,29 +942,31 @@ Populates `T_WC_T2S_LIST` from TMDb lists and custom lists, with linked movies a
 
 Builds person groups from Wikidata membership, employment, and sports-team relationships, and from custom group definitions.
 
-**Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3), `T_WC_TMDB_PERSON`, `T_WC_T2S_PERSON`
+**Reads:** `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE` (V2), `T_WC_WIKIDATA_PERSON`, `T_WC_WIKIDATA_ITEM` / `T_WC_WIKIDATA_ITEM_V1` (labels), `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3), `T_WC_TMDB_PERSON`, `T_WC_T2S_PERSON`
 **Writes:** `T_WC_T2S_GROUP`, `T_WC_T2S_PERSON_GROUP`
 
 **Subprocesses / Wikidata properties:**
 - `en-group` → P463 (member of)
 - `en-employer` → P108 (employer)
-- `en-sports-team` → P54 (member of sports team)
+- `sport-team` → P54 (member of sports team)
 - `custom-group` → `T_WC_CUSTOM_LIST` (TARGET_TABLE = 3)
 
-**Selection strategy (pre-filter).** The Wikidata sub-processes (`en-group`/P463, `en-employer`/P108, `en-sports-team`/P54) do **not** iterate every distinct item value of the property. `T_WC_WIKIDATA_ITEM_PROPERTY` holds ~11M rows and P463 ("member of") alone resolves to hundreds of thousands of distinct items, the overwhelming majority of which link to 0 or 1 tracked TMDb person and would only be deleted as singletons. The driving query therefore pre-filters to **items that resolve to ≥ 2 linked TMDb persons**, mirroring the per-item person join (`T_WC_TMDB_PERSON ⋈ T_WC_WIKIDATA_PERSON_V1 ⋈ T_WC_WIKIDATA_ITEM_PROPERTY`) and the group-creation gate:
+**Selection strategy (pre-filter).** The Wikidata sub-processes (`en-group`/P463, `en-employer`/P108, `sport-team`/P54) do **not** iterate every distinct item value of the property. P463 ("member of") alone resolves to hundreds of thousands of distinct items, the overwhelming majority of which link to 0 or 1 tracked TMDb person and would only be deleted as singletons. The driving query therefore pre-filters to **items that resolve to ≥ 2 linked TMDb persons**, mirroring the per-item person join (`T_WC_TMDB_PERSON ⋈ T_WC_WIKIDATA_PERSON ⋈ T_WC_WIKIDATA_STATEMENT ⋈ T_WC_WIKIDATA_ITEM_VALUE`) and the group-creation gate (`f_persondrivingsql()` in `tmdb_preprocess_helpers.py`):
 
 ```sql
-SELECT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM
-FROM T_WC_WIKIDATA_ITEM_PROPERTY
-INNER JOIN T_WC_TMDB_PERSON      ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA
-INNER JOIN T_WC_WIKIDATA_PERSON_V1 ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON_V1.ID_WIKIDATA
-WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = '<P463|P108|P54>'
-GROUP BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM
+SELECT pv.ID_ITEM
+FROM T_WC_WIKIDATA_STATEMENT sp
+JOIN T_WC_WIKIDATA_ITEM_VALUE pv ON pv.ID_STATEMENT = sp.ID_STATEMENT
+INNER JOIN T_WC_TMDB_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = sp.ID_WIKIDATA
+INNER JOIN T_WC_WIKIDATA_PERSON ON T_WC_TMDB_PERSON.ID_WIKIDATA = T_WC_WIKIDATA_PERSON.ID_WIKIDATA
+WHERE sp.ID_PROPERTY = '<P463|P108|P54>'
+AND (sp.`RANK` IS NULL OR sp.`RANK` <> 'deprecated')
+GROUP BY pv.ID_ITEM
 HAVING COUNT(DISTINCT T_WC_TMDB_PERSON.ID_PERSON) >= 2
-ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC
+ORDER BY pv.ID_ITEM ASC
 ```
 
-This is a pure performance change — the output set is unchanged because the previous per-item code already deleted any group resolving to < 2 persons. The pre-filter is fastest with a composite index on `T_WC_WIKIDATA_ITEM_PROPERTY (ID_PROPERTY, ID_WIKIDATA)`.
+This is a pure performance change — the output set is unchanged because the previous per-item code already deleted any group resolving to < 2 persons.
 
 **Operations:**
 - For each Wikidata property/item pair, retrieves the item's English and French labels and description; `WIKIPEDIA_IMAGE_PATH` is resolved through the shared helper lookup.
@@ -1015,20 +1026,25 @@ A group's works (TMDB-MOVIE-PREPROCESS-059): the films and series a group made, 
 
 Builds award records from the Wikidata "award received" property (P166).
 
-**Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
-**Writes:** `T_WC_T2S_AWARD`, `T_WC_T2S_MOVIE_AWARD`, `T_WC_T2S_SERIE_AWARD`, `T_WC_T2S_PERSON_AWARD`
+**Reads:** `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE` (V2), `T_WC_WIKIDATA_SUBCLASS` (award cone), `T_WC_WIKIDATA_ITEM` / `T_WC_WIKIDATA_ITEM_V1` (labels), `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
+**Writes:** `T_WC_T2S_AWARD_CLASS` (the P279 cone under `Q618779`), `T_WC_T2S_AWARD`, `T_WC_T2S_MOVIE_AWARD`, `T_WC_T2S_SERIE_AWARD`, `T_WC_T2S_PERSON_AWARD`
 
 **Selection strategy (pre-filter).** The driving query selects only P166 items that have **≥ 1 linked T2S movie, series, or person** — not every distinct item value of the property. Items whose award recipients are not tracked in the T2S read model would produce an award row with zero links (pure noise), so they are skipped via three OR'd `EXISTS` probes against `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` / `T_WC_T2S_PERSON` (all `ID_WIKIDATA`-indexed), mirroring the per-item link queries:
 
 ```sql
-SELECT DISTINCT T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM
-FROM T_WC_WIKIDATA_ITEM_PROPERTY
-WHERE T_WC_WIKIDATA_ITEM_PROPERTY.ID_PROPERTY = 'P166'
-  AND (   EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
-       OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
-       OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = T_WC_WIKIDATA_ITEM_PROPERTY.ID_WIKIDATA AND pe.ID_WIKIDATA <> ''))
-ORDER BY T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM ASC
+SELECT DISTINCT av.ID_ITEM
+FROM T_WC_WIKIDATA_STATEMENT sa
+JOIN T_WC_WIKIDATA_ITEM_VALUE av ON av.ID_STATEMENT = sa.ID_STATEMENT
+WHERE sa.ID_PROPERTY = 'P166'
+  AND (sa.`RANK` IS NULL OR sa.`RANK` <> 'deprecated')
+  AND (   EXISTS (SELECT 1 FROM T_WC_T2S_MOVIE  m  WHERE m.ID_WIKIDATA  = sa.ID_WIKIDATA AND m.ID_WIKIDATA  <> '')
+       OR EXISTS (SELECT 1 FROM T_WC_T2S_SERIE  s  WHERE s.ID_WIKIDATA  = sa.ID_WIKIDATA AND s.ID_WIKIDATA  <> '')
+       OR EXISTS (SELECT 1 FROM T_WC_T2S_PERSON pe WHERE pe.ID_WIKIDATA = sa.ID_WIKIDATA AND pe.ID_WIKIDATA <> ''))
+  -- plus f_awardconefilter(av.ID_ITEM): the value's P31 class is in T_WC_T2S_AWARD_CLASS, or it has no P31
+ORDER BY av.ID_ITEM ASC
 ```
+
+The query is built by `f_awarddrivingsql()` in `tmdb_preprocess_helpers.py`, shared with Process 47 (property `P1411`). At the head of 44 and 47, `f_awardconeguard()` rebuilds `T_WC_T2S_AWARD_CLASS` from `T_WC_WIKIDATA_SUBCLASS` and skips the process when the cone is below `LNG_AWARD_CONE_FLOOR`.
 
 > Unlike Processes 43/46, this **changes the output**: awards with no tracked recipients are no longer created, and the stale delete below removes any that already exist. On the first run after this change, expect a one-time deletion of all previously-created empty award rows.
 
@@ -1073,19 +1089,19 @@ Populates `T_WC_T2S_MOVEMENT` from custom lists that define cinematic movements.
 
 Builds death-related dimension records from Wikidata death properties.
 
-**Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_TMDB_PERSON`, `T_WC_T2S_PERSON`
+**Reads:** `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE` (V2), `T_WC_WIKIDATA_PERSON`, `T_WC_WIKIDATA_ITEM` / `T_WC_WIKIDATA_ITEM_V1` (labels), `T_WC_TMDB_PERSON`, `T_WC_T2S_PERSON`
 **Writes:** `T_WC_T2S_DEATH`, `T_WC_T2S_PERSON_DEATH`
 
 **Subprocesses / Wikidata properties:**
 - `en-cause-of-death` → P509
 - `en-manner-of-death` → P1196
 
-**Selection strategy (pre-filter).** Like Process 43, the driving query pre-filters to **items that resolve to ≥ 2 linked TMDb persons** (same `T_WC_TMDB_PERSON ⋈ T_WC_WIKIDATA_PERSON_V1 ⋈ T_WC_WIKIDATA_ITEM_PROPERTY` join + `HAVING COUNT(DISTINCT ID_PERSON) >= 2`) rather than iterating every P509/P1196 item. The P1196 excluded-items list is preserved inside the pre-filter. This is a pure performance change — the per-item code already deleted any death resolving to < 2 persons.
+**Selection strategy (pre-filter).** Like Process 43, the driving query pre-filters to **items that resolve to ≥ 2 linked TMDb persons** (same `T_WC_TMDB_PERSON ⋈ T_WC_WIKIDATA_PERSON ⋈ T_WC_WIKIDATA_STATEMENT ⋈ T_WC_WIKIDATA_ITEM_VALUE` join + `HAVING COUNT(DISTINCT ID_PERSON) >= 2`) rather than iterating every P509/P1196 item. The P1196 excluded-items list is preserved inside the pre-filter. This is a pure performance change — the per-item code already deleted any death resolving to < 2 persons.
 
 **Operations:**
 - For each Wikidata item used as a value of P509/P1196, retrieves English/French labels and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_DEATH` and links persons into `T_WC_T2S_PERSON_DEATH` ordered by person popularity.
-- Full stale delete (count-based, inverse of the pre-filter): removes `T_WC_T2S_DEATH` rows whose item no longer resolves to ≥ 2 linked TMDb persons — covering items gone from `T_WC_WIKIDATA_ITEM_PROPERTY`, P1196-excluded items, and deaths degraded from ≥ 2 to < 2 persons.
+- Full stale delete (count-based, inverse of the pre-filter): removes `T_WC_T2S_DEATH` rows whose item no longer resolves to ≥ 2 linked TMDb persons — covering items gone from the V2 statements, P1196-excluded items, and deaths degraded from ≥ 2 to < 2 persons.
 
 ---
 
@@ -1093,7 +1109,7 @@ Builds death-related dimension records from Wikidata death properties.
 
 Builds nomination records from the Wikidata "nominated for" property (P1411).
 
-**Reads:** `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
+**Reads:** `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE` (V2), `T_WC_WIKIDATA_SUBCLASS` (award cone), `T_WC_WIKIDATA_ITEM` / `T_WC_WIKIDATA_ITEM_V1` (labels), `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
 **Writes:** `T_WC_T2S_NOMINATION`, `T_WC_T2S_MOVIE_NOMINATION`, `T_WC_T2S_SERIE_NOMINATION`, `T_WC_T2S_PERSON_NOMINATION`
 
 **Selection strategy (pre-filter).** Like Process 44, the driving query selects only P1411 items that have **≥ 1 linked T2S movie, series, or person** (three OR'd `EXISTS` probes against `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` / `T_WC_T2S_PERSON`), skipping nominations whose recipients are not tracked in the read model.
@@ -1105,7 +1121,7 @@ Builds nomination records from the Wikidata "nominated for" property (P1411).
 - For each nomination item, retrieves English/French label and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_NOMINATION`.
 - Links movies, series, and persons that have the nomination (via Wikidata property join) into the respective junction tables with incremental display order.
-- Stale delete (inverse of the pre-filter): removes any nomination whose item no longer has ≥ 1 linked T2S entity (items gone from `T_WC_WIKIDATA_ITEM_PROPERTY`, now-empty, or degraded to zero tracked recipients); orphan junction rows are then cleaned via `ID_NOMINATION NOT IN (SELECT ID_NOMINATION FROM T_WC_T2S_NOMINATION)` on each junction table.
+- Stale delete (inverse of the pre-filter): removes any nomination whose item no longer has ≥ 1 linked T2S entity (items gone from the V2 statements, now-empty, or degraded to zero tracked recipients); orphan junction rows are then cleaned via `ID_NOMINATION NOT IN (SELECT ID_NOMINATION FROM T_WC_T2S_NOMINATION)` on each junction table.
 
 ### Process 70 — T2S_EVALUATION_ASSERTION_REFRESH
 
@@ -1155,7 +1171,7 @@ The one-column form is unchanged and remains right for a single-kind question (`
 | Wikidata filter | Any movie or serie written to a T2S junction table must satisfy `ADULT = 0 AND ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> ''`. |
 | Shared Wikidata image lookup | `f_getwikidataimagepath()` resolves the first non-empty `WIKIPEDIA_IMAGE_PATH` from `T_WC_WIKIDATA_ITEM_V1`, `T_WC_WIKIDATA_MOVIE_V1`, `T_WC_WIKIDATA_SERIE_V1`, then `T_WC_WIKIDATA_PERSON_V1`. |
 | Full stale delete | Some dimension processes delete parent rows whose source record (TMDb list/collection/custom list or Wikidata property) no longer exists, in addition to orphan link cleanup. |
-| Wikidata-property driving pre-filter | Processes 43, 44, 46, and 47 do not iterate every distinct `T_WC_WIKIDATA_ITEM_PROPERTY.ID_ITEM` value of a property. Group/death (43/46) pre-filter to items with ≥ 2 linked TMDb persons (`GROUP BY … HAVING COUNT(DISTINCT ID_PERSON) >= 2`); award/nomination (44/47) pre-filter to items with ≥ 1 linked T2S movie/series/person (OR'd `EXISTS`). Each end-of-process stale delete is the exact inverse of its pre-filter. Benefits from a composite index on `(ID_PROPERTY, ID_WIKIDATA)`. |
+| Wikidata-property driving pre-filter | Processes 43, 44, 46, and 47 do not iterate every distinct item value of a property. They read the V2 statements (`T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE`) through the helpers `f_persondrivingsql()` / `f_awarddrivingsql()`. Group/death (43/46) pre-filter to items with ≥ 2 linked TMDb persons (`GROUP BY … HAVING COUNT(DISTINCT ID_PERSON) >= 2`); award/nomination (44/47) pre-filter to items with ≥ 1 linked T2S movie/series/person (OR'd `EXISTS`). Each end-of-process stale delete is the exact inverse of its pre-filter. |
 | Server variables | `cp.f_setservervariable()` persists the current process/record for external monitoring. |
 
 ---
@@ -1207,10 +1223,13 @@ The one-column form is unchanged and remains right for a single-kind question (`
 | T_WC_TMDB_KEYWORD / T_WC_TMDB_LIST / T_WC_TMDB_COLLECTION | T_WC_T2S_TOPIC |
 | T_WC_TMDB_MOVIE (technical fields) | T_WC_T2S_TECHNICAL, T_WC_T2S_MOVIE_TECHNICAL |
 | T_WC_WIKIDATA_ITEM_V1 | T_WC_T2S_ITEM |
-| T_WC_WIKIDATA_ITEM_PROPERTY (P463, P108) / T_WC_CUSTOM_LIST (TARGET_TABLE=3) | T_WC_T2S_GROUP, T_WC_T2S_PERSON_GROUP |
+| T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P463, P108, P54) / T_WC_CUSTOM_LIST (TARGET_TABLE=3) | T_WC_T2S_GROUP, T_WC_T2S_PERSON_GROUP |
 | T_WC_T2S_PERSON_GROUP + T_WC_T2S_PERSON_MOVIE / _SERIE / _SEASON / _EPISODE, T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P161, P175, P58, P86, P170, P162, P57, P725) | T_WC_T2S_GROUP_MOVIE, T_WC_T2S_GROUP_SERIE |
-| T_WC_WIKIDATA_ITEM_PROPERTY (P166) | T_WC_T2S_AWARD, T_WC_T2S_MOVIE_AWARD, T_WC_T2S_SERIE_AWARD, T_WC_T2S_PERSON_AWARD |
+| T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P840, P915) | T_WC_T2S_LOCATION, T_WC_T2S_LOCATION_CLASS, T_WC_T2S_LOCATION_ANCESTOR, T_WC_T2S_MOVIE_LOCATION, T_WC_T2S_SERIE_LOCATION, T_WC_T2S_EPISODE_LOCATION |
+| T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P144) | T_WC_T2S_SOURCE_WORK, T_WC_T2S_SOURCE_WORK_CLASS, T_WC_T2S_MOVIE_SOURCE_WORK, T_WC_T2S_SERIE_SOURCE_WORK |
+| T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_QUANTITY_VALUE (P2130, P2142) and their qualifiers | T_WC_T2S_WORK_FINANCE |
+| T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P166) | T_WC_T2S_AWARD, T_WC_T2S_MOVIE_AWARD, T_WC_T2S_SERIE_AWARD, T_WC_T2S_PERSON_AWARD |
 | T_WC_CUSTOM_LIST (TARGET_TABLE=4) | T_WC_T2S_MOVEMENT, T_WC_T2S_MOVIE_MOVEMENT, T_WC_T2S_SERIE_MOVEMENT |
-| T_WC_WIKIDATA_ITEM_PROPERTY (P509, P1196) | T_WC_T2S_DEATH, T_WC_T2S_PERSON_DEATH |
-| T_WC_WIKIDATA_ITEM_PROPERTY (P1411) | T_WC_T2S_NOMINATION, T_WC_T2S_MOVIE_NOMINATION, T_WC_T2S_SERIE_NOMINATION, T_WC_T2S_PERSON_NOMINATION |
+| T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P509, P1196) | T_WC_T2S_DEATH, T_WC_T2S_PERSON_DEATH |
+| T_WC_WIKIDATA_STATEMENT + T_WC_WIKIDATA_ITEM_VALUE (P1411) | T_WC_T2S_NOMINATION, T_WC_T2S_MOVIE_NOMINATION, T_WC_T2S_SERIE_NOMINATION, T_WC_T2S_PERSON_NOMINATION |
 | T_WC_T2S_PERSON_MOVIE / T_WC_T2S_PERSON_SERIE (acting credits) | T_WC_T2S_CHARACTER, T_WC_T2S_MOVIE_CHARACTER, T_WC_T2S_SERIE_CHARACTER, T_WC_T2S_PERSON_CHARACTER |

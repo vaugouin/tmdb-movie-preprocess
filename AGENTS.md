@@ -1,194 +1,80 @@
 # AGENTS.md - Agent Guide for tmdb-movie-preprocess
 
-This file gives you the agentic context you need to work on this codebase safely. For project overview, features, install / deploy steps and human-facing security / performance / troubleshooting material, read @README.md — that file is canonical and not duplicated here.
+Rules an agent needs to work on this codebase safely. @README.md is canonical for everything else: scopes, Docker usage, the per-process reference (inputs, outputs, filters, operations), common patterns and the source → target table map. Consult it rather than re-deriving from code, but verify against code before changing behaviour. Update it for any user-facing change; update this file only when agent workflow or safety context changes. `CLAUDE.md` and any other tool-specific file only point here.
 
-This is the single canonical guide for autonomous coding agents in this repository. Assistant-specific files such as @CLAUDE.md, and any future tool-specific guide such as `GEMINI.md`, should only point here and should not duplicate repository instructions.
-
-Deeper specs live in their own files:
-- @doc/sql/*.sql — reference DDL for the database schema (`T2S-tables.sql`, `TMDb-tables.sql`, `Wikidata-tables.sql`, `Wikipedia-tables.sql`, `T_WC_SERVER_VARIABLE.sql`); treat these files as read-only unless the user explicitly asks you to edit schema documentation
-- @EXTEND_T2S_TECHNICAL.md — completed impact analysis for the `T_WC_T2S_TECHNICAL` extension (medium-format / aspect-ratio rows, §12.5 junction-enrichment contract); historical reference
-
-- For any project update, keep documentation aligned:
-  - Update `README.md` for user-facing behavior, configuration, setup, deployment, troubleshooting, or verification changes. The README carries the full per-process reference (Processes 1–62) and the source → target table map — keep it authoritative for those.
-  - Update this file only when agent workflow or safety context changes.
+Deeper specs: @doc/sql/*.sql (reference DDL, read-only unless asked); @EXTEND_T2S_TECHNICAL.md (completed `T_WC_T2S_TECHNICAL` impact analysis, historical).
 
 ---
 
 ## Related repositories (project ecosystem)
 
-This is the core **preprocessing** stage of the larger movie/TV database system (owned by GitHub user `vaugouin`, all siblings under `C:\Users\vaugo\Code\<repo>` and `github.com/vaugouin/<repo>`, converging on one shared MySQL/MariaDB instance with `T_WC_*` tables). It reads the raw source tables produced by the upstream crawlers — TMDb (`T_WC_TMDB_*`), Wikidata (`T_WC_WIKIDATA_*`), Wikipedia (live API + `T_WC_WIKIPEDIA_*`) and IMDb (`T_WC_IMDB_*`) — and consolidates them into the denormalized `T_WC_T2S_*` read-model. That read-model is consumed downstream by the `fastapi-text2sql` API and the `embedding-update` semantic index.
-
-This repo is parallel to the sibling preprocessing repos `tmdb-person-preprocess` and `keywords-processing`. The canonical sibling-repo roster lives in `%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt`.
+Core preprocessing stage of **Agent BBB** (owner `vaugouin`; sibling roster in `%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt`). Reads the source tables of the crawlers (`T_WC_TMDB_*`, `T_WC_WIKIDATA_*`, `T_WC_WIKIPEDIA_*`, `T_WC_IMDB_*`) and builds the `T_WC_T2S_*` read model consumed by `fastapi-text2sql` and `embedding-update`. Siblings at the same stage: `tmdb-person-preprocess`, `keywords-processing`.
 
 ## Where things live (file → role)
 
-| Path | Role |
-|------|------|
-| `tmdb-movie-preprocess.py` | Main ETL script (~370 KB, single module). Opens one DB connection, walks the `arrprocessscope` dict, and runs each process step inline. Entry point (`CMD` in the Dockerfile). |
-| `tmdb_preprocess_helpers.py` | Stateless helper functions imported by the main script: format-line parsing / extraction (`extract_color_technology`, `extract_film_technology`, `extract_sound_technology`, `extract_format_components`, `clean_format_line`, `validate_format_line`), technical-junction writers (`load_technical_ids`, `write_movie_technical_junction`, `refresh_technical_movie_count`), Wikimedia/Wikidata linking (`f_wikimediarequest`, `f_wikipediasearchcandidates`, `f_wikipediaresolvepage`, `f_wikidataentitysummary`, `f_linktmdbkeywordtowikidata`), custom-list query builders (`f_buildcustomaggregatequery`, `f_buildcustomorderbyclause`, `f_getcustomsortby`), the shared image lookup (`f_getwikidataimagepath`), retry wrapper (`execute_sql_with_retry`), chunked DataFrame upsert (`batch_update_data`). |
-| `citizenphil.py` | House DB-helper module, imported as `cp`. Lazy connection (`f_getconnection`), generic idempotent upsert (`f_sqlupdatearray`), server-variable get/set (`f_getservervariable` / `f_setservervariable`), SQL-string escaping (`f_stringtosql`), and small value/query utilities. Loads `.env` itself at import time. |
-| `requirements.txt` | Python deps: `pymysql`, `pandas`, `numpy`, `requests`, `pytz`, `psutil`, `python-dotenv`. |
-| `Dockerfile` | `python:3.10.5-slim-buster`; installs requirements, copies the source, `CMD ["python", "./tmdb-movie-preprocess.py"]`. |
-| `tmdb-movie-preprocess.sh` | Host launcher: builds the image and `docker run -d --rm --network=host --env-file <host path>`. |
-| `on.sh` / `off.sh` | Small start/stop wrappers. |
-| `.env.example` | Template for the runtime env file (DB + Wikimedia knobs). |
-| `doc/sql/` | **Every `.sql` file of this repo, without exception.** Three kinds live side by side: reference DDL (`T2S-tables.sql`, `TMDb-tables.sql`, `Wikidata-tables.sql`, `Wikipedia-tables.sql`, `T_WC_SERVER_VARIABLE.sql`), which is read-only unless asked; one-shot migrations (`migration-*.sql`, `alter-*.sql`, `fill-*.sql`), applied by hand on the live DB; and audit or test queries (`test-*.sql`, `award-pollution-impact.sql`, `wikidata-company-review.sql`), read-only by construction. Convention set 2026-08-20 and it holds for every repository of the stack: a `.sql` file lives in `doc/sql/` of its own repo, never at the root, never in a `doc/queries/` of its own. The old `doc/queries/` was folded in and removed. **The stack-wide rule has two exceptions this repo happens not to trigger**: a `.sql` executed by code stays where the code expects it, and a `.sql` that writes stays with the procedure it belongs to. Here every migration is applied by hand and none is read by the pipeline, so they could all move; in `wikidata-crawler`, by contrast, `01_create_schema.sql` through `12_bulk_load_subclass_only.sql` are executed and must stay at the root. |
-| `data/` | Static inputs: `closed_vocabularies.json` (technical-spec alias vocabularies), format-line CSVs. |
-| `archive/` | Retired / out-of-scope code and notes. Not in the default run; treat as historical. |
+- `tmdb-movie-preprocess.py`: the whole pipeline (one large module), each process inline in the `arrprocessscope` loop.
+- `tmdb_preprocess_helpers.py`: stateless helpers and the newer set-based builders (`f_buildlocationtables`, `f_buildgroupworktables`, `f_buildworkfinancetable`, award cone, Wikimedia linking, custom-list query builders). Their docstrings and comments carry the reasoning and measurements; read them before changing a builder.
+- `citizenphil.py` (`cp`): house DB layer, loads `.env` itself at import.
+- `doc/sql/`: **every `.sql` of this repo**: reference DDL, one-shot migrations (`migration-*`, `alter-*`, `fill-*`, applied by hand, none read by the pipeline), audit and test queries. Stack-wide convention (2026-08-20): never at the root, never in a `doc/queries/`. Its two exceptions (a `.sql` executed by code, a `.sql` belonging to a write procedure) are not triggered here.
+- `archive/`: retired code, not in any scope.
 
 ## Code conventions
 
-- **House Hungarian notation** on locals and globals: `str*` (string), `lng*` / `int*` (integer), `dbl*` (float), `arr*` (dict/list). Booleans are often stored as `int*` and written to the DB as `0`/`1`. Follow this when adding code.
-- **Function prefixes:** public helpers are `f_*` (e.g. `f_sqlupdatearray`, `f_linktmdbkeywordtowikidata`); private/internal helpers use a leading underscore (e.g. `_movie_technical_target_rows`, `_build_aspect_ratio_lookup`). A few newer utility functions use plain snake_case (`extract_color_technology`, `batch_update_data`, `check_memory`).
-- **DB access goes through `citizenphil` (`cp`)** — do not open ad-hoc connections. Use `cp.f_getconnection()` for the shared connection and `cp.f_sqlupdatearray(table, dict, where, addstdfields)` for idempotent single-row upserts. Always escape literals with `cp.f_stringtosql()` (note: most bulk SQL is built as f-strings — keep using parameterised/escaped values for any user/source-derived text).
-- **Standard audit columns:** when `f_sqlupdatearray` is called with `intaddstdfields = 1`, it auto-fills `TIM_UPDATED`, `DELETED`, `DAT_CREAT`, `ID_CREATOR`, `ID_OWNER`, `ID_USER_UPDATED` on insert. Pass `0` for tables that don't carry them.
-- **Progress is reported via server variables**, not logs alone: `cp.f_setservervariable(name, value, desc, 0)` persists current process / sub-process / current entity ID to `T_WC_SERVER_VARIABLE` for external monitoring. Keep updating these when you add a step.
-- **Timers: the run clock is `dblrunstarttime` / `dblrunendtime`, never `start_time`.** Four processes
-  keep a local `start_time` for their own elapsed-time print, and they are 20 spaces deep in the same
-  function, so they simply overwrite anything the run level put there. Until 2026-08-21 the total-runtime
-  variable was computed from `start_time` and therefore measured **the last process that had reassigned
-  it**: the run of 2026-08-20, an hour and 27 minutes long, reported 58 seconds. Nothing in the data was
-  wrong, which is why it went unnoticed for so long. If you add a timer, give it a local name and leave
-  the two `dblrun*` alone.
-- **Multiple cursors** (`cursor`, `cursor2` … `cursor5`) are opened up front so independent reads/writes can interleave within one process.
-- **Idempotent upserts:** copy steps use `INSERT … ON DUPLICATE KEY UPDATE` plus a scoped stale-delete (delete rows in the processed ID range that no longer exist in source), so the pipeline is safe to re-run.
-- **Batch / chunk processing:** row-copy processes iterate source IDs in chunks of 1000; `batch_update_data` flushes DataFrame updates in batches of 1000.
-- **Staging rebuild + atomic swap:** the newer, performance-sensitive rebuilds (junction/image/video tables, `T2S_ITEM`, company/network) build a full `*_BUILD` table, validate row count, swap with `RENAME TABLE` (→ `*_OLD`), and drop `*_OLD` after success. See README "Common Patterns".
-- **Error handling:** MySQL errors funnel through `cp.f_handlemysqlerror`; lock-wait timeouts (errno 1205) are retried/skipped rather than fatal. The top-level `try/except` rolls back on a `pymysql.MySQLError`.
-- **Emoji log markers** (✅/⚠️/❌) are used in console output intentionally — match the existing style. Source data is multilingual; keep everything UTF-8.
+- **House Hungarian notation**: `str*`, `lng*` / `int*` (integers; booleans as `int*` written `0`/`1`), `dbl*`, `arr*` (dict/list).
+- Public helpers `f_*`, private `_*`; a few newer utilities are plain snake_case.
+- **DB access only through `cp`** (`cp.f_getconnection()`, `cp.f_sqlupdatearray(table, dict, where, addstdfields)`); no ad-hoc connections. Escape literals with `cp.f_stringtosql()`, since most bulk SQL is built as f-strings. `intaddstdfields = 1` fills `TIM_UPDATED`, `DELETED`, `DAT_CREAT`, `ID_CREATOR`, `ID_OWNER`, `ID_USER_UPDATED`; pass `0` for tables without them.
+- Report progress through `cp.f_setservervariable(...)`, and keep doing so in any step you add.
+- **Run clock is `dblrunstarttime` / `dblrunendtime`, never `start_time`**: several processes reassign a local `start_time`, and the total runtime once measured only the last of them (an 87-minute run reported 58 s). Give any new timer a local name.
+- Lock-wait timeouts and deadlocks (1205, 1213: `MYSQL_RETRYABLE_ERROR_CODES`) are retried/skipped, not fatal; use `execute_sql_with_retry` for new heavy writes.
+- Emoji log markers (✅/⚠️/❌) are intentional. All data is multilingual: keep everything UTF-8, never assume ASCII.
 
 ## Pipeline / process steps
 
-**⚠ Une table reconstruite par BUILD puis RENAME perd son AUTO_INCREMENT, donc son identifiant.** `CREATE TABLE ... LIKE` ne reporte pas le compteur, et un `INSERT ... SELECT` sans la colonne d'identifiant renumerote toutes les lignes dans l'ordre de la requete. Vu le 2026-09-13 sur le processus 72 : `ID_LOCATION` changeait chaque nuit, et rien ne le signalait, la table avait le bon nombre de lignes. Un identifiant `ID_<ENTITE>` doit se comporter comme `ID_GROUP` : attribue une fois, jamais reattribue. La forme retenue dans `f_buildlocations` (etape 1c) : le perimetre materialise une fois en table temporaire, puis trois insertions, (i) les lignes connues avec leur `ID_LOCATION` reporte par jointure sur la table servie, (ii) les lignes sorties du perimetre conservees en `DELETED = 1` pour que leur numero ne soit jamais reattribue, (iii) les nouvelles apres `ALTER TABLE ..._BUILD AUTO_INCREMENT = MAX(ID_LOCATION) + 1`. Trois insertions et non une seule melant ID explicites et NULL, qui peut produire une cle dupliquee. Toute nouvelle table T2S reconstruite par ce patron doit reprendre ces trois temps ; recette `doc/sql/test-014-location-id-stability.sql`, a lancer avant et apres un passage.
+**Process selection is the dict `arrprocessscopemain` (or another scope chosen by `TMDB_PREPROCESS_SCOPE`), and execution order is dict insertion order, not numeric order.** The run executes once and exits; scheduling is external. Ordering constraints: 74 after 43 and 9, 10, 29, 31; 75 after 72; 72 and 73 before 71; 71 (image copier) last. Process 60 is not in `main` (own scope and cron). Step 64 never writes a movie signed `COLOR_SOURCE = 'format_line'` or carrying a non-empty Format line: the line always wins.
 
-**Les libelles, les descriptions et les notes des lieux (TMDB-MOVIE-PREPROCESS-064, 1.1.20).** `LOCATION_NAME` suit l'anglais, le `mul` que `LABEL_EN` porte deja, `en-gb` / `en-us`, le francais, puis le premier libelle de n'importe quelle langue : le 2026-10-19, 172 lieux vivants n'avaient aucun nom et tmdb-front ne lie pas un lieu sans nom ; seul un lieu sans ligne `T_WC_WIKIDATA_ITEM` reste sans nom (12970, Q96746067). `LOCATION_NAME_FR` suit le francais, puis `mul`, puis ce nom : **un `LOCATION_NAME_FR` egal a `LOCATION_NAME` veut dire « pas de libelle francais propre »**, sans drapeau, la convention qu'embedding-update applique deja ; ne pas reintroduire de NULL pour le dire. `OVERVIEW_FR` porte la description francaise seule, sans repli (10 175 lieux sur 12 978) ; la colonne est ajoutee par 72 a la table servie (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, etape 1-0) avant que 1b ne cree la construction `LIKE` elle, comme `IMDB_VOTES` sur `T_WC_T2S_EPISODE`. L'etape 4b moyenne les notes et la popularite sur les films **et** les series, une voix par oeuvre (table temporaire `tmp_lieu_oeuvre`, cle lieu-type-oeuvre, `INSERT IGNORE` qui retire le second role ; MariaDB refuse une reference exterieure dans une table derivee, d'ou l'`UPDATE` par jointure) : 12 295 lieux notes au lieu de 10 224. Mesure : `doc/sql/test-064-location-labels-20261019.txt`. Compte en variable serveur `strtmdbmoviepreprocesslocationsans_nomcount`.
+**⚠ `strdesc` est la variable de boucle du pipeline, ne la masquez pas dans un bloc de processus.** Elle est relue **apres** le bloc (classement des durees, description de la variable serveur du temps ecoule), et une boucle `for ... strdesc in ...` interne survit a sa boucle : le rapport titre alors le processus avec une autre valeur, sans erreur visible. Prefixer les variables de boucle locales par l'entite (`strlocationdesc`).
 
-**La hierarchie des lieux, `T_WC_T2S_LOCATION_ANCESTOR` (TMDB-MOVIE-PREPROCESS-048, 1.1.19).** Le processus 72 calcule chaque nuit, a l'etape 3d de `f_buildlocationtables()`, la fermeture transitive de `P131` (entite administrative contenante) et `P17` (pays) sur les lieux vivants, et la bascule dans le meme `RENAME` que `T_WC_T2S_LOCATION` et ses associations. Une ligne par (lieu, ancetre), **le lieu lui-meme a la profondeur 0** : « les films en France » se lit d'une seule jointure, que le film soit rattache a la France ou a Paris. Trois regles a ne pas defaire. (1) **Le meilleur rang par (item, propriete)** : `preferred` s'il en existe, sinon tout ce qui n'est pas `deprecated` ; Paris porte sept `P17` (royaume de France, Empire, occupation) et n'en garde qu'un, la France. (2) **Le parcours traverse des items qui ne sont pas des lieux T2S** (« metropolitan France », les departements) ; seules les paires dont les deux bouts sont des lieux vivants sont gardees, et `DEPTH` compte les sauts Wikidata, pas les niveaux administratifs. (3) **Jamais `LOCATION_TYPE`** dans le calcul : la classification est fausse par endroits (Marseille est une `region`). La table est creee par le code (`CREATE TABLE IF NOT EXISTS`, comme `T_WC_T2S_LOCATION_CLASS`), sans migration. Mesure du 2026-10-19 (`doc/sql/test-048-location-hierarchy-20261019.txt`) : 37 155 lignes, 24 177 au-dessus de 0, profondeur maximale 7 ; « tourne en France » passe de 27 films a 1 796, « tourne a Paris » ne rend aucun film de Lyon, la Lune reste une feuille. La borne `INT_LOCATION_ANCESTOR_MAX_DEPTH` (12) n'est la que pour les cycles ; un journal qui l'atteint (`3d-2. ATTENTION`) est a regarder. Variable serveur : `strtmdbmoviepreprocesslocationancestors` (lignes au-dessus de 0). Consommateur : le prompt de fastapi-text2sql (`data/text_to_sql.md`, section Locations).
+**⚠ Une table reconstruite par BUILD puis RENAME perd son AUTO_INCREMENT, donc son identifiant.** `CREATE TABLE ... LIKE` ne reporte pas le compteur et un `INSERT ... SELECT` sans l'identifiant renumerote tout, en silence (vu le 2026-09-13 : `ID_LOCATION` changeait chaque nuit). Un `ID_<ENTITE>` s'attribue une fois et ne se reattribue jamais. Toute nouvelle table T2S reconstruite par ce patron reprend les trois insertions de `f_buildlocationtables` (etape 1c, commentee) : (i) lignes connues avec leur identifiant reporte, (ii) lignes sorties du perimetre gardees en `DELETED = 1`, (iii) nouvelles apres `AUTO_INCREMENT = MAX + 1`. Jamais une seule insertion melant identifiants explicites et NULL. Recette : `doc/sql/test-014-location-id-stability.sql`, avant et apres un passage.
 
-**Un lieu a cheval sur plusieurs pays n'est dans aucun (TMDB-MOVIE-PREPROCESS-067, 1.1.23).** Avant -067, les Appalaches (Etats-Unis, Canada et France, par Saint-Pierre-et-Miquelon) apportaient 51 films a la fiche France, la Mediterranee etait rattachee a 22 pays. L'etape 3d-0 de `_f_buildlocationancestor()` filtre desormais les aretes en deux temps. (a) **L'arete vers un parent passe tombe** : qualificatif `P582`, parent a `P576`, ou parent d'une classe `TUPLE_LOCATION_ENDED_CLASSES` (historical country, dynastie chinoise, province romaine...), plus `Q99541706` au rang `preferred` seulement (les Etats-Unis la portent au rang normal : prise a tout rang, leur fiche tombait de 15 556 films a 420) et `Q2577883` occupied territory sauf si l'item est aussi disputed territory. Wikidata ne date presque jamais ces aretes (2 `P582` sur 510 974), d'ou les classes. (b) **Un item qui garde deux `P17` ou plus, parents connus de la base seulement, ne monte plus**, `P131` compris ; il garde sa ligne 0 et ses enfants. Trois decisions de Philippe du 2026-10-21 a ne pas defaire : **les lieux disputes vont sous chaque pays revendique** (Jerusalem, la Crimee et ses villes, la Cisjordanie, le Golan ; trois clauses D1 a D3 dans les constantes, pas `Q10711424` que la Chine porte) ; **la Normandie reste sous la France** (`TUPLE_LOCATION_P17_DROP`, la seule exception nommee) ; **seuls les parents `P17` connus comptent**. Toujours aucun `LOCATION_TYPE`. Mesure : `doc/sql/archive/test-067-cross-border-places-20261021.txt` et les `check-067-*` du meme jour ; 1 268 paires sur 37 155 tombent, aucune n'apparait ; France 1 797 a 1 792 films tournes, 3 753 a 3 608 qui s'y passent ; Israel 357 a 269, la Palestine 216 a 129 (la Mediterranee et le Moyen-Orient ne comptent plus). Kosovo et Serbie, l'ile de Chypre, la zone demilitarisee de Coree restent transfrontaliers : aucune classe ne les marque.
+**Les lieux (processus 72) : decisions a ne pas defaire.** Le raisonnement et les mesures sont dans les commentaires de `f_buildlocationtables` et la docstring de `_f_buildlocationancestor` (`tmdb_preprocess_helpers.py`).
 
-**Le processus 72 saute quand wikidata-crawler ecrit les tables Wikidata (TMDB-MOVIE-PREPROCESS-063, 1.1.16).** `f_wikidataloadbusy()` (`tmdb_preprocess_helpers.py`) lit les variables serveur du crawler : `strwikidatacrawlerstatus` a `RUNNING` et `strwikidatacrawlercurrentprocess` dans les etapes 110 a 114 (chargement des tables cibles, controles, medias, purge des anciens lots) font sauter la reconstruction, avec une ligne `72: SKIPPED, ...` au journal et la raison dans `strtmdbmoviepreprocesslocationskipped` (vide quand 72 a tourne). La table servie reste celle de la veille. Les passes ETL et le staging (101 a 109, 115) ne bloquent rien : ils n'ecrivent pas ce que 72 lit. Une variable `RUNNING` dont l'etape a demarre il y a plus de 48 h (`INT_WIKIDATA_LOAD_STALE_HOURS`) est un reste d'arret brutal et ne bloque pas. Pourquoi : l'etape 110 du 2026-10-15 a dure 12 h, de 16:57 a 05:01, et le passage de 01:00 est tombe en plein dedans ; un instantane partiel passe des lieux en `DELETED = 1` pour une nuit. Le processus 73 (`T2S_SOURCE_WORK`, "based on") lit les memes tables et a la meme garde depuis 1.1.17 : ligne `73: SKIPPED, ...`, raison dans `strtmdbmoviepreprocesssourceworkskipped`. Ses comptes ne sont plus ecrits apres un echec ou un saut (ils mettaient des zeros a la place de ceux du dernier passage reussi), comme ceux de 72.
+- Libelles (-064) : **un `LOCATION_NAME_FR` egal a `LOCATION_NAME` veut dire « pas de libelle francais propre »**, sans drapeau ; ne pas reintroduire de NULL pour le dire. `OVERVIEW_FR` n'a pas de repli sur l'anglais.
+- Hierarchie `T_WC_T2S_LOCATION_ANCESTOR` (-048) : le lieu lui-meme a la profondeur 0 ; meilleur rang par (item, propriete) ; le parcours traverse des items qui ne sont pas des lieux T2S et ne garde que les paires de lieux vivants ; **jamais `LOCATION_TYPE`** dans le calcul (classification fausse par endroits). Un journal qui atteint `INT_LOCATION_ANCESTOR_MAX_DEPTH` (`3d-2. ATTENTION`) signale un cycle. Consommateur : le prompt de fastapi-text2sql (`data/text_to_sql.md`, section Locations).
+- Lieux transfrontaliers (-067), trois decisions de Philippe du 2026-10-21 : les lieux disputes vont sous chaque pays revendique ; la Normandie reste sous la France (`TUPLE_LOCATION_P17_DROP`, seule exception nommee) ; seuls les parents `P17` connus de la base comptent.
 
-**⚠ `strdesc` est la variable de boucle du pipeline, ne la masquez pas dans un bloc de processus.** `for intindex, strdesc in arrprocessscope.items():` (ligne 326) la lie au nom du processus, et elle est relue **apres** le bloc, pour le classement des durees et pour la description de la variable serveur du temps ecoule. Un `for ... strdesc in ...` a l'interieur d'un bloc survit a sa boucle, Python n'ayant pas de portee de bloc, et le rapport titre alors le processus avec la derniere valeur prise. Vu le 2026-09-12 : le processus 72 s'est affiche « Locations left without a LOCATION_TYPE by » au lieu de « T2S_LOCATION ». Aucun calcul n'etait faux, mais le rapport mentait sur ce qu'il mesurait, ce qui est pire qu'une erreur visible. Prefixer les variables de boucle locales par l'entite (`strlocationdesc`).
-
-The script defines ordered dicts `arrprocessscopemain` / `arrprocessscopewikidatatopics` near the top of `tmdb-movie-preprocess.py` and selects one into `arrprocessscope` from the `TMDB_PREPROCESS_SCOPE` env var (`main` default, or `wikidata-topics`), then runs `for intindex, strdesc in arrprocessscope.items():` — **process selection is this dict, and execution order is dict insertion order, not numeric order.** Many candidate scopes are present as commented-out lines; to run a subset, comment the active selection and uncomment (or add) a narrower dict. There is **no internal scheduler loop** in the active script — it runs the scope once and exits; recurrence is handled externally (Docker run + host cron / launcher). **Process 60 (Wikidata keyword linker) is decoupled** into the `wikidata-topics` scope so it can be scheduled separately (its own cron / `tmdb-movie-preprocess-wikidata-topics.sh`) instead of blocking the ~3h45m of the main run; it is NOT in `main`. The archived Process 30 (`archive/TMDB_MOVIE_LANG_META.py`) is not in any default scope, and its spaCy-based lemmatisation has been removed from the codebase.
-
-`main` scope (insertion order): `0` (HTML-unescape `T_WC_CUSTOM_LIST`), `1` (`WIKIPEDIA_FORMAT_LINE` + technical-junction enrichment), `64` (`WIKIDATA_COLOR`, colour flags from Wikidata `P462` for films without a Format line, the line keeping precedence through the `COLOR_SOURCE` signature, TMDB-MOVIE-PREPROCESS-049), `2` (`T2S_MOVIE_TECHNICAL`), `62` (link Wikidata → T2S technical), `3` (`T2S_TOPIC`), `41` (`T2S_COLLECTION`), `61` (link Wikidata → collections), `42` (`T2S_LIST`), `43` (`T2S_GROUP`), `44` (`T2S_AWARD`), `47` (`T2S_NOMINATION`), `45` (`T2S_MOVEMENT`), `46` (`T2S_DEATH`), then the bulk copy/rebuild steps `4`–`40` (`T2S_MOVIE`, `T2S_SERIE`, `T2S_PERSON`, `T2S_COMPANY`, `T2S_NETWORK`, the person/genre/company/network/country/language link tables, image & video tables, seasons/episodes and their links/media, and `T2S_ITEM`), then `72` (`T2S_LOCATION`), `73` (`T2S_SOURCE_WORK`), `74` (`T2S_GROUP_WORK`, a group's works, TMDB-MOVIE-PREPROCESS-059: it reads the groups of `43` and the person credits of `9`, `10`, `29`, `31`, so it must stay after all of them), `75` (`T2S_WORK_FINANCE`, budgets and box office by place and date from Wikidata `P2130` / `P2142` and their qualifiers, TMDB-MOVIE-PREPROCESS-066, scope `finance`; after `72`, whose locations it links), `70` and `71` (the image copier, last because it fills every T2S entity table). Process 74 has its own scope `group-works` (wrapper `tmdb-movie-preprocess-group-works.sh`); its rule thresholds are the constants `INT_GROUP_WORK_MIN_MEMBERS` / `DBL_GROUP_WORK_MIN_SHARE` and its group families `ARR_GROUP_WORK_SOURCES` (`'P463'`, `'custom'`; `P108` and `P54` excluded on purpose) at the top of `f_buildgroupworktables()` in `tmdb_preprocess_helpers.py`. The `wikidata-topics` scope is just `60` (link Wikidata → topics). The bulk copies `4`/`5`/`6`/`27`/`28` use an incremental `TIM_UPDATED` watermark (server variables `strtmdbmoviepreprocesst2s{movie,serie,person,season,episode}lastrun`) with a full-table stale-delete + once-per-run enrichment; `27`/`28` also OR-in the parent serie (and, for `28`, season) `TIM_UPDATED` so a newly-qualifying parent re-pulls its children. The IMDb weighted-rating average is precomputed once per run in `4`/`5`/`27`/`28`. The rebuild+swap steps `7` (`T2S_COMPANY`) and `8` (`T2S_NETWORK`) compute their `MOVIE_COUNT`/`SERIE_COUNT` with a set-based reset-then-update keyed on `ID_COMPANY`/`ID_NETWORK` (replacing a per-row `f_sqlupdatearray` loop grouped by `NAME`).
-
-Main sub-pipeline families:
-- **Source cleanup** — step 0 decodes HTML-escaped text in `T_WC_CUSTOM_LIST` so downstream labels are clean.
-- **Technical specs**: step 1 parses `WIKIPEDIA_FORMAT_LINE` on `T_WC_TMDB_MOVIE` and writes the movie↔technical junction, signing `COLOR_SOURCE = 'format_line'`; step 64 fills the colour flags from Wikidata `P462` for the films with no line and signs them `'wikidata'` (set-based, idempotent, own `try`; scope `wikidata-colour` for a run on its own); step 2 builds the `T_WC_T2S_TECHNICAL` dimension; step 62 backfills Wikidata IDs/labels on it. Rule that must hold: a movie signed `format_line` or carrying a non-empty Format line is never written by 64, so the line always wins the day it arrives.
-- **Wikidata/Wikipedia linking** — steps 60/61/62 use the throttled Wikimedia request wrapper (retry/backoff on HTTP 429) and the `P31` blocked-types filter to attach Wikidata QIDs to keywords, collections, and technical rows.
-- **Dimension builders from Wikidata properties** — groups (P463/P108/P54), awards (P166), nominations (P1411), deaths (P509/P1196), plus custom-list-driven collections/lists/movements/groups.
-- **Bulk T2S copy + rebuild** — the long tail of `T_WC_TMDB_*` → `T_WC_T2S_*` copies (chunked upsert) and junction/media rebuilds (staging swap).
-
-### Custom lists (`T_WC_CUSTOM_LIST`)
-
-One row = one hand-declared collection / list / movement / group, routed by `TARGET_TABLE` (`1` list → process 42, `2` collection → process 41, `3` group → 43, `4` movement → 45) and only read when `DELETED = 0`. Membership is the union of four **cumulative** mechanisms (`UNION ALL` then `GROUP BY`, see `f_buildcustomaggregatequery`):
-
-1. `ID_IMDB_LIST`, explicit `tt…` ids, their position feeding `ORIGINAL_ORDER`;
-2. `WIKIDATA_PROPERTIES`, a `P… Q…` pair, resolved against the legacy V1 `T_WC_WIKIDATA_ITEM_PROPERTY` (item-valued statements only);
-3. `TMDB_ELEMENTS`, `T_WC_TMDB_KEYWORD.NAME = '…'`;
-4. `WIKIDATA_PROPERTIES` markers `ID:P…` / `ORDER:P…`, membership by **external-id property present**, read in the **V2** statements (TMDB-MOVIE-PREPROCESS-044). Wired into process 41 only for now; `f_customexternalidsourcesql` is entity-agnostic (`movie` / `serie`), so 42 and 45 take two lines each when needed.
-
-`SORT_BY` accepts `1`/`2` (`ORIGINAL_ORDER` asc/desc, NULLs last), `3`/`4` (weighted IMDb rating asc/desc, `4` is the default), `5`/`6` (date asc/desc); `DISPLAY_ORDER` in `T_WC_T2S_MOVIE_COLLECTION` / `_SERIE_COLLECTION` is just a 1..N counter following that order. **A catalogue numbered by its publisher therefore needs no new sort code**: pour the numbering property into `ORIGINAL_ORDER` via `ORDER:P…` and set `SORT_BY = 1`. Reconciliation is built in: titles that stopped matching are deleted, a collection falling to one element or none is dropped, and rows whose custom list vanished are purged. `TMDB_TARGET_RECORD` (`ID_COLLECTION = n` / `ID_LIST = n`) pushes the members into an existing TMDb collection instead of creating one, additively and without deletion.
-
-Worked example, the Criterion Collection: `WIKIDATA_PROPERTIES = 'ID:P9584 ORDER:P12279 Q1204187'`, `SORT_BY = 1`, `TARGET_TABLE = 2`. `P9584` is the criterion.com film id (membership), `P12279` the DVD/Blu-ray spine number (display order), `Q1204187` the company item, left for `ID_WIKIDATA` and the Wikipedia image. The markers are read and **removed** before the mechanism-2 parse, so a lone `Q` keeps its illustrative role without waking mechanism 2.
-
-Per-process inputs, outputs, filters and operations are documented exhaustively in @README.md (Process Reference + Source → Target Table Map) — consult it rather than re-deriving from code, but verify against code before changing behavior.
+**Les processus 72, 73 et 75 sautent quand wikidata-crawler ecrit les tables Wikidata (-063).** `f_wikidataloadbusy()` lit les variables serveur du crawler ; un saut laisse la table de la veille, ecrit une ligne `<n>: SKIPPED, ...` et sa raison en variable serveur, et n'ecrase pas les comptes du dernier passage reussi. Tout nouveau processus qui lit les tables cibles Wikidata doit passer par cette garde.
 
 ## Database tables
 
-Verified prefixes this repo touches: source `T_WC_TMDB_*`, `T_WC_WIKIDATA_*`, `T_WC_IMDB_*` (e.g. `T_WC_IMDB_MOVIE_RATING_IMPORT`), the cross-cutting `T_WC_CUSTOM_LIST`, and `T_WC_SERVER_VARIABLE`; targets are the `T_WC_T2S_*` read-model.
-
-Representative source tables read: `T_WC_TMDB_MOVIE`, `T_WC_TMDB_SERIE`, `T_WC_TMDB_PERSON`, `T_WC_TMDB_COMPANY`, `T_WC_TMDB_NETWORK`, `T_WC_TMDB_KEYWORD`, `T_WC_TMDB_LIST` / `T_WC_TMDB_LIST_LANG`, `T_WC_TMDB_COLLECTION` / `T_WC_TMDB_COLLECTION_LANG`, `T_WC_TMDB_SEASON`, `T_WC_TMDB_EPISODE`, the `T_WC_TMDB_PERSON_*` / `T_WC_TMDB_MOVIE_*` / `T_WC_TMDB_SERIE_*` relation, image and video tables, `T_WC_WIKIDATA_ITEM_V1`, `T_WC_WIKIDATA_ITEM_PROPERTY`, `T_WC_WIKIDATA_PERSON_V1` (and `_MOVIE_V1` / `_SERIE_V1` via the image-path helper), and `T_WC_IMDB_MOVIE_RATING_IMPORT`.
-
-Representative `T_WC_T2S_*` targets written: the core entities `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`, `T_WC_T2S_COMPANY`, `T_WC_T2S_NETWORK`, `T_WC_T2S_SEASON`, `T_WC_T2S_EPISODE`, `T_WC_T2S_ITEM`; the references `T_WC_T2S_GENRE` / `T_WC_T2S_GENRE_LANG` (Process 50) and `T_WC_T2S_PERSON_ALSO_KNOWN_AS` (Process 51, T2S persons only); the dimensions `T_WC_T2S_TECHNICAL`, `T_WC_T2S_TOPIC`, `T_WC_T2S_COLLECTION`, `T_WC_T2S_LIST`, `T_WC_T2S_GROUP`, `T_WC_T2S_AWARD`, `T_WC_T2S_NOMINATION`, `T_WC_T2S_MOVEMENT`, `T_WC_T2S_DEATH`, `T_WC_T2S_CHARACTER`; a group's works `T_WC_T2S_GROUP_MOVIE` / `T_WC_T2S_GROUP_SERIE` (Process 74); and the junction tables (`T_WC_T2S_PERSON_MOVIE`, `T_WC_T2S_PERSON_SERIE`, `T_WC_T2S_PERSON_SEASON`, `T_WC_T2S_PERSON_EPISODE`, `*_GENRE`, `*_COMPANY`, `*_NETWORK`, `*_PRODUCTION_COUNTRY`, `*_SPOKEN_LANGUAGE`, `*_IMAGE`, `*_VIDEO`, `*_TECHNICAL`, `*_COLLECTION`, `*_LIST`, `*_GROUP`, `*_AWARD`, `*_NOMINATION`, `*_MOVEMENT`, `*_DEATH`, `*_CHARACTER`). A few source tables are also written back (counts/flags): `T_WC_TMDB_MOVIE` (technical flags), `T_WC_TMDB_KEYWORD` (counts + Wikidata link), `T_WC_TMDB_COMPANY` / `T_WC_TMDB_NETWORK` (counts). The full authoritative map is in @README.md.
-
-When changing schema, update the matching DDL in `doc/sql/` and quote only table/column names you have verified in code or DDL.
+Tables read and written: README § Source → Target Table Map. When changing schema, update the matching DDL in `doc/sql/`, and quote only table/column names verified in code or DDL.
 
 ### `T_WC_T2S_AWARD_CLASS`, and why processes 44 and 47 can skip themselves
 
-Built by `f_awardconeguard()` (`tmdb_preprocess_helpers.py`) at the head of process 44
-and 47, this helper table holds the **P279 transitive closure under `Q618779` (award)**,
-14 260 classes measured 2026-08-19. It answers the question the driving queries could
-not ask before WIKIDATA-CRAWLER-020 loaded the subclass graph: *is this value an award*.
+`f_awardconeguard()` rebuilds the P279 cone under `Q618779` at the head of 44 and 47 and skips the process (rather than raising) when the cone is below `LNG_AWARD_CONE_FLOOR`; its docstring explains why. The award rule exists once, in `f_awardconefilter()`, shared by each process's driving query and purge `DELETE`: never re-inline it, or the purge and the build drift and the process recreates nightly what it deletes. Its subqueries use the aliases `st` and `iv`: a host query must not use them (silent self-correlation). Watch `strtmdbmoviepreprocessawardconeskipstreak`: three skips in a row means the crawler dependency is broken.
 
-The rule those queries now apply on `ID_ITEM`: keep if the value's `P31` class is in the
-cone, **or** if it has no `P31` at all. The second term is not slack, it protects the 552
-rows with no class where real awards missing from V2 live (Waldo Salt Screenwriting
-Award, prix Fénéon, Gaudí Awards). Measured effect: 16 164 rows kept, 27 920 dropped.
-
-**The same rule lives in four places and they must move together**: the driving query and
-the purge `DELETE` of each process. The purge does not remove what is outside the cone,
-it removes what the driving query did not produce, so if one expression drifts from the
-other the process recreates every night what it has just deleted, or keeps what it should
-drop. Both are built from `STR_AWARD_CONE_FILTER_DRIVING` and `STR_AWARD_CONE_FILTER_PURGE`
-for that reason.
-
-**The guard skips instead of raising, deliberately.** The process loop carries no `try`
-around its body, so an exception in process 44 would cost the fifty processes that follow.
-Nothing else in the run reads `T_WC_T2S_AWARD` or `T_WC_T2S_NOMINATION`, so a skipped day
-simply leaves both tables one day stale, on data that moves very slowly.
-
-**The floor of 10 000 targets the partial load, not the empty table.** An empty
-`T_WC_WIKIDATA_SUBCLASS` is the loud failure that any floor catches. The dangerous case is
-the crawler halfway through its reload: the cone then holds a plausible few thousand
-classes, clears a low floor, and the build deletes every award whose class sat in the
-missing half of the graph.
-
-**Skipping quietly is not skipping silently.** `strtmdbmoviepreprocessawardconeclasses`,
-`...awardconeskipstreak` and `...awardconeskipreason` are written every run. Read the
-streak: one skipped day is invisible, three in a row means the crawler dependency is
-broken and the two tables have been frozen since.
 ## Recettes SQL : deux pieges qui ne se voient pas sur le poste de l'auteur
 
-**⚠ Ne jamais placer une requete sur `information_schema` AVANT des instructions qui nomment des tables sans les qualifier.** phpMyAdmin retient la derniere base referencee comme base courante : une requete sur `information_schema` y bascule le contexte, et tout ce qui suit va chercher `T_WC_...` la-bas, avec « #1109 Table inconnue dans information_schema ». Mettre ces requetes **en dernier**, ou qualifier les noms. Le defaut ne se voit PAS avec le client `mariadb` en ligne de commande, qui garde la base de la connexion : une recette qui marche d'un cote et casse de l'autre. Paye deux fois, `migration-t2s-location.sql` le 2026-09-11 puis `test-014-locks.sql` le 2026-09-12, la seconde parce que la consigne n'existait que dans les commentaires du premier fichier. **Un avertissement dans un fichier ne protege que son lecteur**, d'ou celui-ci.
+**⚠ Ne jamais placer une requete sur `information_schema` AVANT des instructions qui nomment des tables sans les qualifier.** phpMyAdmin bascule alors la base courante et la suite echoue (« #1109 Table inconnue dans information_schema ») ; le client `mariadb` en ligne de commande ne montre pas le defaut. Mettre ces requetes **en dernier**, ou qualifier les noms.
 
-**⚠ `information_schema.INNODB_TRX` et `PROCESSLIST` demandent le privilege global `PROCESS`, que le compte applicatif n'a pas.** Ne pas le lui donner pour faire passer une recette : `PROCESS` laisse voir le texte de toutes les requetes de tous les utilisateurs, donnees comprises. Lancer ces sections depuis phpMyAdmin en `root`, et les isoler du reste du fichier pour que leur echec n'emporte pas les sections qui, elles, tournent avec le compte applicatif.
+**⚠ `information_schema.INNODB_TRX` et `PROCESSLIST` demandent le privilege global `PROCESS`, que le compte applicatif n'a pas.** Ne pas le lui donner (il expose le texte de toutes les requetes de tous les utilisateurs). Lancer ces sections depuis phpMyAdmin en `root`, isolees du reste du fichier pour que leur echec n'emporte pas les autres.
 
 ## SQL Object Naming Conventions
 
-The shared database follows these conventions (consistent across sibling repos) — keep new objects aligned:
-
-- **Tables:** uppercase snake case with a domain prefix — `T_WC_*` (shared core), `T_WC_T2S_*` (this repo's read-model targets), `T_WC_TMDB_*`, `T_WC_WIKIDATA_*`, `T_WC_WIKIPEDIA_*` (source tables), `T_WC_IMDB_*` (IMDb imports). The namespace prefix is configurable via `DB_NAMESPACE` (default `T_WC_`).
-- **Primary keys:** `ID_{ENTITY}` (e.g. `ID_MOVIE`, `ID_SERIE`, `ID_PERSON`, `ID_TECHNICAL`).
-- **Foreign keys:** reuse the referenced PK name (e.g. `ID_MOVIE` in a junction table references `T_WC_T2S_MOVIE.ID_MOVIE`).
-- **Dates / timestamps:** `DAT_*` for dates (`DAT_RELEASE`, `DAT_FIRST_AIR`, `DAT_CREAT`), `TIM_*` for datetimes (`TIM_UPDATED`, `TIM_WIKIPEDIA_SEARCH`).
-- **Boolean flags:** `IS_*` (`IS_VALID_FORMAT`, `IS_PERSON`, `IS_EMPTY`), plus the soft-delete `DELETED` (0/1).
-- **Ordering / counts:** `DISPLAY_ORDER`; `*_COUNT` (`MOVIE_COUNT`, `SERIE_COUNT`, `PERSON_COUNT`, `NAME_WORD_COUNT`).
-- **Search / normalisation columns:** `*_NORM` / `*_KEY` for normalised search values.
+- Tables uppercase snake case with a domain prefix: `T_WC_*` (core), `T_WC_T2S_*` (this repo's targets), `T_WC_TMDB_*`, `T_WC_WIKIDATA_*`, `T_WC_WIKIPEDIA_*`, `T_WC_IMDB_*`. The prefix is configurable via `DB_NAMESPACE` (default `T_WC_`).
+- Keys `ID_{ENTITY}`; foreign keys reuse the referenced key name.
+- Columns: `DAT_*` dates, `TIM_*` datetimes, `IS_*` flags plus soft-delete `DELETED`, `DISPLAY_ORDER`, `*_COUNT`, `*_NORM` / `*_KEY` for normalised search values.
 
 ## Configuration & secrets
 
-Configuration is environment-driven. `citizenphil.py` calls `load_dotenv()` on the `.env` next to it at import time; in containers the values come from `--env-file` instead (see README "Secrets handling").
+Env vars: `.env.example` and README § Secrets handling. Secrets are never committed nor baked into the image; the runtime env file lives outside the source tree. There is **no OpenAI / LLM dependency** here. The PyMySQL connection sets `local_infile=True`: keep it in mind if you touch connection setup.
 
-Verified env vars (see `.env.example`):
-- **Database:** `DB_HOST`, `DB_PORT` (default 3306), `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_NAMESPACE` (default `T_WC_`).
-- **Locale:** `USER_TIMEZONE` (default `Europe/Paris`; used for all `TIM_*`/`DAT_*` stamps).
-- **Clock rule (2026-10-19, DEPLOYMENT-015, TMDB-MOVIE-PREPROCESS-060).** Every naive `DATETIME`/`DATE` this repo writes is **naive Europe/Paris**: always `datetime.now(cp.paris_tz)`, never a bare `datetime.now()` (the container runs in UTC, the VPS host stays `Etc/UTC`), and never a fixed `+02:00`. A human-read date with an offset uses the zone too. Compare a Paris column against a cutoff computed in Python with `cp.paris_tz`, not against `NOW()`. The SQL-side `NOW()`/`CURDATE()` writes (`ASSERTION_REFRESH_LAST`, `DAT_CREAT`/`TIM_UPDATED` of the Wikidata-sourced T2S rows in `tmdb_preprocess_helpers.py`) follow the MariaDB clock, which is UTC until TMDB-FRONT-100 sets it to Europe/Paris: values written before that switch are UTC. `TIM_WIKIPEDIA_SEARCH` values written by versions before 1.1.18 are naive UTC as well.
-- **Wikimedia (Processes 60/61/62):** `WIKIMEDIA_USER_AGENT`, `WIKIMEDIA_REQUEST_DELAY_SECONDS`, `WIKIMEDIA_BACKOFF_SECONDS`, `WIKIMEDIA_MAX_RETRIES`, `WIKIMEDIA_TIMEOUT_SECONDS`.
-- **TMDb (optional, read by `citizenphil`):** `TMDB_API_DOMAIN_URL`, `TMDB_API_KEY`, `TMDB_API_TOKEN` — used only if TMDb HTTP calls are exercised; the default scope is DB-only.
-
-There is **no OpenAI / LLM dependency** in this repo. Secrets must never be committed or baked into the image: `.env` is git-ignored and docker-ignored, and the runtime env file lives outside the source tree (e.g. `/home/debian/docker/tmdb-movie-preprocess/.env`). The PyMySQL connection sets `local_infile=True` — keep that in mind if you touch connection setup.
-
-## Encoding
-
-All source and target data is multilingual (English + French labels, accented and non-Latin text). Treat all files as **UTF-8**; do not introduce code that assumes ASCII or a non-UTF-8 locale, and keep DB reads/writes UTF-8-clean.
+**Clock rule (2026-10-19, DEPLOYMENT-015, TMDB-MOVIE-PREPROCESS-060).** Every naive `DATETIME`/`DATE` this repo writes is **naive Europe/Paris**: always `datetime.now(cp.paris_tz)`, never a bare `datetime.now()` (the container runs in UTC, the VPS host stays `Etc/UTC`), and never a fixed `+02:00`. A human-read date with an offset uses the zone too. Compare a Paris column against a cutoff computed in Python with `cp.paris_tz`, not against `NOW()`. The SQL-side `NOW()`/`CURDATE()` writes (`ASSERTION_REFRESH_LAST`, `DAT_CREAT`/`TIM_UPDATED` of the Wikidata-sourced T2S rows in `tmdb_preprocess_helpers.py`) follow the MariaDB clock, which is UTC until TMDB-FRONT-100 sets it to Europe/Paris: values written before that switch are UTC. `TIM_WIKIPEDIA_SEARCH` values written by versions before 1.1.18 are naive UTC as well.
 
 ---
 
-**Last Updated**: 2026-10-25
-**Current Version**: 1.1.29
+**Last Updated**: 2026-10-31
+**Current Version**: 1.1.30
 
 ## Backlog (Nestor second-brain)
 
-The prioritized, agent-ready implementation backlog for this repo lives in the **Nestor**
-knowledge repo (a separate repo, not cloned alongside this one):
-
-- This repo: `C:\Users\vaugo\Nestor\projets\t2s-backlog\repos\tmdb-movie-preprocess.md`
-- Cross-repo dashboard: `C:\Users\vaugo\Nestor\projets\t2s-backlog\index.md`
-
-Consult it before implementing: tasks are `TMDB-MOVIE-PREPROCESS-NNN` with status (done / in-progress /
-todo), priority, and quick-wins. NOTE: these are local paths on Philippe's PC and do not
-resolve on the VPS or on cloud agents (claude.ai/code).
+Tasks `TMDB-MOVIE-PREPROCESS-NNN` (status, priority, quick wins) live in the Nestor repo; consult before implementing: `C:\Users\vaugo\Nestor\projets\t2s-backlog\repos\tmdb-movie-preprocess.md` (dashboard: `...\t2s-backlog\index.md`). These paths exist only on Philippe's PC, not on the VPS or cloud agents.
