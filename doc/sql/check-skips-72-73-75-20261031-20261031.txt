@@ -1,0 +1,17 @@
+-- check-skips-72-73-75-20261031.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-31 16:48:54 +0100
+--
++------------------------------------------+------------------------------------------------------------------------------------------------------------------+---------------------+
+| VAR_NAME                                 | VAR_VALUE                                                                                                        | TIM_UPDATED         |
++------------------------------------------+------------------------------------------------------------------------------------------------------------------+---------------------+
+| strtmdbmoviepreprocessgroupworkerror     |                                                                                                                  | 2026-10-31 16:20:12 |
+| strtmdbmoviepreprocesslocationerror      |                                                                                                                  | 2026-10-31 04:39:39 |
+| strtmdbmoviepreprocesslocationskipped    | wikidata-crawler is loading the Wikidata tables (step 112: resolve media resources, started 2026-10-31 16:17:46) | 2026-10-31 16:19:24 |
+| strtmdbmoviepreprocesssourceworkerror    |                                                                                                                  | 2026-10-31 04:41:22 |
+| strtmdbmoviepreprocesssourceworkskipped  | wikidata-crawler is loading the Wikidata tables (step 112: resolve media resources, started 2026-10-31 16:17:46) | 2026-10-31 16:19:24 |
+| strtmdbmoviepreprocessworkfinanceerror   |                                                                                                                  | 2026-10-31 04:42:17 |
+| strtmdbmoviepreprocessworkfinanceskipped | wikidata-crawler is loading the Wikidata tables (step 112: resolve media resources, started 2026-10-31 16:17:46) | 2026-10-31 16:20:12 |
+| strwikidatacrawlerbulkloadlaststatement  | 74                                                                                                               | 2026-10-31 16:15:53 |
+| strwikidatacrawlercurrentprocess         | 115: cleanup old staging batches                                                                                 | 2026-10-31 16:40:17 |
+| strwikidatacrawlerstatus                 | SUCCESS                                                                                                          | 2026-10-31 16:40:17 |
++------------------------------------------+------------------------------------------------------------------------------------------------------------------+---------------------+
