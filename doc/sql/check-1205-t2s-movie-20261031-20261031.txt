@@ -1,0 +1,50 @@
+-- check-1205-t2s-movie-20261031.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-10-31 15:10:03 +0100
+--
++-----------------------------------+
+| SECTION                           |
++-----------------------------------+
+| 1. tmdb-movie-preprocess position |
++-----------------------------------+
++-----------------------------------------+------------------------------------------+---------------------+
+| VAR_NAME                                | VAR_VALUE                                | TIM_UPDATED         |
++-----------------------------------------+------------------------------------------+---------------------+
+| strtmdbmoviepreprocesscurrentmovieid    | 1808254                                  | 2026-10-31 14:55:54 |
+| strtmdbmoviepreprocesscurrentprocess    | T2S_AWARD                                | 2026-10-31 15:08:35 |
+| strtmdbmoviepreprocesscurrentsubprocess |                                          | 2026-10-31 15:08:35 |
+| strtmdbmoviepreprocessfrom              |                                          | 2026-10-31 14:49:55 |
+| strtmdbmoviepreprocessprocessesexecuted | 0, 1, 64, 2, 62, 3, 41, 61, 42, 43, 44,  | 2026-10-31 15:08:35 |
+| strtmdbmoviepreprocessstartdatetime     | 2026-10-31 14:49:55                      | 2026-10-31 14:49:55 |
+| strtmdbmoviepreprocesst2smovielastrun   | 2026-10-31 03:31:44                      | 2026-10-31 03:36:56 |
+| strtmdbmoviepreprocesstotalruntime      | RUNNING                                  | 2026-10-31 14:49:55 |
++-----------------------------------------+------------------------------------------+---------------------+
++------------------------------+
+| SECTION                      |
++------------------------------+
+| 2. wikidata-crawler position |
++------------------------------+
++-----------------------------------------+------------------------------+---------------------+
+| VAR_NAME                                | VAR_VALUE                    | TIM_UPDATED         |
++-----------------------------------------+------------------------------+---------------------+
+| strwikidatacrawlerbulkloadbatchid       | wikidata_full_20261021_0317  | 2026-10-23 11:40:10 |
+| strwikidatacrawlerbulkloadlaststatement | 33                           | 2026-10-31 13:49:02 |
+| strwikidatacrawlercurrentprocess        | 110: bulk load target tables | 2026-10-31 05:21:34 |
+| strwikidatacrawlerstatus                | RUNNING                      | 2026-10-31 05:21:34 |
+| strwikidatacrawlerstep110startedat      | 2026-10-31 05:21:34          | 2026-10-31 05:21:34 |
+| strwikidatacrawlerstep111startedat      | 2026-10-23 11:40:10          | 2026-10-23 11:40:10 |
+| strwikidatacrawlerstep112startedat      | 2026-10-23 11:42:43          | 2026-10-23 11:42:43 |
+| strwikidatacrawlerstep113startedat      | 2026-10-23 11:46:04          | 2026-10-23 11:46:04 |
+| strwikidatacrawlerstep114startedat      | 2026-10-23 11:46:05          | 2026-10-23 11:46:05 |
+| strwikidatacrawlerstep115startedat      | 2026-10-23 12:06:44          | 2026-10-23 12:06:44 |
++-----------------------------------------+------------------------------+---------------------+
++----------------------+
+| SECTION              |
++----------------------+
+| 3. Open transactions |
++----------------------+
+
+-- ---------------------------------------------------------------------
+-- mariadb stderr. The statements after each error below were still run
+-- (--force), so the results above are complete except for those.
+-- ---------------------------------------------------------------------
+ERROR 1227 (42000) at line 32: Access denied; you need (at least one of) the PROCESS privilege(s) for this operation
