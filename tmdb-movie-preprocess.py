@@ -249,6 +249,23 @@ try:
             # Un forcage ponctuel se fait par la variable d'environnement, jamais par une
             # date en dur qui survit a son jour.
             cp.f_setservervariable("strtmdbmoviepreprocessscope", strprocessscope, "Selected process scope for this run (main | wikidata-topics | wikidata-companies | wikidata-all | assertion-refresh | wikipedia-main-image | neighbours | locations | source-works | group-works | wikidata-colour | genre-alias)", 0)
+            # Resume after a crash (2026-10-31): TMDB_PREPROCESS_FROM=<process number> keeps
+            # the chosen scope but drops every process BEFORE that one in execution order
+            # (dict insertion order, not numeric order). Empty or unset runs the whole
+            # scope, which is what the nightly cron does. A number that is not in the scope
+            # runs NOTHING: silently falling back to the full scope would redo an hour of
+            # work the operator meant to skip.
+            strprocessfrom = os.getenv("TMDB_PREPROCESS_FROM", "").strip()
+            if strprocessfrom:
+                lstprocesskeys = list(arrprocessscope.keys())
+                if strprocessfrom.isdigit() and int(strprocessfrom) in lstprocesskeys:
+                    intprocessfrompos = lstprocesskeys.index(int(strprocessfrom))
+                    arrprocessscope = {k: arrprocessscope[k] for k in lstprocesskeys[intprocessfrompos:]}
+                    print(f"Resuming from process {strprocessfrom}: {intprocessfrompos} earlier process(es) skipped.")
+                else:
+                    print(f"TMDB_PREPROCESS_FROM={strprocessfrom} is not a process of scope {strprocessscope}: nothing runs. Scope order: {lstprocesskeys}")
+                    arrprocessscope = {}
+            cp.f_setservervariable("strtmdbmoviepreprocessfrom", strprocessfrom, "Process the last run resumed from (TMDB_PREPROCESS_FROM), empty for a full run", 0)
             print(f"Process scope: {strprocessscope} ({len(arrprocessscope)} process(es))")
             #arrprocessscope = {48: 'TMDB_CHARACTER', 49: 'TMDB_CHARACTER_ALT'}
             #arrprocessscope = {10: 'T2S_PERSON_SERIE'}

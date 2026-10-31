@@ -75,6 +75,27 @@ Adjust the path after `--env-file` to wherever the host operator stores the runt
 
 The included `tmdb-movie-preprocess.sh` wraps build + run and already uses `--env-file` with the host path above; update that path if your deployment layout differs.
 
+### Resume after a crash (`TMDB_PREPROCESS_FROM`)
+
+When a run dies partway, restart from the process that failed instead of redoing the whole scope. `TMDB_PREPROCESS_FROM=<process number>` keeps the chosen scope (`main` by default) and skips every process that comes **before** that one in execution order. The order is the one listed in the Overview (dict insertion order, not numeric order), so `TMDB_PREPROCESS_FROM=43` in `main` runs 43, 44, 47, 45, 46, 4, 5 and so on to the end.
+
+Find the process that failed: it is the **last number** in the server variable `strtmdbmoviepreprocessprocessesexecuted` (the list of processes started by the run), and `strtmdbmoviepreprocesscurrentprocess` gives its name (for example `T2S_GROUP` for 43). Then on the VPS:
+
+```bash
+cd ~/docker/tmdb-movie-preprocess
+git pull --ff-only
+docker ps -f name=^tmdb-movie-preprocess$     # must be empty
+./tmdb-movie-preprocess.sh 43                 # first argument = TMDB_PREPROCESS_FROM
+docker logs -f tmdb-movie-preprocess
+```
+
+Without the launcher, add `-e TMDB_PREPROCESS_FROM=43` to the `docker run` above. It combines with `TMDB_PREPROCESS_SCOPE`: the number must belong to the selected scope.
+
+- The log prints `Resuming from process 43: N earlier process(es) skipped.` and the server variable `strtmdbmoviepreprocessfrom` records the starting point (empty for a full run).
+- A number outside the scope runs **nothing** and prints the scope order, rather than falling back to a full run.
+- The failed process restarts from its beginning. The connection is not in autocommit, so a process that dies is rolled back to its last commit, and rerunning it in full is the expected behaviour.
+- The cron calls the launcher without an argument, so nightly runs stay full.
+
 ### Decoupled Wikidata-topics job (Process 60)
 
 Process 60 (Link Wikidata items to topics) is network-bound and rate-limited (~3h45m) and is **excluded from the `main` scope**. Run it as a separate scheduled container that reuses the same image and env file, with the scope overridden via `-e`:
