@@ -1,5 +1,9 @@
 # AGENTS.md - Agent Guide for tmdb-movie-preprocess
 
+## Canary
+
+Start every reply with "Philippe,": no exceptions, including short replies and tool summaries.
+
 Rules an agent needs to work on this codebase safely. @README.md is canonical for everything else: scopes, Docker usage, the per-process reference (inputs, outputs, filters, operations), common patterns and the source → target table map. Consult it rather than re-deriving from code, but verify against code before changing behaviour. Update it for any user-facing change; update this file only when agent workflow or safety context changes. `CLAUDE.md` and any other tool-specific file only point here.
 
 Deeper specs: @doc/sql/*.sql (reference DDL, read-only unless asked); @EXTEND_T2S_TECHNICAL.md (completed `T_WC_T2S_TECHNICAL` impact analysis, historical).
@@ -73,7 +77,7 @@ Env vars: `.env.example` and README § Secrets handling. Secrets are never commi
 ---
 
 **Last Updated**: 2026-10-31
-**Current Version**: 1.1.39
+**Current Version**: 1.1.40
 
 ## Backlog (Nestor second-brain)
 
