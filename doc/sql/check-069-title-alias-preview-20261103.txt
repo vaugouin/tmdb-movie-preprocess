@@ -1,0 +1,177 @@
+-- check-069-title-alias-preview.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-11-03 17:11:12 +0100
+--
++----------------------------------+-------+
+| STEP                             | FORMS |
++----------------------------------+-------+
+| T_WC_T2S_MOVIE_TITLE_ALIAS title |     0 |
++----------------------------------+-------+
++-------------------------------------+-------+
+| STEP                                | FORMS |
++-------------------------------------+-------+
+| T_WC_T2S_MOVIE_TITLE_ALIAS label en | 38867 |
++-------------------------------------+-------+
++-------------------------------------+-------+
+| STEP                                | FORMS |
++-------------------------------------+-------+
+| T_WC_T2S_MOVIE_TITLE_ALIAS label fr | 22351 |
++-------------------------------------+-------+
++--------------------------------------+-------+
+| STEP                                 | FORMS |
++--------------------------------------+-------+
+| T_WC_T2S_MOVIE_TITLE_ALIAS label mul |   921 |
++--------------------------------------+-------+
++-------------------------------------+-------+
+| STEP                                | FORMS |
++-------------------------------------+-------+
+| T_WC_T2S_MOVIE_TITLE_ALIAS alias en | 61219 |
++-------------------------------------+-------+
++-------------------------------------+-------+
+| STEP                                | FORMS |
++-------------------------------------+-------+
+| T_WC_T2S_MOVIE_TITLE_ALIAS alias fr | 26530 |
++-------------------------------------+-------+
++--------------------------------+----------+-------------------------------------+-----------+
+| TMDB_ORIGINAL_TITLE            | ID_MOVIE | TITLE                               | LANG_CODE |
++--------------------------------+----------+-------------------------------------+-----------+
+| The Dark Knight                |      155 | The Dark Knight, Le Chevalier Noir  | fr        |
+| The Dark Knight                |      155 | Le Chevalier noir                   | fr        |
+| The Dark Knight                |      155 | The Dark Knight: Le Chevalier noir  | fr        |
+| 호프                           |  1058424 | Hopeu                               | fr        |
+| Insidious: Out of the Further  |  1291595 | Insidious 6                         | fr        |
+| Insidious: Out of the Further  |  1291595 | Insidious: The Bleeding World       | fr        |
+| The Nightmare Before Christmas |     9479 | L’Étrange Noël de monsieur Jack     | fr        |
+| The Nightmare Before Christmas |     9479 | L’Etrange Noël de Monsieur Jack     | fr        |
+| The Nightmare Before Christmas |     9479 | L'étrange Noël de M. Jack           | fr        |
+| The Nightmare Before Christmas |     9479 | Nightmare Before Christmas          | fr        |
+| The Nightmare Before Christmas |     9479 | L'étrange Noel de M. Jack           | fr        |
+| The Nightmare Before Christmas |     9479 | L'Étrange Noël de mister Jack       | fr        |
+| The Nightmare Before Christmas |     9479 | Étrange Noël de monsieur Jack       | fr        |
+| Avengers: Doomsday             |  1003596 | Avengers : The Kang Dynasty         | fr        |
+| La bola negra                  |  1422041 | La Boule noire                      | fr        |
++--------------------------------+----------+-------------------------------------+-----------+
++--------------------------------+----------+---------------------------------------------+-----------+
+| TMDB_ORIGINAL_TITLE            | ID_MOVIE | TITLE                                       | LANG_CODE |
++--------------------------------+----------+---------------------------------------------+-----------+
+| The Dark Knight                |      155 | Batman: The Dark Knight                     | en        |
+| The Dark Knight                |      155 | Dark Knight                                 | en        |
+| Spider-Man: Brand New Day      |   969681 | Spider-Man 4                                | en        |
+| Fall 2: Deadpoint              |  1101412 | Fall 2                                      | en        |
+| The Odyssey                    |  1368337 | Odyssey                                     | en        |
+| The Odyssey                    |  1368337 | 2026 The Odyssey                            | en        |
+| The Odyssey                    |  1368337 | 2026 Odyssey                                | en        |
+| The Odyssey                    |  1368337 | Christopher Nolan The Odyssey               | en        |
+| The Odyssey                    |  1368337 | Christopher Nolan Odyssey                   | en        |
+| Insidious: Out of the Further  |  1291595 | Insidious: The Bleeding World               | en        |
+| Insidious: Out of the Further  |  1291595 | Insidious 6                                 | en        |
+| Insidious: Out of the Further  |  1291595 | Insidious VI                                | en        |
+| Clayface                       |  1400940 | Clayface (film)                             | en        |
+| The Nightmare Before Christmas |     9479 | Tim Burton's The Nightmare Before Christmas | en        |
+| Coyote vs. Acme                |  1204680 | Coyote v. Acme                              | en        |
++--------------------------------+----------+---------------------------------------------+-----------+
++-------------------------------------------+----------+---------------------------------------------+-----------+
+| TMDB_ORIGINAL_TITLE                       | ID_MOVIE | TITLE                                       | LANG_CODE |
++-------------------------------------------+----------+---------------------------------------------+-----------+
+| Mission: Impossible - The Final Reckoning |   575265 | Mission: Impossible – The Final Reckoning   | mul       |
+| Straume                                   |   823219 | Flow/Straume                                | mul       |
+| Wake Up Dead Man: A Knives Out Mystery    |   812583 | Wake Up Dead Man                            | mul       |
+| The Twilight Saga: Breaking Dawn - Part 2 |    50620 | The Twilight Saga: Breaking Dawn – Part 2   | mul       |
+| Love Me Love Me                           |  1317672 | Love Me, Love Me                            | mul       |
+| The Twilight Saga: Breaking Dawn - Part 1 |    50619 | The Twilight Saga: Breaking Dawn – Part 1   | mul       |
+| ಟಾಕ್ಸಿಕ್                                  |  1213243 | Toxic: A Fairy Tale for Grown-Ups           | mul       |
+| Miraculous - le film                      |   496450 | Ladybug & Cat Noir: The Movie               | mul       |
+| 가능한 사랑                               |  1483525 | Ganeunghan sarang                           | mul       |
+| Focker-in-Law                             |  1400336 | Focker In-Law                               | mul       |
+| STRAW                                     |  1426776 | big boss movie                              | mul       |
+| Haps: Crime Doesn't Pay                   |  1300258 | Haps                                        | mul       |
+| Nervures                                  |  1455066 | long métrage de fiction                     | mul       |
+| Astérix & Obélix : L'Empire du Milieu     |   643215 | Astérix et Obélix : l'Empire du Milieu      | mul       |
+| F Valentine's Day                         |  1429605 | F*ck Valentine's Day                        | mul       |
++-------------------------------------------+----------+---------------------------------------------+-----------+
++----------------------------------+-------+
+| STEP                             | FORMS |
++----------------------------------+-------+
+| T_WC_T2S_SERIE_TITLE_ALIAS title |     0 |
++----------------------------------+-------+
++-------------------------------------+-------+
+| STEP                                | FORMS |
++-------------------------------------+-------+
+| T_WC_T2S_SERIE_TITLE_ALIAS label en |  6777 |
++-------------------------------------+-------+
++-------------------------------------+-------+
+| STEP                                | FORMS |
++-------------------------------------+-------+
+| T_WC_T2S_SERIE_TITLE_ALIAS label fr |  3105 |
++-------------------------------------+-------+
++--------------------------------------+-------+
+| STEP                                 | FORMS |
++--------------------------------------+-------+
+| T_WC_T2S_SERIE_TITLE_ALIAS label mul |   446 |
++--------------------------------------+-------+
++-------------------------------------+-------+
+| STEP                                | FORMS |
++-------------------------------------+-------+
+| T_WC_T2S_SERIE_TITLE_ALIAS alias en | 13063 |
++-------------------------------------+-------+
++-------------------------------------+-------+
+| STEP                                | FORMS |
++-------------------------------------+-------+
+| T_WC_T2S_SERIE_TITLE_ALIAS alias fr |  3601 |
++-------------------------------------+-------+
++-----------------------------------+----------+------------------------------------+-----------+
+| TMDB_ORIGINAL_TITLE               | ID_SERIE | TITLE                              | LANG_CODE |
++-----------------------------------+----------+------------------------------------+-----------+
+| Law & Order: Special Victims Unit |     2734 | New York : Unité spéciale          | fr        |
+| Law & Order: Special Victims Unit |     2734 | La Loi et l'Ordre : crimes sexuels | fr        |
+| How I Met Your Mother             |     1100 | HIMYM                              | fr        |
+| The Vampire Diaries               |    18165 | Journal d'un vampire               | fr        |
+| The Mentalist                     |     5920 | Le mentaliste                      | fr        |
+| The Simpsons                      |      456 | Simpson                            | fr        |
+| House                             |     1408 | House, M.D.                        | fr        |
+| Supernatural                      |     1622 | Surnaturel                         | fr        |
+| Orange Is the New Black           |     1424 | L'orange lui va si bien            | fr        |
+| The Magicians                     |    64432 | Les Magiciens                      | fr        |
+| Kuruluş Osman                     |    95603 | Établissement: Osman               | fr        |
+| Kuruluş Osman                     |    95603 | L' Ottoman                         | fr        |
+| Kuruluş Osman                     |    95603 | Ottoman                            | fr        |
+| The Last of Us                    |   100088 | TLoU                               | fr        |
+| The Legend of Korra               |    33880 | Avatar : The Legend of Korra       | fr        |
++-----------------------------------+----------+------------------------------------+-----------+
++-----------------------------------+----------+-------------------------------------+-----------+
+| TMDB_ORIGINAL_TITLE               | ID_SERIE | TITLE                               | LANG_CODE |
++-----------------------------------+----------+-------------------------------------+-----------+
+| Law & Order: Special Victims Unit |     2734 | Law & Order: SVU                    | en        |
+| Law & Order: Special Victims Unit |     2734 | SVU                                 | en        |
+| Law & Order: Special Victims Unit |     2734 | Special Victims Unit                | en        |
+| Law & Order: Special Victims Unit |     2734 | Law and Order: SVU                  | en        |
+| Law & Order: Special Victims Unit |     2734 | Law and Order: Special Victims Unit | en        |
+| How I Met Your Mother             |     1100 | HIMYM                               | en        |
+| Criminal Minds                    |     4057 | Criminal Minds: Evolution           | en        |
+| The Office                        |     2316 | Flor cabrera                        | en        |
+| Baywatch                          |     4386 | Baywatch Hawaii                     | en        |
+| Supernatural                      |     1622 | SPN                                 | en        |
+| The 100                           |    48866 | The Hundred                         | en        |
+| Columbo                           |      873 | Lieutenant Columbo                  | en        |
+| Orange Is the New Black           |     1424 | OITNB                               | en        |
+| The Summer I Turned Pretty        |   194766 | TSITP                               | en        |
+| Kuruluş Osman                     |    95603 | The Ottoman                         | en        |
++-----------------------------------+----------+-------------------------------------+-----------+
++-------------------------------------------+----------+---------------------------------------------+-----------+
+| TMDB_ORIGINAL_TITLE                       | ID_SERIE | TITLE                                       | LANG_CODE |
++-------------------------------------------+----------+---------------------------------------------+-----------+
+| House                                     |     1408 | House M.D.                                  | mul       |
+| Kuruluş Osman                             |    95603 | Kuruluş: Osman                              | mul       |
+| Barbara Karlich – Talk um 4               |   108188 | Die Barbara Karlich Show                    | mul       |
+| BoJack Horseman                           |    61222 | nepe                                        | mul       |
+| Steve                                     |    86342 | Steve on Watch                              | mul       |
+| Anderson Cooper 360°                      |     3508 | Anderson Cooper 360                         | mul       |
+| DAS!                                      |    62992 | DAS! Rote Sofa                              | mul       |
+| Alarm für Cobra 11 - Die Autobahnpolizei  |     1338 | Alarm für Cobra 11 – Die Autobahnpolizei    | mul       |
+| MDR um 4                                  |   103108 | MDR um Vier – Der starke Osten              | mul       |
+| Meet the Press                            |     4496 | NBC Meet the Press                          | mul       |
+| Morgenmagazin                             |    37288 | ZDF-Morgenmagazin                           | mul       |
+| Schitt's Creek                            |    61662 | Schitt’s Creek                              | mul       |
+| Le 20H                                    |   299690 | Journal de 20 heures                        | mul       |
+| Brothers and Sisters                      |      341 | Brothers & Sisters                          | mul       |
+| 仙逆                                      |   223911 | Renegade Immortal (Donghua)                 | mul       |
++-------------------------------------------+----------+---------------------------------------------+-----------+
