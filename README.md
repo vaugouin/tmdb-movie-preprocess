@@ -25,6 +25,7 @@ for intindex, strdesc in arrprocessscope.items():
 - `group-works` (alias `group-work`), **only** Process 74 (TMDB-MOVIE-PREPROCESS-059): rebuild `T_WC_T2S_GROUP_MOVIE` and `T_WC_T2S_GROUP_SERIE`, a group's works. Wrapper: `tmdb-movie-preprocess-group-works.sh`. Prerequisite once: `doc/sql/migration-t2s-group-work.sql`. Acceptance: `doc/sql/test-059-group-work.sql`. In `main` it runs after 73, hence after 43 and 9, 10, 29, 31 whose outputs it reads.
 - `finance` (aliases `work-finance`, `box-office`), **only** Process 75 (TMDB-MOVIE-PREPROCESS-066): rebuild `T_WC_T2S_WORK_FINANCE`, the budgets and box office of the movies and series from Wikidata, by place and date. Wrapper: `tmdb-movie-preprocess-finance.sh`. The table is created by the process. Acceptance: `doc/sql/test-066-work-finance.sql`. In `main` it runs after 74, hence after 72 whose locations it links.
 - `genre-alias` (alias `genres-aliases`), **only** Processes 51 and 50 (`T_WC_T2S_PERSON_ALSO_KNOWN_AS`, then `T_WC_T2S_GENRE` and `T_WC_T2S_GENRE_LANG`). For the first build of the three tables and reruns on demand; in `main`, 51 runs right after 6 and 50 right before 11. Wrapper: `tmdb-movie-preprocess-genre-alias.sh`.
+- `title-alias` (alias `title-aliases`), **only** Process 52 (`T_WC_T2S_MOVIE_TITLE_ALIAS`, `T_WC_T2S_SERIE_TITLE_ALIAS`). For the first build and reruns on demand; in `main`, 52 runs right after 4 and 5. Wrapper: `tmdb-movie-preprocess-title-alias.sh`.
 - `neighbours` (aliases `neighbors`, `similar-recommendations`) — **only** Processes 36-39 (rebuild the T2S `similar` / `recommendation` neighbour tables from the raw `T_WC_TMDB_*` twins). Handy as a **unit test** right after creating the four T2S tables, without the whole pipeline. Wrapper: `tmdb-movie-preprocess-neighbours.sh`.
 - `assertion-refresh` (alias `assertions`), **only** Process 70 (rebuild `ASSERTIONS_QUERY_RESULT` of the living evaluations, e.g. right after seeding new showcase samples). Wrapper: `tmdb-movie-preprocess-assertion-refresh.sh`.
 - `wikipedia-main-image` (alias `wikipedia-image`), **only** Process 71 (re-copy the Wikipedia lead image from `T_WC_WIKIPEDIA_PAGE_LANG` into the T2S serving columns, e.g. right after a wikipedia-crawler pass or a first `locations` / `source-works` pass). Wrapper: `tmdb-movie-preprocess-wikipedia-main-image.sh`.
@@ -794,6 +795,21 @@ Copies the person aliases of the T2S persons only (TMDB-MOVIE-PREPROCESS-054). T
 
 ---
 
+### Process 52 - T2S_TITLE_ALIAS
+
+Builds the movie and series title aliases (TMDB-MOVIE-PREPROCESS-069): the second table of a two-level title resolution in `fastapi-text2sql`, as `T_WC_T2S_PERSON_ALSO_KNOWN_AS` is for person names (FASTAPI-TEXT2SQL-360). The API looks a title up in `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` first, and in these tables only when that misses.
+
+**Reads:** `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_WIKIDATA_MOVIE`, `T_WC_WIKIDATA_SERIE` (`LABELS_JSON`, `ALIASES_JSON`), `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_STRING_VALUE` (P1476, read by wikidata-crawler since WIKIDATA-CRAWLER-031)
+**Writes:** `T_WC_T2S_MOVIE_TITLE_ALIAS`, `T_WC_T2S_SERIE_TITLE_ALIAS`
+
+**Forms, in this order:** the Wikidata title P1476 (every language, `LANG_CODE` from the statement, deprecated rank left out), the labels in en, fr and mul, the aliases in en and fr (one row per array element, through `JSON_TABLE`). `ALIAS_SOURCE` says which: `title`, `label`, `alias`.
+
+**Filter:** a living T2S row linked by `ID_WIKIDATA`, and a form different from the three TMDb titles of the row (`MOVIE_TITLE`, `MOVIE_TITLE_FR`, `ORIGINAL_TITLE`, and their series twins). The comparison runs in `utf8mb4_unicode_ci`, so case and accents do not count, as in the SQL the API generates; every form is converted to that collation first. The unique key (`ID_MOVIE`, `TITLE`), in the same collation, drops the duplicates across sources, the first source inserted winning.
+
+**Operations:** full rebuild of each table in a `*_BUILD` copy created from `STR_TITLE_ALIAS_DDL` (`tmdb_preprocess_helpers.py`), then an atomic `RENAME TABLE` swap. `TITLE_NORM` / `TITLE_KEY` are generated with the expressions of `PERSON_NAME_NORM` / `PERSON_NAME_KEY`. `ID_ROW` is renumbered at every run: consumers key on `ID_MOVIE` / `ID_SERIE`, never on it. Skips itself behind `f_wikidataloadbusy()` while wikidata-crawler writes the Wikidata tables (-063), keeping the previous tables; reason in `strtmdbmoviepreprocesstitlealiasskipped`, last error in `strtmdbmoviepreprocesstitlealiaserror`. Preview without writing: `doc/sql/check-069-title-alias-preview.sql`.
+
+---
+
 ### Process 60 — Link Wikidata items to topics
 
 Links TMDb keywords to Wikidata items before process `3` builds `T_WC_T2S_TOPIC`, and spreads the work over rolling daily batches.
@@ -1239,6 +1255,7 @@ The one-column form is unchanged and remains right for a single-kind question (`
 | T_WC_TMDB_EPISODE_VIDEO | T_WC_T2S_EPISODE_VIDEO |
 | T_WC_TMDB_GENRE / T_WC_TMDB_GENRE_LANG | T_WC_T2S_GENRE, T_WC_T2S_GENRE_LANG |
 | T_WC_TMDB_PERSON_ALSO_KNOWN_AS (T2S persons only) | T_WC_T2S_PERSON_ALSO_KNOWN_AS |
+| T_WC_WIKIDATA_MOVIE / _SERIE (labels, aliases), P1476 statements, minus the TMDb titles | T_WC_T2S_MOVIE_TITLE_ALIAS, T_WC_T2S_SERIE_TITLE_ALIAS |
 | T_WC_TMDB_LIST / T_WC_CUSTOM_LIST (TARGET_TABLE=1) | T_WC_T2S_LIST, T_WC_T2S_MOVIE_LIST, T_WC_T2S_SERIE_LIST |
 | T_WC_TMDB_COLLECTION / T_WC_CUSTOM_LIST (TARGET_TABLE=2) | T_WC_T2S_COLLECTION, T_WC_T2S_MOVIE_COLLECTION, T_WC_T2S_SERIE_COLLECTION |
 | T_WC_TMDB_KEYWORD / T_WC_TMDB_LIST / T_WC_TMDB_COLLECTION | T_WC_T2S_TOPIC |

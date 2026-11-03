@@ -38,6 +38,7 @@ from tmdb_preprocess_helpers import (
     f_readwithoutlocking,
     f_buildsourceworkclasstable,
     f_buildsourceworktables,
+    f_buildtitlealiastables,
     f_buildgroupworktables,
     f_buildworkfinancetable,
     INT_GROUP_WORK_MIN_MEMBERS,
@@ -139,7 +140,7 @@ try:
             # Process 3 (T2S_TOPIC) only reads the ID_WIKIDATA that 60 stamps on
             # T_WC_TMDB_KEYWORD and is itself a rolling idempotent batch, so the two need not
             # run in the same invocation. The default scope ("main") excludes Process 60.
-            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 73: 'T2S_SOURCE_WORK', 74: 'T2S_GROUP_WORK', 75: 'T2S_WORK_FINANCE', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
+            arrprocessscopemain = {0: 'T_WC_CUSTOM_LIST_UNESCAPE', 1: 'WIKIPEDIA_FORMAT_LINE', 64: 'WIKIDATA_COLOR', 2: 'T2S_MOVIE_TECHNICAL', 62: 'Link Wikidata items to T2S technical', 3: 'T2S_TOPIC', 41: 'T2S_COLLECTION', 61: 'Link Wikidata items to collections', 42: 'T2S_LIST', 43: 'T2S_GROUP', 44: 'T2S_AWARD', 47: 'T2S_NOMINATION', 45: 'T2S_MOVEMENT', 46: 'T2S_DEATH', 4: 'T2S_MOVIE', 5: 'T2S_SERIE', 52: 'T2S_TITLE_ALIAS', 6: 'T2S_PERSON', 51: 'T2S_PERSON_ALSO_KNOWN_AS', 7: 'T2S_COMPANY', 8: 'T2S_NETWORK', 9: 'T2S_PERSON_MOVIE', 10: 'T2S_PERSON_SERIE', 50: 'T2S_GENRE', 11: 'T2S_MOVIE_GENRE', 12: 'T2S_SERIE_GENRE', 36: 'T2S_MOVIE_SIMILAR', 37: 'T2S_MOVIE_RECOMMENDATION', 38: 'T2S_SERIE_SIMILAR', 39: 'T2S_SERIE_RECOMMENDATION', 13: 'T2S_MOVIE_COMPANY', 14: 'T2S_SERIE_COMPANY', 15: 'T2S_SERIE_NETWORK', 16: 'T2S_MOVIE_PRODUCTION_COUNTRY', 17: 'T2S_SERIE_PRODUCTION_COUNTRY', 18: 'T2S_MOVIE_SPOKEN_LANGUAGE', 19: 'T2S_SERIE_SPOKEN_LANGUAGE', 20: 'T2S_COMPANY_IMAGE', 21: 'T2S_MOVIE_IMAGE', 22: 'T2S_NETWORK_IMAGE', 23: 'T2S_PERSON_IMAGE', 24: 'T2S_SERIE_IMAGE', 25: 'T2S_MOVIE_VIDEO', 26: 'T2S_SERIE_VIDEO', 27: 'T2S_SEASON', 28: 'T2S_EPISODE', 29: 'T2S_PERSON_SEASON', 31: 'T2S_PERSON_EPISODE', 32: 'T2S_SEASON_IMAGE', 33: 'T2S_EPISODE_IMAGE', 34: 'T2S_SEASON_VIDEO', 35: 'T2S_EPISODE_VIDEO', 40: 'T2S_ITEM', 72: 'T2S_LOCATION', 73: 'T2S_SOURCE_WORK', 74: 'T2S_GROUP_WORK', 75: 'T2S_WORK_FINANCE', 70: 'T2S_EVALUATION_ASSERTION_REFRESH', 71: 'T2S_WIKIPEDIA_MAIN_IMAGE'}
             arrprocessscopewikidatatopics = {60: 'Link Wikidata items to topics'}
             # Pilot: the same decoupled, rate-limited pattern as Process 60, for
             # companies (Process 63). Run with TMDB_PREPROCESS_SCOPE=wikidata-companies.
@@ -210,6 +211,10 @@ try:
             # the first build of the three tables, and reruns on demand, without the main run.
             # In main, 51 follows 6 and 50 precedes 11. Run with TMDB_PREPROCESS_SCOPE=genre-alias.
             arrprocessscopegenrealias = {51: 'T2S_PERSON_ALSO_KNOWN_AS', 50: 'T2S_GENRE'}
+            # Movie and series title aliases only (Process 52, TMDB-MOVIE-PREPROCESS-069): the first
+            # build of the two tables, and reruns on demand. In main, 52 follows 4 and 5.
+            # Run with TMDB_PREPROCESS_SCOPE=title-alias.
+            arrprocessscopetitlealias = {52: 'T2S_TITLE_ALIAS'}
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
                 arrprocessscope = arrprocessscopewikidatatopics
@@ -235,6 +240,8 @@ try:
                 arrprocessscope = arrprocessscopewikidatacolour
             elif strprocessscope in ("genre-alias", "genres-aliases"):
                 arrprocessscope = arrprocessscopegenrealias
+            elif strprocessscope in ("title-alias", "title-aliases"):
+                arrprocessscope = arrprocessscopetitlealias
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
@@ -6604,6 +6611,31 @@ RENAME TABLE
                         cursor.execute("SELECT COUNT(*) AS row_count FROM T_WC_TMDB_PERSON_ALSO_KNOWN_AS")
                         lngsourcecount = cursor.fetchone()['row_count']
                         print(f"T_WC_T2S_PERSON_ALSO_KNOWN_AS: {lngt2scount} rows kept out of {lngsourcecount} source aliases")
+
+                elif intindex == 52:
+                    #----------------------------------------------------
+                    # TMDB-MOVIE-PREPROCESS-069: the movie and series title aliases, second level of
+                    # the title resolution in fastapi-text2sql (FASTAPI-TEXT2SQL-360), as process 51
+                    # is for person names. Wikidata P1476 (WIKIDATA-CRAWLER-031), labels and aliases,
+                    # minus the forms equal to a TMDb title. Reads the Wikidata target tables, so it
+                    # waits behind the same guard as 72 and 73 (-063): a skip keeps yesterday's tables.
+                    print("T2S_TITLE_ALIAS processing")
+                    strtitlealiasbusy = f_wikidataloadbusy("52")
+                    cp.f_setservervariable("strtmdbmoviepreprocesstitlealiasskipped", strtitlealiasbusy, "Why the title alias rebuild (process 52) was skipped in the last run, empty when it ran", 0)
+                    if strtitlealiasbusy:
+                        print(f"52: SKIPPED, {strtitlealiasbusy}. The served title alias tables are unchanged; the next night rebuilds them.")
+                    else:
+                        cp.f_setservervariable("strtmdbmoviepreprocesscurrentsubprocess","Rebuilding T2S_MOVIE_TITLE_ALIAS and T2S_SERIE_TITLE_ALIAS","Current sub process in the TMDb database movie preprocess",0)
+                        try:
+                            arrtitlealiascounts = f_buildtitlealiastables()
+                            for strtitlealiastable, arrtitlealiastablecounts in arrtitlealiascounts.items():
+                                strtitlealiasdetail = ", ".join(f"{k} {v}" for k, v in arrtitlealiastablecounts.items() if k != "total")
+                                print(f"52: {strtitlealiastable}: {arrtitlealiastablecounts.get('total', 0)} rows ({strtitlealiasdetail})")
+                            cp.f_setservervariable("strtmdbmoviepreprocesstitlealiaserror", "", "Last error of the title alias rebuild (process 52), empty when it succeeded", 0)
+                        except Exception as titlealiaserror:
+                            strtitlealiaserror = f"{type(titlealiaserror).__name__}: {titlealiaserror}"
+                            print(f"52: FAILED, the served tables are unchanged: {strtitlealiaserror}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesstitlealiaserror", strtitlealiaserror, "Last error of the title alias rebuild (process 52), empty when it succeeded", 0)
 
                 elif intindex == 32:
                     #----------------------------------------------------

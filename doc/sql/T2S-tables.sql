@@ -1868,6 +1868,62 @@ CREATE TABLE `T_WC_T2S_PERSON_ALSO_KNOWN_AS` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
+-- TMDB-MOVIE-PREPROCESS-069, process 52: full rebuild every night (DDL carried by
+-- STR_TITLE_ALIAS_DDL in tmdb_preprocess_helpers.py). ID_ROW is renumbered at every run.
+CREATE TABLE `T_WC_T2S_MOVIE_TITLE_ALIAS` (
+  `ID_ROW` int(11) NOT NULL AUTO_INCREMENT,
+  `ID_MOVIE` int(11) NOT NULL,
+  `TITLE` varchar(500) NOT NULL,
+  `LANG_CODE` varchar(20) DEFAULT NULL,
+  `ALIAS_SOURCE` varchar(10) NOT NULL,
+  `DELETED` int(5) DEFAULT 0,
+  `DISPLAY_ORDER` int(5) DEFAULT NULL,
+  `ID_CREATOR` int(5) DEFAULT NULL,
+  `DAT_CREAT` date DEFAULT NULL,
+  `ID_OWNER` int(5) DEFAULT NULL,
+  `TIM_UPDATED` datetime DEFAULT NULL,
+  `ID_USER_UPDATED` int(5) DEFAULT NULL,
+  `TITLE_NORM` varchar(500) GENERATED ALWAYS AS (lcase(regexp_replace(regexp_replace(`TITLE`,'[^\\p{L}\\p{M}\\p{N} ]+',' '),' +',' '))) STORED,
+  `TITLE_KEY` varchar(500) GENERATED ALWAYS AS (replace(`TITLE_NORM`,' ','')) STORED,
+  PRIMARY KEY (`ID_ROW`),
+  UNIQUE KEY `UQ_T2S_MOVIE_TITLE_ALIAS_TITLE` (`ID_MOVIE`,`TITLE`),
+  KEY `ID_MOVIE` (`ID_MOVIE`),
+  KEY `LANG_CODE` (`LANG_CODE`),
+  KEY `ALIAS_SOURCE` (`ALIAS_SOURCE`),
+  KEY `IDX_T2S_MOVIE_TITLE_ALIAS_TITLE_NORM` (`TITLE_NORM`),
+  KEY `IDX_T2S_MOVIE_TITLE_ALIAS_TITLE_KEY` (`TITLE_KEY`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+-- TMDB-MOVIE-PREPROCESS-069, process 52: full rebuild every night (DDL carried by
+-- STR_TITLE_ALIAS_DDL in tmdb_preprocess_helpers.py). ID_ROW is renumbered at every run.
+CREATE TABLE `T_WC_T2S_SERIE_TITLE_ALIAS` (
+  `ID_ROW` int(11) NOT NULL AUTO_INCREMENT,
+  `ID_SERIE` int(11) NOT NULL,
+  `TITLE` varchar(500) NOT NULL,
+  `LANG_CODE` varchar(20) DEFAULT NULL,
+  `ALIAS_SOURCE` varchar(10) NOT NULL,
+  `DELETED` int(5) DEFAULT 0,
+  `DISPLAY_ORDER` int(5) DEFAULT NULL,
+  `ID_CREATOR` int(5) DEFAULT NULL,
+  `DAT_CREAT` date DEFAULT NULL,
+  `ID_OWNER` int(5) DEFAULT NULL,
+  `TIM_UPDATED` datetime DEFAULT NULL,
+  `ID_USER_UPDATED` int(5) DEFAULT NULL,
+  `TITLE_NORM` varchar(500) GENERATED ALWAYS AS (lcase(regexp_replace(regexp_replace(`TITLE`,'[^\\p{L}\\p{M}\\p{N} ]+',' '),' +',' '))) STORED,
+  `TITLE_KEY` varchar(500) GENERATED ALWAYS AS (replace(`TITLE_NORM`,' ','')) STORED,
+  PRIMARY KEY (`ID_ROW`),
+  UNIQUE KEY `UQ_T2S_SERIE_TITLE_ALIAS_TITLE` (`ID_SERIE`,`TITLE`),
+  KEY `ID_SERIE` (`ID_SERIE`),
+  KEY `LANG_CODE` (`LANG_CODE`),
+  KEY `ALIAS_SOURCE` (`ALIAS_SOURCE`),
+  KEY `IDX_T2S_SERIE_TITLE_ALIAS_TITLE_NORM` (`TITLE_NORM`),
+  KEY `IDX_T2S_SERIE_TITLE_ALIAS_TITLE_KEY` (`TITLE_KEY`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `T_WC_T2S_PERSON_AWARD` (
   `ID_ROW` int(11) NOT NULL AUTO_INCREMENT,
   `ID_PERSON` int(11) NOT NULL,

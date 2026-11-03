@@ -4023,3 +4023,142 @@ def f_buildworkfinancetable():
         return arrresult
     finally:
         cursor.close()
+
+
+# ---------------------------------------------------------------------------------------------
+# TMDB-MOVIE-PREPROCESS-069: movie and series title aliases (process 52)
+# ---------------------------------------------------------------------------------------------
+
+# One template for both tables, as for the person aliases of process 51 (T2S_PERSON_ALSO_KNOWN_AS):
+# the _BUILD table is created from this DDL, not LIKE the live table, so a change reaches the
+# live table at the next run through the swap. TITLE_NORM / TITLE_KEY are generated exactly as
+# PERSON_NAME_NORM / PERSON_NAME_KEY (p{M} keeps the vowels of the abugidas).
+# ID_ROW is renumbered at every run: nothing may reference it; consumers key on ID_MOVIE / ID_SERIE.
+STR_TITLE_ALIAS_DDL = r"""
+CREATE TABLE {table} (
+  ID_ROW int(11) NOT NULL AUTO_INCREMENT,
+  {idcol} int(11) NOT NULL,
+  TITLE varchar(500) NOT NULL,
+  LANG_CODE varchar(20) DEFAULT NULL,
+  ALIAS_SOURCE varchar(10) NOT NULL,
+  DELETED int(5) DEFAULT 0,
+  DISPLAY_ORDER int(5) DEFAULT NULL,
+  ID_CREATOR int(5) DEFAULT NULL,
+  DAT_CREAT date DEFAULT NULL,
+  ID_OWNER int(5) DEFAULT NULL,
+  TIM_UPDATED datetime DEFAULT NULL,
+  ID_USER_UPDATED int(5) DEFAULT NULL,
+  TITLE_NORM varchar(500) GENERATED ALWAYS AS (lcase(regexp_replace(regexp_replace(TITLE,'[^\\p{L}\\p{M}\\p{N} ]+',' '),' +',' '))) STORED,
+  TITLE_KEY varchar(500) GENERATED ALWAYS AS (replace(TITLE_NORM,' ','')) STORED,
+  PRIMARY KEY (ID_ROW),
+  UNIQUE KEY UQ_{short}_TITLE ({idcol}, TITLE),
+  KEY {idcol} ({idcol}),
+  KEY LANG_CODE (LANG_CODE),
+  KEY ALIAS_SOURCE (ALIAS_SOURCE),
+  KEY IDX_{short}_TITLE_NORM (TITLE_NORM),
+  KEY IDX_{short}_TITLE_KEY (TITLE_KEY)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+# (T2S table, id column, TMDb title columns, Wikidata table, alias table, short name for keys)
+TUPLE_TITLE_ALIAS_TARGETS = (
+    ("T_WC_T2S_MOVIE", "ID_MOVIE", ("MOVIE_TITLE", "MOVIE_TITLE_FR", "ORIGINAL_TITLE"),
+     "T_WC_WIKIDATA_MOVIE", "T_WC_T2S_MOVIE_TITLE_ALIAS", "T2S_MOVIE_TITLE_ALIAS"),
+    ("T_WC_T2S_SERIE", "ID_SERIE", ("SERIE_TITLE", "SERIE_TITLE_FR", "ORIGINAL_TITLE"),
+     "T_WC_WIKIDATA_SERIE", "T_WC_T2S_SERIE_TITLE_ALIAS", "T2S_SERIE_TITLE_ALIAS"),
+)
+# Languages read from the Wikidata blobs. The crawler keeps aliases in fr and en only
+# (ALIAS_LANGUAGES); labels exist in every language, and these three are the ones a user types.
+TUPLE_TITLE_ALIAS_LABEL_LANGUAGES = ("en", "fr", "mul")
+TUPLE_TITLE_ALIAS_ALIAS_LANGUAGES = ("en", "fr")
+
+
+def f_titlealiasinsertsql(strt2s, stridcol, arrtitlecols, strwikidata, strbuild, strsource, strlang=None):
+    """One INSERT IGNORE into the _BUILD alias table, for one source of forms.
+
+    strsource: 'title' (P1476, every language, from the V2 statements), 'label' (LABELS_JSON
+    of strlang) or 'alias' (ALIASES_JSON of strlang, one row per array element, JSON_TABLE).
+    A form is kept only if it differs from the three TMDb titles of the row: the comparison
+    runs in the table collation (utf8mb4_unicode_ci), so case and accents do not count, as in
+    the generated SQL of fastapi-text2sql (every form is converted to that collation first: a
+    JSON function or a JSON_TABLE column would otherwise compare in its own). The unique key (id, TITLE) in the same collation
+    drops the duplicates across sources, the first inserted winning: P1476, then labels, then
+    aliases. The forms come from living T2S rows linked by ID_WIKIDATA.
+    """
+    strdiff = " AND ".join(f"x.TITLE <> COALESCE(m.{c}, '')" for c in arrtitlecols)
+    strlinked = (f"  WHERE COALESCE(m.DELETED, 0) = 0 AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> ''\n")
+    strhead = (f"INSERT IGNORE INTO {strbuild} ({stridcol}, TITLE, LANG_CODE, ALIAS_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED)\n"
+               f"SELECT x.{stridcol}, x.TITLE, x.LANG_CODE, '{strsource}', 0, CURDATE(), NOW()\nFROM (\n")
+    if strsource == "title":
+        strinner = (f"  SELECT m.{stridcol}, CONVERT(LEFT(TRIM(sv.VALUE_STRING), 500) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TITLE, sv.LANG_CODE\n"
+                    f"  FROM {strt2s} m\n"
+                    f"  JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_WIKIDATA = m.ID_WIKIDATA AND st.ID_PROPERTY = 'P1476'\n"
+                    f"       AND COALESCE(st.DELETED, 0) = 0 AND COALESCE(st.`RANK`, 'normal') <> 'deprecated'\n"
+                    f"  JOIN T_WC_WIKIDATA_STRING_VALUE sv ON sv.ID_STATEMENT = st.ID_STATEMENT\n"
+                    + strlinked)
+    elif strsource == "label":
+        strinner = (f"  SELECT m.{stridcol}, CONVERT(LEFT(TRIM(JSON_UNQUOTE(JSON_EXTRACT(w.LABELS_JSON, '$.{strlang}'))), 500) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TITLE,\n"
+                    f"         '{strlang}' AS LANG_CODE\n"
+                    f"  FROM {strt2s} m\n"
+                    f"  JOIN {strwikidata} w ON w.ID_WIKIDATA = m.ID_WIKIDATA AND COALESCE(w.DELETED, 0) = 0\n"
+                    + strlinked +
+                    f"    AND JSON_EXTRACT(w.LABELS_JSON, '$.{strlang}') IS NOT NULL\n")
+    elif strsource == "alias":
+        strinner = (f"  SELECT m.{stridcol}, CONVERT(LEFT(TRIM(j.TITLE), 500) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TITLE, '{strlang}' AS LANG_CODE\n"
+                    f"  FROM {strt2s} m\n"
+                    f"  JOIN {strwikidata} w ON w.ID_WIKIDATA = m.ID_WIKIDATA AND COALESCE(w.DELETED, 0) = 0\n"
+                    f"  CROSS JOIN JSON_TABLE(w.ALIASES_JSON, '$.{strlang}[*]' COLUMNS (TITLE varchar(1000) CHARACTER SET utf8mb4 PATH '$')) AS j\n"
+                    + strlinked +
+                    f"    AND w.ALIASES_JSON IS NOT NULL\n")
+    else:
+        raise ValueError(f"unknown title alias source {strsource!r}")
+    strtail = (f") x\nJOIN {strt2s} m ON m.{stridcol} = x.{stridcol}\n"
+               f"WHERE x.TITLE IS NOT NULL AND x.TITLE <> '' AND {strdiff}")
+    return strhead + strinner + strtail
+
+
+def f_buildtitlealiastables():
+    """Rebuild T_WC_T2S_MOVIE_TITLE_ALIAS and T_WC_T2S_SERIE_TITLE_ALIAS in full (process 52).
+
+    The second table of a two-level title resolution in fastapi-text2sql, as
+    T_WC_T2S_PERSON_ALSO_KNOWN_AS is for person names (FASTAPI-TEXT2SQL-360): the title tables
+    first, this one when they miss. The forms are the Wikidata title P1476 (every language,
+    WIKIDATA-CRAWLER-031), the labels (en, fr, mul) and the aliases (en, fr) of the item linked
+    by ID_WIKIDATA, minus the forms equal to a TMDb title of the row. Each table is built in a
+    _BUILD copy and swapped by one atomic RENAME, so the served table is never empty.
+
+    Returns {alias table: {source: inserted rows, ..., 'total': rows}}.
+    """
+    connection = cp.connectioncp
+    cursor = connection.cursor()
+    arrresult = {}
+    try:
+        cursor.execute("SET SESSION innodb_lock_wait_timeout = 120")
+        f_readwithoutlocking(cursor, "52")
+        for strt2s, stridcol, arrtitlecols, strwikidata, strtable, strshort in TUPLE_TITLE_ALIAS_TARGETS:
+            strbuild = strtable + "_BUILD"
+            arrcounts = {}
+            strddl = STR_TITLE_ALIAS_DDL.replace("{idcol}", stridcol).replace("{short}", strshort)
+            cursor.execute(strddl.replace("CREATE TABLE {table}", f"CREATE TABLE IF NOT EXISTS {strtable}"))
+            cursor.execute(f"DROP TABLE IF EXISTS {strbuild}")
+            cursor.execute(strddl.replace("{table}", strbuild))
+            connection.commit()
+            arrsteps = [("title", None)]
+            arrsteps += [("label", lg) for lg in TUPLE_TITLE_ALIAS_LABEL_LANGUAGES]
+            arrsteps += [("alias", lg) for lg in TUPLE_TITLE_ALIAS_ALIAS_LANGUAGES]
+            for strsource, strlang in arrsteps:
+                strstep = strsource + (f" {strlang}" if strlang else "")
+                print(f"52:   {strtable}: INSERT {strstep} ...", flush=True)
+                cursor.execute(f_titlealiasinsertsql(strt2s, stridcol, arrtitlecols, strwikidata, strbuild, strsource, strlang))
+                arrcounts[strstep] = cursor.rowcount
+                connection.commit()
+            cursor.execute(f"DROP TABLE IF EXISTS {strtable}_OLD")
+            cursor.execute(f"RENAME TABLE {strtable} TO {strtable}_OLD, {strbuild} TO {strtable}")
+            cursor.execute(f"DROP TABLE IF EXISTS {strtable}_OLD")
+            connection.commit()
+            cursor.execute(f"SELECT COUNT(*) AS row_count FROM {strtable}")
+            arrcounts["total"] = cursor.fetchone()["row_count"]
+            arrresult[strtable] = arrcounts
+    finally:
+        cursor.close()
+    return arrresult
