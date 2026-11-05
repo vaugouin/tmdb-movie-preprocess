@@ -4162,3 +4162,192 @@ def f_buildtitlealiastables():
     finally:
         cursor.close()
     return arrresult
+
+
+
+# ---------------------------------------------------------------------------------------------
+# TMDB-MOVIE-PREPROCESS-070: Wikidata aliases of persons in T_WC_T2S_PERSON_ALSO_KNOWN_AS (process 51)
+# ---------------------------------------------------------------------------------------------
+
+# Wikidata rows get ID_ROW from this base up, far above the TMDb ids the API keeps (the TMDb
+# table counted about 650,000 rows in November 2026). They are renumbered at every run.
+LNG_PERSON_ALIAS_WIKIDATA_ID_BASE = 1000000000
+# The crawler keeps the aliases in fr and en only (ALIAS_LANGUAGES of wikidata-crawler).
+TUPLE_PERSON_ALIAS_LANGUAGES = ("en", "fr")
+# Words that make an alias a description rather than a name ("Indonesian singer"). Matched
+# case-sensitively in lower case, as whole words, so a surname such as "Bob Singer" survives.
+TUPLE_PERSON_ALIAS_DESCRIPTOR_WORDS = (
+    "singer", "actor", "actress", "director", "producer", "writer", "screenwriter", "rapper",
+    "musician", "comedian", "footballer", "politician", "presenter", "journalist", "model",
+    "chanteur", "chanteuse", "acteur", "actrice", "réalisateur", "réalisatrice", "comédien",
+    "comédienne", "scénariste", "producteur", "productrice", "animateur", "animatrice",
+)
+# The alias-table normalization (PERSON_NAME_NORM of T_WC_T2S_PERSON_ALSO_KNOWN_AS), trimmed.
+# Raw string: the regex must reach MariaDB as a backslash-p class.
+STR_PERSON_ALIAS_NORM_SQL = r"TRIM(LCASE(REGEXP_REPLACE(REGEXP_REPLACE({col}, '[^\\p{L}\\p{M}\\p{N} ]+', ' '), ' +', ' ')))"
+# LANGUAGE_FAMILY of a Wikidata alias: 'Latin' when every character is Latin, a mark, a digit,
+# punctuation or a space, NULL otherwise (the resolver does not filter on it; the TMDb rows get
+# theirs from tmdb-person-preprocess).
+STR_PERSON_ALIAS_LATIN_REGEX = r"^[\p{Latin}\p{M}\p{N}\p{P}\p{Zs}]+$"  # passed as a parameter, not inlined
+
+
+def f_personaliaswikidatainsert(cursor, strbuild):
+    """Add the Wikidata aliases of the T2S persons to the _BUILD person alias table (process 51).
+
+    FASTAPI-TEXT2SQL-293. The person resolver of fastapi-text2sql searches
+    T_WC_T2S_PERSON_ALSO_KNOWN_AS; until now it held the TMDb also_known_as only. This adds
+    the aliases of T_WC_WIKIDATA_PERSON.ALIASES_JSON (fr, en) of each T2S person linked by
+    ID_WIKIDATA, with ALIAS_SOURCE = 'wikidata', after the TMDb rows are in. Measured on
+    2026-11-05 (doc/sql/check-293-person-wikidata-alias-collisions-20261105.txt): about
+    109,000 new aliases for 74,000 persons, 1,320 of them dropped by rule 5 below.
+
+    An alias is left out when, in this order:
+    1. its key (PERSON_NAME_KEY) is already held for the same person: main name or a TMDb alias;
+    2. it is one word while the person's name has several ("Jennifer" for Jenna Haze); the
+       fuzzy token_subset metric already finds a person from part of the name;
+    3. it has no capital letter: web addresses, sentences, descriptions;
+    4. it carries a descriptor word in lower case ("Indonesian singer");
+    5. it is the main name of another T2S person ("Morgan Freeman" as an alias of Morgan
+       J. Freeman): the main-name strategy answers such a name first, and the alias could only
+       ever win when that strategy misses, that is wrongly.
+    Two aliases of one person with the same key keep one row. An alias shared by several
+    persons, or equal to a TMDb alias of another person, is kept: the resolver breaks such ties
+    on popularity (exact match ordered by popularity since FASTAPI-TEXT2SQL-293).
+
+    The work is done in temporary tables of this connection. Returns a dict of counts.
+    """
+    strnormalias = STR_PERSON_ALIAS_NORM_SQL.replace("{col}", "j.ALIAS")
+    strnormname = STR_PERSON_ALIAS_NORM_SQL.replace("{col}", "p.PERSON_NAME")
+    arrcounts = {}
+    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_p51_name")
+    cursor.execute("""
+CREATE TEMPORARY TABLE tmp_p51_name (
+  ID_PERSON int(11) NOT NULL PRIMARY KEY,
+  NAME_NORM varchar(255) DEFAULT NULL,
+  KEY IDX_NORM (NAME_NORM)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci""")
+    cursor.execute(
+        "INSERT INTO tmp_p51_name (ID_PERSON, NAME_NORM)\n"
+        f"SELECT p.ID_PERSON, {strnormname}\n"
+        "FROM T_WC_T2S_PERSON p\n"
+        "WHERE COALESCE(p.DELETED, 0) = 0 AND p.PERSON_NAME IS NOT NULL AND p.PERSON_NAME <> ''"
+    )
+    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_p51_wd")
+    cursor.execute("""
+CREATE TEMPORARY TABLE tmp_p51_wd (
+  ID_PERSON int(11) NOT NULL,
+  ALIAS varchar(200) NOT NULL,
+  NORM varchar(255) DEFAULT NULL,
+  AKEY varchar(255) NOT NULL,
+  TOKENS int DEFAULT NULL,
+  NAME_TOKENS int DEFAULT NULL,
+  DROP_REASON varchar(20) DEFAULT NULL,
+  UNIQUE KEY UK_PERSON_KEY (ID_PERSON, AKEY),
+  KEY IDX_NORM (NORM)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci""")
+    lngread = 0
+    for strlang in TUPLE_PERSON_ALIAS_LANGUAGES:
+        # English first: on a key shared by an en and a fr spelling, the en one is kept.
+        cursor.execute(
+            "INSERT IGNORE INTO tmp_p51_wd (ID_PERSON, ALIAS, NORM, AKEY, NAME_TOKENS)\n"
+            "SELECT x.ID_PERSON, x.ALIAS, x.NORM, REPLACE(x.NORM, ' ', ''), x.NAME_TOKENS\n"
+            "FROM (\n"
+            "  SELECT p.ID_PERSON,\n"
+            "         CONVERT(LEFT(TRIM(j.ALIAS), 200) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ALIAS,\n"
+            f"         CONVERT({strnormalias} USING utf8mb4) COLLATE utf8mb4_unicode_ci AS NORM,\n"
+            f"         LENGTH({strnormname}) - LENGTH(REPLACE({strnormname}, ' ', '')) + 1 AS NAME_TOKENS\n"
+            "  FROM T_WC_T2S_PERSON p\n"
+            "  JOIN T_WC_WIKIDATA_PERSON w ON w.ID_WIKIDATA = p.ID_WIKIDATA AND COALESCE(w.DELETED, 0) = 0\n"
+            f"  CROSS JOIN JSON_TABLE(w.ALIASES_JSON, '$.{strlang}[*]' COLUMNS (ALIAS varchar(1000) CHARACTER SET utf8mb4 PATH '$')) AS j\n"
+            "  WHERE COALESCE(p.DELETED, 0) = 0 AND p.ID_WIKIDATA IS NOT NULL AND p.ID_WIKIDATA <> ''\n"
+            f"    AND w.ALIASES_JSON LIKE '%%\"{strlang}\"%%' AND j.ALIAS IS NOT NULL AND TRIM(j.ALIAS) <> ''\n"
+            ") x\n"
+            "WHERE x.NORM IS NOT NULL AND x.NORM <> ''",
+            (),
+        )
+        lngread += cursor.rowcount
+    arrcounts["read"] = lngread
+    cursor.execute("UPDATE tmp_p51_wd SET TOKENS = LENGTH(NORM) - LENGTH(REPLACE(NORM, ' ', '')) + 1")
+    # 1. already held for the same person (TMDb alias, then main name), compared on the key
+    cursor.execute(
+        "UPDATE tmp_p51_wd w SET w.DROP_REASON = 'held'\n"
+        f"WHERE EXISTS (SELECT 1 FROM {strbuild} b WHERE b.ID_PERSON = w.ID_PERSON AND b.PERSON_NAME_KEY = w.AKEY)"
+    )
+    cursor.execute(
+        "UPDATE tmp_p51_wd w JOIN tmp_p51_name n ON n.ID_PERSON = w.ID_PERSON\n"
+        "SET w.DROP_REASON = 'held'\n"
+        "WHERE w.DROP_REASON IS NULL AND REPLACE(n.NAME_NORM, ' ', '') = w.AKEY"
+    )
+    # 2. one word for a name of several
+    cursor.execute(
+        "UPDATE tmp_p51_wd SET DROP_REASON = 'single_word' "
+        "WHERE DROP_REASON IS NULL AND TOKENS = 1 AND NAME_TOKENS > 1"
+    )
+    # 3. no capital letter (a script without case, such as Chinese, is left alone)
+    cursor.execute(
+        "UPDATE tmp_p51_wd SET DROP_REASON = 'lowercase'\n"
+        "WHERE DROP_REASON IS NULL\n"
+        "  AND CAST(ALIAS AS BINARY) = CAST(LOWER(ALIAS) AS BINARY)\n"
+        "  AND CAST(ALIAS AS BINARY) <> CAST(UPPER(ALIAS) AS BINARY)"
+    )
+    # 4. a descriptor word in lower case (binary comparison: "Bob Singer" is a name)
+    strwords = "|".join(TUPLE_PERSON_ALIAS_DESCRIPTOR_WORDS)
+    cursor.execute(
+        "UPDATE tmp_p51_wd SET DROP_REASON = 'descriptor' "
+        "WHERE DROP_REASON IS NULL AND CAST(ALIAS AS BINARY) REGEXP %s",
+        (f"(^| )({strwords})( |,|$)",),
+    )
+    # 5. the main name of another person
+    cursor.execute(
+        "UPDATE tmp_p51_wd w SET w.DROP_REASON = 'other_name'\n"
+        "WHERE w.DROP_REASON IS NULL\n"
+        "  AND EXISTS (SELECT 1 FROM tmp_p51_name n WHERE n.NAME_NORM = w.NORM AND n.ID_PERSON <> w.ID_PERSON)"
+    )
+    cursor.execute("SELECT COALESCE(DROP_REASON, 'kept') AS REASON, COUNT(*) AS N FROM tmp_p51_wd GROUP BY COALESCE(DROP_REASON, 'kept')")
+    for row in cursor.fetchall():
+        arrcounts[row["REASON"]] = row["N"]
+    # ID_ROW from the Wikidata base, in a stable order. INSERT IGNORE keeps the unique key
+    # (ID_PERSON, PERSON_NAME) safe should the collation fold two spellings the regex kept apart.
+    cursor.execute(
+        "INSERT IGNORE INTO " + strbuild + " (\n"
+        "    ID_ROW, ID_PERSON, PERSON_NAME, LANGUAGE_FAMILY, ALIAS_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED\n"
+        ")\n"
+        f"SELECT {LNG_PERSON_ALIAS_WIKIDATA_ID_BASE} + ROW_NUMBER() OVER (ORDER BY w.ID_PERSON, w.AKEY),\n"
+        "       w.ID_PERSON, w.ALIAS,\n"
+        "       CASE WHEN w.ALIAS REGEXP %s THEN 'Latin' ELSE NULL END,\n"
+        "       'wikidata', 0, CURDATE(), NOW()\n"
+        "FROM tmp_p51_wd w\n"
+        "WHERE w.DROP_REASON IS NULL",
+        (STR_PERSON_ALIAS_LATIN_REGEX,),
+    )
+    arrcounts["inserted"] = cursor.rowcount
+    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_p51_wd")
+    cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_p51_name")
+    return arrcounts
+
+
+def f_personaliaswikidatacarryover(cursor, strbuild, strlive):
+    """Copy yesterday's Wikidata person aliases into the _BUILD table (process 51, load busy).
+
+    While wikidata-crawler loads (f_wikidataloadbusy), T_WC_WIKIDATA_PERSON is a partial
+    snapshot. The TMDb part of the table is rebuilt as usual, and the Wikidata part is taken
+    from the served table, restricted to the persons still in T2S. Returns the rows copied,
+    0 when the served table predates ALIAS_SOURCE.
+    """
+    cursor.execute(
+        "SELECT COUNT(*) AS N FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'ALIAS_SOURCE'",
+        (strlive,),
+    )
+    if not cursor.fetchone()["N"]:
+        return 0
+    cursor.execute(
+        "INSERT IGNORE INTO " + strbuild + " (\n"
+        "    ID_ROW, ID_PERSON, PERSON_NAME, LANGUAGE_FAMILY, ALIAS_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED\n"
+        ")\n"
+        "SELECT a.ID_ROW, a.ID_PERSON, a.PERSON_NAME, a.LANGUAGE_FAMILY, a.ALIAS_SOURCE, a.DELETED, a.DAT_CREAT, a.TIM_UPDATED\n"
+        "FROM " + strlive + " a\n"
+        "JOIN T_WC_T2S_PERSON p ON p.ID_PERSON = a.ID_PERSON\n"
+        "WHERE a.ALIAS_SOURCE = 'wikidata'"
+    )
+    return cursor.rowcount

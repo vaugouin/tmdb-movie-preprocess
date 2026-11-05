@@ -1,0 +1,97 @@
+-- check-070-person-wikidata-alias-dry-run.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-11-05 18:11:33 +0100
+--
++---------------------+
+| NOW_                |
++---------------------+
+| 2026-11-05 18:11:33 |
++---------------------+
++-----------+-----------------+
+| TMDB_ROWS | MAX_TMDB_ID_ROW |
++-----------+-----------------+
+|    646167 |         6382662 |
++-----------+-----------------+
++-------------+--------+
+| REASON      | N      |
++-------------+--------+
+| descriptor  |     46 |
+| held        |  75803 |
+| kept        | 105585 |
+| lowercase   |    241 |
+| other_name  |   1316 |
+| single_word |   5494 |
++-------------+--------+
++-------------+--------+
+| REASON      | N      |
++-------------+--------+
+| kept        | 105585 |
+| held        |  75803 |
+| single_word |   5494 |
+| other_name  |   1316 |
+| lowercase   |    241 |
+| descriptor  |     46 |
++-------------+--------+
++--------------+--------+---------+--------+------------+------------+
+| ALIAS_SOURCE | ROWS_  | PERSONS | LATIN  | MIN_ID_ROW | MAX_ID_ROW |
++--------------+--------+---------+--------+------------+------------+
+| tmdb         | 646167 |  344998 | 551248 |          1 |    6382662 |
+| wikidata     | 105585 |   72336 | 105038 | 1000000001 | 1000105585 |
++--------------+--------+---------+--------+------------+------------+
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------+
+| ALIAS                                                                                                                                                                             | PERSON_NAME           |
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------+
+| Indonesian singer                                                                                                                                                                 | Agnez Mo              |
+| Hwang In-yeop, actor who plays Han Seo-Jun in \"True Beauty\".                                                                                                                    | Hwang In-youp         |
+| Cuban singer                                                                                                                                                                      | Camila Cabello        |
+| Ali actor                                                                                                                                                                         | Ali                   |
+| Govinda an indian actor                                                                                                                                                           | Govinda               |
+| Japanese voice actress                                                                                                                                                            | Keiko Han             |
+| Noah Fearnley actor, Noah Fearnley verticals                                                                                                                                      | Noah Fearnley         |
+| German singer                                                                                                                                                                     | Nicole                |
+| James Joint acteur et coach d'acteurs                                                                                                                                             | James Joint           |
+| Lee Sang-Yeob - director                                                                                                                                                          | Lee Sang-yeob         |
+| Indian actor                                                                                                                                                                      | Adarsh Kumar          |
+| Swiss singer                                                                                                                                                                      | Beatrice Egli         |
+| Dylan Holmes Williams writer and director                                                                                                                                         | Dylan Holmes Williams |
+| actor John Wesley                                                                                                                                                                 | John Wesley           |
+| John Wesley actor                                                                                                                                                                 | John Wesley           |
+| Nicolas Jacques acteur                                                                                                                                                            | Nicolas Jacques       |
+| Nicolas Jacques actor                                                                                                                                                             | Nicolas Jacques       |
+| Israeli singer                                                                                                                                                                    | Netta                 |
+| Giovanni Maletta casting director                                                                                                                                                 | Giovanni Maletta      |
+| Iranian actress                                                                                                                                                                   | Shahrouz Ebrahimi     |
+| Le chanteur énervant                                                                                                                                                              | Renaud                |
+| María Duval Argentine actress                                                                                                                                                     | María Duval           |
+| Welsh actor                                                                                                                                                                       | Grahame Fox           |
+| American comedian, writer, and showrunner                                                                                                                                         | Paul Robalino         |
+| First Turkish female opera singer                                                                                                                                                 | Semiha Berksoy        |
+| Indian singer                                                                                                                                                                     | Shreya Ghoshal        |
+| Stun Siva is an Indian actor and stunt coordinator who worked in Tamil and Telugu movies.                                                                                         | Stun Siva             |
+| Indonesian singer and actress                                                                                                                                                     | Nikita Willy          |
+| Filipino singer                                                                                                                                                                   | Sarah Geronimo        |
+| Le chanteur du nez                                                                                                                                                                | Eddy Mitchell         |
+| Japanese singer                                                                                                                                                                   | Ai Higuchi            |
+| Czech actor                                                                                                                                                                       | Jaroslav Vávra        |
+| Greek actress                                                                                                                                                                     | Chara Mata Giannatou  |
+| Arek Zasowski, Arkadiusz Zasowski, Arkadiusz \"Arek\" Zasowski, Arek Zasowski – film actor, Arek Zasowski – filmmaker, Arek Zasowski – director, Arek Zasowski – producer         | Arek Zasowski         |
+| English actress                                                                                                                                                                   | Lucy-Jo Hudson        |
+| Jacques Bernard, acteur                                                                                                                                                           | Jacques Bernard       |
+| Pierre Rousseau, acteur                                                                                                                                                           | Pierre Rousseau       |
+| Russian journalist                                                                                                                                                                | Dmitry Bogolyubov     |
+| Georgi Unkovski film director                                                                                                                                                     | Georgi M. Unkovski    |
+| Iranian poet and Film director                                                                                                                                                    | Baktash Abtin         |
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------+
++-----------+----------------+----------------------------+--------------+-----------------+
+| ID_PERSON | PERSON_NAME    | ALIAS                      | ALIAS_SOURCE | LANGUAGE_FAMILY |
++-----------+----------------+----------------------------+--------------+-----------------+
+|        31 | Tom Hanks      | Thomas Hanks               | wikidata     | Latin           |
+|       380 | Robert De Niro | De Niro                    | wikidata     | Latin           |
+|       380 | Robert De Niro | Robert Anthony De Niro     | wikidata     | Latin           |
+|      3895 | Michael Caine  | Maurice Joseph Micklewhite | wikidata     | Latin           |
+|      3895 | Michael Caine  | Sir Michael Caine, CBE     | wikidata     | Latin           |
++-----------+----------------+----------------------------+--------------+-----------------+
++-----------+----------------+------------------+------------+
+| ID_PERSON | PERSON_NAME    | PERSON_NAME_NORM | POPULARITY |
++-----------+----------------+------------------+------------+
+|       192 | Morgan Freeman | morgan freeman   |      8.401 |
++-----------+----------------+------------------+------------+

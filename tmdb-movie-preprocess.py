@@ -39,6 +39,8 @@ from tmdb_preprocess_helpers import (
     f_buildsourceworkclasstable,
     f_buildsourceworktables,
     f_buildtitlealiastables,
+    f_personaliaswikidatainsert,
+    f_personaliaswikidatacarryover,
     f_buildgroupworktables,
     f_buildworkfinancetable,
     INT_GROUP_WORK_MIN_MEMBERS,
@@ -6568,6 +6570,7 @@ CREATE TABLE {table} (
   ID_OWNER int(5) DEFAULT NULL,
   TIM_UPDATED datetime DEFAULT NULL,
   ID_USER_UPDATED int(5) DEFAULT NULL,
+  ALIAS_SOURCE varchar(10) NOT NULL DEFAULT 'tmdb',
   PERSON_NAME_NORM varchar(255) GENERATED ALWAYS AS (lcase(regexp_replace(regexp_replace(PERSON_NAME,'[^\\p{L}\\p{M}\\p{N} ]+',' '),' +',' '))) STORED,
   PERSON_NAME_KEY varchar(255) GENERATED ALWAYS AS (replace(PERSON_NAME_NORM,' ','')) STORED,
   PRIMARY KEY (ID_ROW),
@@ -6575,6 +6578,7 @@ CREATE TABLE {table} (
   KEY ID_PERSON (ID_PERSON),
   KEY DELETED (DELETED),
   KEY LANGUAGE_FAMILY (LANGUAGE_FAMILY),
+  KEY ALIAS_SOURCE (ALIAS_SOURCE),
   KEY PERSON_NAME (PERSON_NAME),
   KEY IDX_T2S_PERSON_NAME_NORM (PERSON_NAME_NORM),
   KEY IDX_T2S_PERSON_NAME_KEY (PERSON_NAME_KEY),
@@ -6597,7 +6601,29 @@ SELECT
 FROM T_WC_TMDB_PERSON_ALSO_KNOWN_AS a
 INNER JOIN T_WC_T2S_PERSON p ON p.ID_PERSON = a.ID_PERSON
 """)
+                        lngtmdbaliascount = cursor2.rowcount
                         cp.connectioncp.commit()
+                        # TMDB-MOVIE-PREPROCESS-070 (FASTAPI-TEXT2SQL-293): the Wikidata aliases of the same
+                        # persons, deduplicated against the TMDb rows just copied and filtered (see the
+                        # helper's docstring). While wikidata-crawler loads, yesterday's Wikidata rows are
+                        # carried over instead, so the TMDb part stays fresh and the Wikidata part is not cut
+                        # short. A failure leaves the TMDb rows alone: the table is swapped without Wikidata.
+                        strpersonaliasbusy = f_wikidataloadbusy("51")
+                        try:
+                            if strpersonaliasbusy:
+                                lngcarried = f_personaliaswikidatacarryover(cursor2, "T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD", "T_WC_T2S_PERSON_ALSO_KNOWN_AS")
+                                print(f"51: Wikidata aliases not rebuilt, {strpersonaliasbusy}; {lngcarried} carried over from the served table")
+                            else:
+                                f_readwithoutlocking(cursor2, "51")
+                                arrpersonaliascounts = f_personaliaswikidatainsert(cursor2, "T_WC_T2S_PERSON_ALSO_KNOWN_AS_BUILD")
+                                print("51: Wikidata aliases: " + ", ".join(f"{k} {v}" for k, v in arrpersonaliascounts.items()))
+                            cp.connectioncp.commit()
+                            cp.f_setservervariable("strtmdbmoviepreprocesspersonaliaswikidataerror", "", "Last error of the Wikidata person aliases of process 51, empty when it succeeded", 0)
+                        except Exception as personaliaserror:
+                            cp.connectioncp.rollback()
+                            strpersonaliaserror = f"{type(personaliaserror).__name__}: {personaliaserror}"
+                            print(f"51: Wikidata aliases FAILED, the table is built from TMDb only: {strpersonaliaserror}")
+                            cp.f_setservervariable("strtmdbmoviepreprocesspersonaliaswikidataerror", strpersonaliaserror, "Last error of the Wikidata person aliases of process 51, empty when it succeeded", 0)
                         cursor2.execute("DROP TABLE IF EXISTS T_WC_T2S_PERSON_ALSO_KNOWN_AS_OLD")
                         cursor2.execute("""
 RENAME TABLE
@@ -6610,7 +6636,7 @@ RENAME TABLE
                         lngt2scount = cursor.fetchone()['row_count']
                         cursor.execute("SELECT COUNT(*) AS row_count FROM T_WC_TMDB_PERSON_ALSO_KNOWN_AS")
                         lngsourcecount = cursor.fetchone()['row_count']
-                        print(f"T_WC_T2S_PERSON_ALSO_KNOWN_AS: {lngt2scount} rows kept out of {lngsourcecount} source aliases")
+                        print(f"T_WC_T2S_PERSON_ALSO_KNOWN_AS: {lngt2scount} rows, {lngtmdbaliascount} of them from TMDb (out of {lngsourcecount} source aliases), the rest from Wikidata")
 
                 elif intindex == 52:
                     #----------------------------------------------------
