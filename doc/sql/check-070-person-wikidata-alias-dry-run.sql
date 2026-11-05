@@ -1,0 +1,158 @@
+-- TMDB-MOVIE-PREPROCESS-070, dry run of the Wikidata person aliases of process 51, before the
+-- first night run. Read-only: every write goes to temporary tables. The statements between the
+-- two markers are generated from f_personaliaswikidatainsert (tmdb_preprocess_helpers.py) with
+-- their parameters inlined, run against a temporary copy of the _BUILD table filled with the
+-- current TMDb rows, exactly as process 51 does. Also checks the exact-match query of
+-- fastapi-text2sql after FASTAPI-TEXT2SQL-293 (ORDER BY popularity) on the served table.
+
+SELECT NOW() AS NOW_;
+
+DROP TEMPORARY TABLE IF EXISTS tmp_p51_build;
+CREATE TEMPORARY TABLE tmp_p51_build (
+  ID_ROW int(11) NOT NULL,
+  ID_PERSON int(11) NOT NULL,
+  PERSON_NAME varchar(200) DEFAULT NULL,
+  LANGUAGE_FAMILY varchar(10) DEFAULT NULL,
+  DELETED int(5) DEFAULT NULL,
+  DISPLAY_ORDER int(5) DEFAULT NULL,
+  ID_CREATOR int(5) DEFAULT NULL,
+  DAT_CREAT date DEFAULT NULL,
+  ID_OWNER int(5) DEFAULT NULL,
+  TIM_UPDATED datetime DEFAULT NULL,
+  ID_USER_UPDATED int(5) DEFAULT NULL,
+  ALIAS_SOURCE varchar(10) NOT NULL DEFAULT 'tmdb',
+  PERSON_NAME_NORM varchar(255) GENERATED ALWAYS AS (lcase(regexp_replace(regexp_replace(PERSON_NAME,'[^\\p{L}\\p{M}\\p{N} ]+',' '),' +',' '))) STORED,
+  PERSON_NAME_KEY varchar(255) GENERATED ALWAYS AS (replace(PERSON_NAME_NORM,' ','')) STORED,
+  PRIMARY KEY (ID_ROW),
+  UNIQUE KEY UQ_PERSON_NAME (ID_PERSON, PERSON_NAME),
+  KEY ID_PERSON (ID_PERSON),
+  KEY IDX_KEY (PERSON_NAME_KEY)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO tmp_p51_build (ID_ROW, ID_PERSON, PERSON_NAME, LANGUAGE_FAMILY, DELETED, DISPLAY_ORDER, ID_CREATOR, DAT_CREAT, ID_OWNER, TIM_UPDATED, ID_USER_UPDATED)
+SELECT a.ID_ROW, a.ID_PERSON, a.PERSON_NAME, a.LANGUAGE_FAMILY, a.DELETED, a.DISPLAY_ORDER, a.ID_CREATOR, a.DAT_CREAT, a.ID_OWNER, a.TIM_UPDATED, a.ID_USER_UPDATED
+FROM T_WC_TMDB_PERSON_ALSO_KNOWN_AS a
+INNER JOIN T_WC_T2S_PERSON p ON p.ID_PERSON = a.ID_PERSON;
+
+SELECT COUNT(*) AS TMDB_ROWS, MAX(ID_ROW) AS MAX_TMDB_ID_ROW FROM tmp_p51_build;
+
+-- ===== generated from f_personaliaswikidatainsert =====
+DROP TEMPORARY TABLE IF EXISTS tmp_p51_name;
+
+CREATE TEMPORARY TABLE tmp_p51_name (
+  ID_PERSON int(11) NOT NULL PRIMARY KEY,
+  NAME_NORM varchar(255) DEFAULT NULL,
+  KEY IDX_NORM (NAME_NORM)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO tmp_p51_name (ID_PERSON, NAME_NORM)
+SELECT p.ID_PERSON, TRIM(LCASE(REGEXP_REPLACE(REGEXP_REPLACE(p.PERSON_NAME, '[^\\p{L}\\p{M}\\p{N} ]+', ' '), ' +', ' ')))
+FROM T_WC_T2S_PERSON p
+WHERE COALESCE(p.DELETED, 0) = 0 AND p.PERSON_NAME IS NOT NULL AND p.PERSON_NAME <> '';
+
+CREATE TEMPORARY TABLE tmp_p51_wd (
+  ID_PERSON int(11) NOT NULL,
+  ALIAS varchar(200) NOT NULL,
+  NORM varchar(255) DEFAULT NULL,
+  AKEY varchar(255) NOT NULL,
+  TOKENS int DEFAULT NULL,
+  NAME_TOKENS int DEFAULT NULL,
+  DROP_REASON varchar(20) DEFAULT NULL,
+  UNIQUE KEY UK_PERSON_KEY (ID_PERSON, AKEY),
+  KEY IDX_NORM (NORM)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO tmp_p51_wd (ID_PERSON, ALIAS, NORM, AKEY, NAME_TOKENS)
+SELECT x.ID_PERSON, x.ALIAS, x.NORM, REPLACE(x.NORM, ' ', ''), x.NAME_TOKENS
+FROM (
+  SELECT p.ID_PERSON,
+         CONVERT(LEFT(TRIM(j.ALIAS), 200) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ALIAS,
+         CONVERT(TRIM(LCASE(REGEXP_REPLACE(REGEXP_REPLACE(j.ALIAS, '[^\\p{L}\\p{M}\\p{N} ]+', ' '), ' +', ' '))) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS NORM,
+         LENGTH(TRIM(LCASE(REGEXP_REPLACE(REGEXP_REPLACE(p.PERSON_NAME, '[^\\p{L}\\p{M}\\p{N} ]+', ' '), ' +', ' ')))) - LENGTH(REPLACE(TRIM(LCASE(REGEXP_REPLACE(REGEXP_REPLACE(p.PERSON_NAME, '[^\\p{L}\\p{M}\\p{N} ]+', ' '), ' +', ' '))), ' ', '')) + 1 AS NAME_TOKENS
+  FROM T_WC_T2S_PERSON p
+  JOIN T_WC_WIKIDATA_PERSON w ON w.ID_WIKIDATA = p.ID_WIKIDATA AND COALESCE(w.DELETED, 0) = 0
+  CROSS JOIN JSON_TABLE(w.ALIASES_JSON, '$.en[*]' COLUMNS (ALIAS varchar(1000) CHARACTER SET utf8mb4 PATH '$')) AS j
+  WHERE COALESCE(p.DELETED, 0) = 0 AND p.ID_WIKIDATA IS NOT NULL AND p.ID_WIKIDATA <> ''
+    AND w.ALIASES_JSON LIKE '%"en"%' AND j.ALIAS IS NOT NULL AND TRIM(j.ALIAS) <> ''
+) x
+WHERE x.NORM IS NOT NULL AND x.NORM <> '';
+
+INSERT IGNORE INTO tmp_p51_wd (ID_PERSON, ALIAS, NORM, AKEY, NAME_TOKENS)
+SELECT x.ID_PERSON, x.ALIAS, x.NORM, REPLACE(x.NORM, ' ', ''), x.NAME_TOKENS
+FROM (
+  SELECT p.ID_PERSON,
+         CONVERT(LEFT(TRIM(j.ALIAS), 200) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ALIAS,
+         CONVERT(TRIM(LCASE(REGEXP_REPLACE(REGEXP_REPLACE(j.ALIAS, '[^\\p{L}\\p{M}\\p{N} ]+', ' '), ' +', ' '))) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS NORM,
+         LENGTH(TRIM(LCASE(REGEXP_REPLACE(REGEXP_REPLACE(p.PERSON_NAME, '[^\\p{L}\\p{M}\\p{N} ]+', ' '), ' +', ' ')))) - LENGTH(REPLACE(TRIM(LCASE(REGEXP_REPLACE(REGEXP_REPLACE(p.PERSON_NAME, '[^\\p{L}\\p{M}\\p{N} ]+', ' '), ' +', ' '))), ' ', '')) + 1 AS NAME_TOKENS
+  FROM T_WC_T2S_PERSON p
+  JOIN T_WC_WIKIDATA_PERSON w ON w.ID_WIKIDATA = p.ID_WIKIDATA AND COALESCE(w.DELETED, 0) = 0
+  CROSS JOIN JSON_TABLE(w.ALIASES_JSON, '$.fr[*]' COLUMNS (ALIAS varchar(1000) CHARACTER SET utf8mb4 PATH '$')) AS j
+  WHERE COALESCE(p.DELETED, 0) = 0 AND p.ID_WIKIDATA IS NOT NULL AND p.ID_WIKIDATA <> ''
+    AND w.ALIASES_JSON LIKE '%"fr"%' AND j.ALIAS IS NOT NULL AND TRIM(j.ALIAS) <> ''
+) x
+WHERE x.NORM IS NOT NULL AND x.NORM <> '';
+
+UPDATE tmp_p51_wd SET TOKENS = LENGTH(NORM) - LENGTH(REPLACE(NORM, ' ', '')) + 1;
+
+UPDATE tmp_p51_wd w SET w.DROP_REASON = 'held'
+WHERE EXISTS (SELECT 1 FROM tmp_p51_build b WHERE b.ID_PERSON = w.ID_PERSON AND b.PERSON_NAME_KEY = w.AKEY);
+
+UPDATE tmp_p51_wd w JOIN tmp_p51_name n ON n.ID_PERSON = w.ID_PERSON
+SET w.DROP_REASON = 'held'
+WHERE w.DROP_REASON IS NULL AND REPLACE(n.NAME_NORM, ' ', '') = w.AKEY;
+
+UPDATE tmp_p51_wd SET DROP_REASON = 'single_word' WHERE DROP_REASON IS NULL AND TOKENS = 1 AND NAME_TOKENS > 1;
+
+UPDATE tmp_p51_wd SET DROP_REASON = 'lowercase'
+WHERE DROP_REASON IS NULL
+  AND CAST(ALIAS AS BINARY) = CAST(LOWER(ALIAS) AS BINARY)
+  AND CAST(ALIAS AS BINARY) <> CAST(UPPER(ALIAS) AS BINARY);
+
+UPDATE tmp_p51_wd SET DROP_REASON = 'descriptor' WHERE DROP_REASON IS NULL AND CAST(ALIAS AS BINARY) REGEXP '(^| )(singer|actor|actress|director|producer|writer|screenwriter|rapper|musician|comedian|footballer|politician|presenter|journalist|model|chanteur|chanteuse|acteur|actrice|réalisateur|réalisatrice|comédien|comédienne|scénariste|producteur|productrice|animateur|animatrice)( |,|$)';
+
+UPDATE tmp_p51_wd w SET w.DROP_REASON = 'other_name'
+WHERE w.DROP_REASON IS NULL
+  AND EXISTS (SELECT 1 FROM tmp_p51_name n WHERE n.NAME_NORM = w.NORM AND n.ID_PERSON <> w.ID_PERSON);
+
+SELECT COALESCE(DROP_REASON, 'kept') AS REASON, COUNT(*) AS N FROM tmp_p51_wd GROUP BY COALESCE(DROP_REASON, 'kept');
+
+INSERT IGNORE INTO tmp_p51_build (
+    ID_ROW, ID_PERSON, PERSON_NAME, LANGUAGE_FAMILY, ALIAS_SOURCE, DELETED, DAT_CREAT, TIM_UPDATED
+)
+SELECT 1000000000 + ROW_NUMBER() OVER (ORDER BY w.ID_PERSON, w.AKEY),
+       w.ID_PERSON, w.ALIAS,
+       CASE WHEN w.ALIAS REGEXP '^[\\p{Latin}\\p{M}\\p{N}\\p{P}\\p{Zs}]+$' THEN 'Latin' ELSE NULL END,
+       'wikidata', 0, CURDATE(), NOW()
+FROM tmp_p51_wd w
+WHERE w.DROP_REASON IS NULL;
+
+DROP TEMPORARY TABLE IF EXISTS tmp_p51_name;
+
+
+-- ===== end of generated statements =====
+
+-- 1. Filter funnel (the counts process 51 prints).
+SELECT COALESCE(DROP_REASON, 'kept') AS REASON, COUNT(*) AS N FROM tmp_p51_wd GROUP BY COALESCE(DROP_REASON, 'kept') ORDER BY N DESC;
+
+-- 2. The table process 51 would swap in.
+SELECT ALIAS_SOURCE, COUNT(*) AS ROWS_, COUNT(DISTINCT ID_PERSON) AS PERSONS,
+       SUM(LANGUAGE_FAMILY = 'Latin') AS LATIN, MIN(ID_ROW) AS MIN_ID_ROW, MAX(ID_ROW) AS MAX_ID_ROW
+FROM tmp_p51_build GROUP BY ALIAS_SOURCE;
+
+-- 3. What the descriptor filter drops, all of it if short.
+SELECT w.ALIAS, p.PERSON_NAME FROM tmp_p51_wd w JOIN T_WC_T2S_PERSON p ON p.ID_PERSON = w.ID_PERSON
+WHERE w.DROP_REASON = 'descriptor' ORDER BY p.POPULARITY DESC LIMIT 40;
+
+-- 4. Witnesses: the Wikidata rows of a few persons whose birth or other names are expected.
+SELECT b.ID_PERSON, p.PERSON_NAME, b.PERSON_NAME AS ALIAS, b.ALIAS_SOURCE, b.LANGUAGE_FAMILY
+FROM tmp_p51_build b JOIN T_WC_T2S_PERSON p ON p.ID_PERSON = b.ID_PERSON
+WHERE b.ID_PERSON IN (31, 4165, 3895, 1100, 192, 380, 113) AND b.ALIAS_SOURCE = 'wikidata'
+ORDER BY b.ID_PERSON, b.PERSON_NAME;
+
+-- 5. The exact-match query of fastapi-text2sql after FASTAPI-TEXT2SQL-293, on the served tables.
+SELECT `t`.`ID_ROW`, `t`.`PERSON_NAME`, `t`.`PERSON_NAME_NORM`, `t`.`ID_PERSON`, COALESCE(`j`.`POPULARITY`, 0) AS `POPULARITY` FROM `T_WC_T2S_PERSON_ALSO_KNOWN_AS` `t` LEFT JOIN `T_WC_T2S_PERSON` `j` ON `j`.`ID_PERSON` = `t`.`ID_PERSON` WHERE `t`.`PERSON_NAME_NORM` = 'marion morrison' ORDER BY `POPULARITY` DESC, `t`.`ID_ROW` ASC LIMIT 1;
+SELECT `t`.`ID_PERSON`, `t`.`PERSON_NAME`, `t`.`PERSON_NAME_NORM`, `t`.`POPULARITY` FROM `T_WC_T2S_PERSON` `t` WHERE `t`.`PERSON_NAME_NORM` = 'morgan freeman' ORDER BY `POPULARITY` DESC, `t`.`ID_PERSON` ASC LIMIT 1;
+
+DROP TEMPORARY TABLE IF EXISTS tmp_p51_wd;
+DROP TEMPORARY TABLE IF EXISTS tmp_p51_name;
+DROP TEMPORARY TABLE IF EXISTS tmp_p51_build;
