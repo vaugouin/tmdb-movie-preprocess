@@ -6,7 +6,7 @@ Start every reply with "Philippe,": no exceptions, including short replies and t
 
 Rules an agent needs to work on this codebase safely. @README.md is canonical for everything else: scopes, Docker usage, the per-process reference (inputs, outputs, filters, operations), common patterns and the source → target table map. Consult it rather than re-deriving from code, but verify against code before changing behaviour. Update it for any user-facing change; update this file only when agent workflow or safety context changes. `CLAUDE.md` and any other tool-specific file only point here.
 
-Deeper specs: @doc/sql/*.sql (reference DDL, read-only unless asked); @EXTEND_T2S_TECHNICAL.md (completed `T_WC_T2S_TECHNICAL` impact analysis, historical).
+Deeper specs: @doc/sql/*.sql (reference DDL: the `*-tables.sql` files are dumps of the live base, never edited by hand); `doc/t2s-schema-notes.md` (hand-written notes on T2S tables and columns); @EXTEND_T2S_TECHNICAL.md (completed `T_WC_T2S_TECHNICAL` impact analysis, historical).
 
 ---
 
@@ -50,7 +50,7 @@ Core preprocessing stage of **Agent BBB** (owner `vaugouin`; sibling roster in `
 
 ## Database tables
 
-Tables read and written: README § Source → Target Table Map. When changing schema, update the matching DDL in `doc/sql/`, and quote only table/column names verified in code or DDL.
+Tables read and written: README § Source → Target Table Map. The `*-tables.sql` files of `doc/sql/` are exported from the live base by `structurevaugouindb.sh` (tmdb-front) and copied to every repo that needs them: **never edit them by hand**, a hand-written line is lost at the next export. When changing schema, write the migration in `doc/sql/`, put any note about a table or column (who creates it, how it is rebuilt, what a column means) in `doc/t2s-schema-notes.md`, and commit the refreshed dump once Philippe has applied the DDL and dispatched the export (commit message `Refresh reference DDL from the VPS: <files>`). Quote only table/column names verified in code or DDL.
 
 ### `T_WC_T2S_AWARD_CLASS`, and why processes 44 and 47 can skip themselves
 
@@ -81,7 +81,7 @@ Env vars: `.env.example` and README § Secrets handling. Secrets are never commi
 ---
 
 **Last Updated**: 2026-11-10
-**Current Version**: 1.1.56
+**Current Version**: 1.1.57
 
 ## Backlog (Nestor second-brain)
 
