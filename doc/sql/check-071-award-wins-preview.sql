@@ -1,0 +1,367 @@
+-- TMDB-MOVIE-PREPROCESS-071, step 1: measure before changing the award link tables.
+-- Read-only: every write goes to temporary tables.
+--
+-- Today T_WC_T2S_MOVIE_AWARD, _SERIE_AWARD and _PERSON_AWARD hold one row per (award, entity):
+-- the four Best Actress Oscars of Katharine Hepburn are one row, without year or film. The
+-- ticket moves them to one row per P166 statement, with the year (P585), the work (P1686),
+-- the ceremony (P805), and gives each category its family (the P31 of the category).
+--
+-- What this file answers:
+--   A. how many P166 statements on T2S entities, and how many rows the pair dedup removes
+--   B. qualifier coverage: P585, P1686, P805, and statements carrying several of the same
+--   C. the P1686 work resolved to a T2S movie or series
+--   D. the P31 parents of the categories: how many, which ones, and what tells a family
+--      (Academy Awards) from a generic class (film award)
+--   E. the acceptance cases of the ticket, read through this preview
+--   F. key stability: STATEMENT_GUID filled, one Wikidata id on several T2S entities
+
+SELECT NOW() AS NOW_;
+
+-- ---------------------------------------------------------------------------------------
+-- The win set: one row per (P166 statement, T2S entity). Same reading as f_awardlinksql:
+-- deprecated rank excluded, no DELETED filter. ID_AWARD is NULL when the category is not a
+-- T_WC_T2S_AWARD row (outside the award cone, or not built yet).
+-- ---------------------------------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_071_win;
+CREATE TEMPORARY TABLE tmp_071_win (
+  ID_STATEMENT bigint(20) NOT NULL,
+  STATEMENT_GUID varchar(255) DEFAULT NULL,
+  ID_SUBJECT varchar(50) NOT NULL,
+  ID_CATEGORY varchar(50) NOT NULL,
+  ID_AWARD int(11) DEFAULT NULL,
+  ENTITY_KIND varchar(10) NOT NULL,
+  ID_ENTITY int(11) NOT NULL,
+  KEY ID_STATEMENT (ID_STATEMENT),
+  KEY ID_CATEGORY (ID_CATEGORY),
+  KEY ID_SUBJECT (ID_SUBJECT),
+  KEY ID_AWARD (ID_AWARD, ID_ENTITY)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO tmp_071_win
+SELECT s.ID_STATEMENT, s.STATEMENT_GUID, s.ID_WIKIDATA, v.ID_ITEM, a.ID_AWARD, 'person', p.ID_PERSON
+FROM T_WC_WIKIDATA_STATEMENT s
+JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
+JOIN T_WC_T2S_PERSON p ON p.ID_WIKIDATA = s.ID_WIKIDATA
+LEFT JOIN T_WC_T2S_AWARD a ON a.ID_WIKIDATA = v.ID_ITEM AND a.AWARD_SOURCE = 'P166'
+WHERE s.ID_PROPERTY = 'P166'
+  AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')
+  AND p.ID_WIKIDATA IS NOT NULL AND p.ID_WIKIDATA <> '';
+
+INSERT INTO tmp_071_win
+SELECT s.ID_STATEMENT, s.STATEMENT_GUID, s.ID_WIKIDATA, v.ID_ITEM, a.ID_AWARD, 'movie', m.ID_MOVIE
+FROM T_WC_WIKIDATA_STATEMENT s
+JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
+JOIN T_WC_T2S_MOVIE m ON m.ID_WIKIDATA = s.ID_WIKIDATA
+LEFT JOIN T_WC_T2S_AWARD a ON a.ID_WIKIDATA = v.ID_ITEM AND a.AWARD_SOURCE = 'P166'
+WHERE s.ID_PROPERTY = 'P166'
+  AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')
+  AND m.ID_WIKIDATA IS NOT NULL AND m.ID_WIKIDATA <> '';
+
+INSERT INTO tmp_071_win
+SELECT s.ID_STATEMENT, s.STATEMENT_GUID, s.ID_WIKIDATA, v.ID_ITEM, a.ID_AWARD, 'serie', t.ID_SERIE
+FROM T_WC_WIKIDATA_STATEMENT s
+JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
+JOIN T_WC_T2S_SERIE t ON t.ID_WIKIDATA = s.ID_WIKIDATA
+LEFT JOIN T_WC_T2S_AWARD a ON a.ID_WIKIDATA = v.ID_ITEM AND a.AWARD_SOURCE = 'P166'
+WHERE s.ID_PROPERTY = 'P166'
+  AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated')
+  AND t.ID_WIKIDATA IS NOT NULL AND t.ID_WIKIDATA <> '';
+
+-- ---------------------------------------------------------------------------------------
+-- A. Statements against pairs: the rows the dedup removes
+-- ---------------------------------------------------------------------------------------
+SELECT '=== A1. P166 statements on T2S entities, by kind ===' AS section;
+
+SELECT ENTITY_KIND,
+       COUNT(*) AS WIN_ROWS,
+       SUM(ID_AWARD IS NOT NULL) AS ROWS_ON_A_T2S_AWARD,
+       SUM(ID_AWARD IS NULL) AS ROWS_OUTSIDE_T2S_AWARD,
+       COUNT(DISTINCT CASE WHEN ID_AWARD IS NOT NULL THEN CONCAT(ID_AWARD, '-', ID_ENTITY) END) AS DISTINCT_PAIRS,
+       SUM(ID_AWARD IS NOT NULL)
+         - COUNT(DISTINCT CASE WHEN ID_AWARD IS NOT NULL THEN CONCAT(ID_AWARD, '-', ID_ENTITY) END) AS ROWS_THE_DEDUP_REMOVES
+FROM tmp_071_win
+GROUP BY ENTITY_KIND
+ORDER BY ENTITY_KIND;
+
+SELECT '=== A2. the link tables today ===' AS section;
+
+SELECT 'T_WC_T2S_PERSON_AWARD' AS TABLE_NAME, COUNT(*) AS TABLE_ROWS, COUNT(DISTINCT ID_AWARD, ID_PERSON) AS DISTINCT_PAIRS FROM T_WC_T2S_PERSON_AWARD
+UNION ALL
+SELECT 'T_WC_T2S_MOVIE_AWARD', COUNT(*), COUNT(DISTINCT ID_AWARD, ID_MOVIE) FROM T_WC_T2S_MOVIE_AWARD
+UNION ALL
+SELECT 'T_WC_T2S_SERIE_AWARD', COUNT(*), COUNT(DISTINCT ID_AWARD, ID_SERIE) FROM T_WC_T2S_SERIE_AWARD;
+
+SELECT '=== A3. T_WC_T2S_AWARD today, by source and type ===' AS section;
+
+SELECT AWARD_SOURCE, AWARD_TYPE, COUNT(*) AS AWARDS FROM T_WC_T2S_AWARD GROUP BY AWARD_SOURCE, AWARD_TYPE;
+
+SELECT '=== A4. pairs with several statements: how many wins a pair hides ===' AS section;
+
+SELECT ENTITY_KIND, WINS_IN_THE_PAIR, COUNT(*) AS PAIRS
+FROM (SELECT ENTITY_KIND, ID_AWARD, ID_ENTITY, COUNT(*) AS WINS_IN_THE_PAIR
+      FROM tmp_071_win WHERE ID_AWARD IS NOT NULL
+      GROUP BY ENTITY_KIND, ID_AWARD, ID_ENTITY) x
+GROUP BY ENTITY_KIND, WINS_IN_THE_PAIR
+ORDER BY ENTITY_KIND, WINS_IN_THE_PAIR;
+
+-- ---------------------------------------------------------------------------------------
+-- B. Qualifiers
+-- ---------------------------------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_071_stmt;
+CREATE TEMPORARY TABLE tmp_071_stmt (PRIMARY KEY (ID_STATEMENT))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS SELECT DISTINCT ID_STATEMENT FROM tmp_071_win WHERE ID_AWARD IS NOT NULL;
+
+DROP TEMPORARY TABLE IF EXISTS tmp_071_qual;
+CREATE TEMPORARY TABLE tmp_071_qual (PRIMARY KEY (ID_STATEMENT))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS
+SELECT w.ID_STATEMENT,
+       SUM(q.ID_QUALIFIER_PROPERTY = 'P585')  AS N_P585,
+       SUM(q.ID_QUALIFIER_PROPERTY = 'P1686') AS N_P1686,
+       SUM(q.ID_QUALIFIER_PROPERTY = 'P805')  AS N_P805,
+       MIN(CASE WHEN q.ID_QUALIFIER_PROPERTY = 'P585' THEN qt.YEAR_VALUE END) AS YEAR_MIN,
+       MAX(CASE WHEN q.ID_QUALIFIER_PROPERTY = 'P585' THEN qt.YEAR_VALUE END) AS YEAR_MAX,
+       MIN(CASE WHEN q.ID_QUALIFIER_PROPERTY = 'P1686' THEN qi.ID_ITEM END) AS WORK_MIN,
+       MIN(CASE WHEN q.ID_QUALIFIER_PROPERTY = 'P805' THEN qi.ID_ITEM END) AS CEREMONY_MIN
+FROM tmp_071_stmt w
+JOIN T_WC_WIKIDATA_STATEMENT_QUALIFIER q
+  ON q.ID_STATEMENT = w.ID_STATEMENT AND q.ID_QUALIFIER_PROPERTY IN ('P585', 'P1686', 'P805')
+LEFT JOIN T_WC_WIKIDATA_QUALIFIER_TIME_VALUE qt ON qt.ID_STATEMENT_QUALIFIER = q.ID_STATEMENT_QUALIFIER
+LEFT JOIN T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE qi ON qi.ID_STATEMENT_QUALIFIER = q.ID_STATEMENT_QUALIFIER
+GROUP BY w.ID_STATEMENT;
+
+SELECT '=== B1. qualifier coverage of the win rows, by kind ===' AS section;
+
+SELECT w.ENTITY_KIND,
+       COUNT(*) AS WIN_ROWS,
+       SUM(COALESCE(q.N_P585, 0) > 0)  AS WITH_P585_YEAR,
+       ROUND(100 * SUM(COALESCE(q.N_P585, 0) > 0) / COUNT(*), 1) AS PCT_YEAR,
+       SUM(COALESCE(q.N_P1686, 0) > 0) AS WITH_P1686_WORK,
+       ROUND(100 * SUM(COALESCE(q.N_P1686, 0) > 0) / COUNT(*), 1) AS PCT_WORK,
+       SUM(COALESCE(q.N_P805, 0) > 0)  AS WITH_P805_CEREMONY,
+       SUM(COALESCE(q.N_P585, 0) = 0 AND COALESCE(q.N_P805, 0) > 0) AS NO_YEAR_BUT_CEREMONY,
+       SUM(COALESCE(q.N_P585, 0) > 1)  AS SEVERAL_P585,
+       SUM(COALESCE(q.N_P585, 0) > 1 AND q.YEAR_MIN <> q.YEAR_MAX) AS SEVERAL_DISTINCT_YEARS,
+       SUM(COALESCE(q.N_P1686, 0) > 1) AS SEVERAL_P1686,
+       SUM(COALESCE(q.N_P805, 0) > 1)  AS SEVERAL_P805
+FROM tmp_071_win w
+LEFT JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT
+WHERE w.ID_AWARD IS NOT NULL
+GROUP BY w.ENTITY_KIND
+ORDER BY w.ENTITY_KIND;
+
+SELECT '=== B2. win rows with no year: can the ceremony give it? ===' AS section;
+-- The ceremony carries its own P585 (point in time) only when it is a full V2 entity.
+
+SELECT COUNT(*) AS ROWS_NO_YEAR_BUT_CEREMONY,
+       SUM(EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT cs
+                   JOIN T_WC_WIKIDATA_TIME_VALUE ct ON ct.ID_STATEMENT = cs.ID_STATEMENT
+                   WHERE cs.ID_WIKIDATA = q.CEREMONY_MIN AND cs.ID_PROPERTY = 'P585')) AS CEREMONY_HAS_P585
+FROM tmp_071_win w
+JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT
+WHERE w.ID_AWARD IS NOT NULL AND q.N_P585 = 0 AND q.N_P805 > 0;
+
+SELECT '=== B3. every qualifier property seen on the win statements ===' AS section;
+
+SELECT q.ID_QUALIFIER_PROPERTY, COUNT(DISTINCT q.ID_STATEMENT) AS STATEMENTS
+FROM tmp_071_stmt w
+JOIN T_WC_WIKIDATA_STATEMENT_QUALIFIER q ON q.ID_STATEMENT = w.ID_STATEMENT
+GROUP BY q.ID_QUALIFIER_PROPERTY
+ORDER BY STATEMENTS DESC
+LIMIT 20;
+
+SELECT '=== B4. years out of range (before 1880 or in the future) ===' AS section;
+
+SELECT SUM(YEAR_MIN < 1880) AS BEFORE_1880, SUM(YEAR_MIN > YEAR(CURDATE())) AS IN_THE_FUTURE,
+       MIN(YEAR_MIN) AS YEAR_LOWEST, MAX(YEAR_MIN) AS YEAR_HIGHEST
+FROM tmp_071_qual WHERE N_P585 > 0;
+
+-- ---------------------------------------------------------------------------------------
+-- C. The P1686 work resolved to T2S
+-- ---------------------------------------------------------------------------------------
+SELECT '=== C1. the work of a win (first P1686), resolved to T2S, by kind of winner ===' AS section;
+
+SELECT w.ENTITY_KIND,
+       COUNT(*) AS ROWS_WITH_A_WORK,
+       SUM(m.ID_MOVIE IS NOT NULL) AS WORK_IS_A_T2S_MOVIE,
+       SUM(t.ID_SERIE IS NOT NULL) AS WORK_IS_A_T2S_SERIE,
+       SUM(m.ID_MOVIE IS NOT NULL AND t.ID_SERIE IS NOT NULL) AS WORK_IS_BOTH,
+       SUM(m.ID_MOVIE IS NULL AND t.ID_SERIE IS NULL) AS WORK_OUTSIDE_T2S
+FROM tmp_071_win w
+JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT AND q.N_P1686 > 0
+LEFT JOIN (SELECT ID_WIKIDATA, MIN(ID_MOVIE) AS ID_MOVIE FROM T_WC_T2S_MOVIE
+           WHERE ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '' GROUP BY ID_WIKIDATA) m ON m.ID_WIKIDATA = q.WORK_MIN
+LEFT JOIN (SELECT ID_WIKIDATA, MIN(ID_SERIE) AS ID_SERIE FROM T_WC_T2S_SERIE
+           WHERE ID_WIKIDATA IS NOT NULL AND ID_WIKIDATA <> '' GROUP BY ID_WIKIDATA) t ON t.ID_WIKIDATA = q.WORK_MIN
+WHERE w.ID_AWARD IS NOT NULL
+GROUP BY w.ENTITY_KIND
+ORDER BY w.ENTITY_KIND;
+
+-- ---------------------------------------------------------------------------------------
+-- D. Families: the P31 parents of the categories
+-- ---------------------------------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_071_category;
+CREATE TEMPORARY TABLE tmp_071_category (PRIMARY KEY (ID_CATEGORY))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS SELECT ID_CATEGORY, COUNT(*) AS WIN_ROWS FROM tmp_071_win WHERE ID_AWARD IS NOT NULL GROUP BY ID_CATEGORY;
+
+DROP TEMPORARY TABLE IF EXISTS tmp_071_parent;
+CREATE TEMPORARY TABLE tmp_071_parent (KEY ID_CATEGORY (ID_CATEGORY), KEY ID_PARENT (ID_PARENT))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS
+SELECT DISTINCT c.ID_CATEGORY, pv.ID_ITEM AS ID_PARENT, c.WIN_ROWS
+FROM tmp_071_category c
+JOIN T_WC_WIKIDATA_STATEMENT ps ON ps.ID_WIKIDATA = c.ID_CATEGORY AND ps.ID_PROPERTY = 'P31'
+JOIN T_WC_WIKIDATA_ITEM_VALUE pv ON pv.ID_STATEMENT = ps.ID_STATEMENT
+WHERE (ps.`RANK` IS NULL OR ps.`RANK` <> 'deprecated');
+
+SELECT '=== D1. categories by number of P31 parents ===' AS section;
+
+SELECT COALESCE(x.PARENTS, 0) AS P31_PARENTS, COUNT(*) AS CATEGORIES, SUM(c.WIN_ROWS) AS WIN_ROWS
+FROM tmp_071_category c
+LEFT JOIN (SELECT ID_CATEGORY, COUNT(*) AS PARENTS FROM tmp_071_parent GROUP BY ID_CATEGORY) x ON x.ID_CATEGORY = c.ID_CATEGORY
+GROUP BY COALESCE(x.PARENTS, 0)
+ORDER BY P31_PARENTS;
+
+SELECT '=== D2. the parents: how many, in the award cone, themselves a T2S award ===' AS section;
+
+SELECT COUNT(*) AS DISTINCT_PARENTS,
+       SUM(x.IN_CONE) AS PARENTS_IN_THE_CONE,
+       SUM(x.IS_T2S_AWARD) AS PARENTS_ALREADY_A_T2S_AWARD,
+       SUM(x.HAS_P31) AS PARENTS_WITH_THEIR_OWN_P31,
+       SUM(x.HAS_P279) AS PARENTS_WITH_A_P279,
+       SUM(x.CATEGORIES = 1) AS PARENTS_OF_ONE_CATEGORY,
+       SUM(x.CATEGORIES >= 2) AS PARENTS_OF_SEVERAL
+FROM (SELECT p.ID_PARENT, COUNT(*) AS CATEGORIES,
+             EXISTS (SELECT 1 FROM T_WC_T2S_AWARD_CLASS ac WHERE ac.ID_CLASS = p.ID_PARENT) AS IN_CONE,
+             EXISTS (SELECT 1 FROM T_WC_T2S_AWARD a WHERE a.ID_WIKIDATA = p.ID_PARENT AND a.AWARD_SOURCE = 'P166') AS IS_T2S_AWARD,
+             EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT s1 WHERE s1.ID_WIKIDATA = p.ID_PARENT AND s1.ID_PROPERTY = 'P31') AS HAS_P31,
+             EXISTS (SELECT 1 FROM T_WC_WIKIDATA_SUBCLASS sc WHERE sc.ID_CHILD = p.ID_PARENT AND sc.DELETED = 0) AS HAS_P279
+      FROM tmp_071_parent p GROUP BY p.ID_PARENT) x;
+
+SELECT '=== D3. the 70 parents with the most categories, with what tells a family from a class ===' AS section;
+-- OWN_P31: what the parent is an instance of. OWN_P279: what it is a subclass of.
+-- Expected: Academy Awards (Q19020) is an instance of something; "film award" is only a class.
+
+SELECT p.ID_PARENT,
+       COALESCE(i.LABEL_EN, '') AS LABEL_EN,
+       COUNT(*) AS CATEGORIES,
+       SUM(p.WIN_ROWS) AS WIN_ROWS,
+       EXISTS (SELECT 1 FROM T_WC_T2S_AWARD_CLASS ac WHERE ac.ID_CLASS = p.ID_PARENT) AS IN_CONE,
+       EXISTS (SELECT 1 FROM T_WC_T2S_AWARD a WHERE a.ID_WIKIDATA = p.ID_PARENT AND a.AWARD_SOURCE = 'P166') AS IS_T2S_AWARD,
+       (SELECT GROUP_CONCAT(DISTINCT v1.ID_ITEM ORDER BY v1.ID_ITEM SEPARATOR ' ')
+        FROM T_WC_WIKIDATA_STATEMENT s1 JOIN T_WC_WIKIDATA_ITEM_VALUE v1 ON v1.ID_STATEMENT = s1.ID_STATEMENT
+        WHERE s1.ID_WIKIDATA = p.ID_PARENT AND s1.ID_PROPERTY = 'P31') AS OWN_P31,
+       (SELECT GROUP_CONCAT(DISTINCT sc.ID_PARENT ORDER BY sc.ID_PARENT SEPARATOR ' ')
+        FROM T_WC_WIKIDATA_SUBCLASS sc WHERE sc.ID_CHILD = p.ID_PARENT AND sc.DELETED = 0) AS OWN_P279
+FROM tmp_071_parent p
+LEFT JOIN T_WC_WIKIDATA_ITEM i ON i.ID_WIKIDATA = p.ID_PARENT
+GROUP BY p.ID_PARENT, i.LABEL_EN
+ORDER BY CATEGORIES DESC, p.ID_PARENT
+LIMIT 70;
+
+SELECT '=== D4. labels of the classes the top parents are instances of ===' AS section;
+
+SELECT v1.ID_ITEM AS ID_CLASS, COALESCE(i.LABEL_EN, '') AS LABEL_EN,
+       COUNT(DISTINCT x.ID_PARENT) AS PARENTS_INSTANCE_OF_IT,
+       EXISTS (SELECT 1 FROM T_WC_T2S_AWARD_CLASS ac WHERE ac.ID_CLASS = v1.ID_ITEM) AS IN_CONE
+FROM (SELECT DISTINCT ID_PARENT FROM tmp_071_parent) x
+JOIN T_WC_WIKIDATA_STATEMENT s1 ON s1.ID_WIKIDATA = x.ID_PARENT AND s1.ID_PROPERTY = 'P31'
+JOIN T_WC_WIKIDATA_ITEM_VALUE v1 ON v1.ID_STATEMENT = s1.ID_STATEMENT
+LEFT JOIN T_WC_WIKIDATA_ITEM i ON i.ID_WIKIDATA = v1.ID_ITEM
+GROUP BY v1.ID_ITEM, i.LABEL_EN
+ORDER BY PARENTS_INSTANCE_OF_IT DESC
+LIMIT 30;
+
+SELECT '=== D5. the reference families: Academy Awards, Cesar, Golden Globe, BAFTA, Emmy, Palme ===' AS section;
+
+SELECT p.ID_PARENT, COALESCE(i.LABEL_EN, '') AS LABEL_EN, COUNT(*) AS CATEGORIES, SUM(p.WIN_ROWS) AS WIN_ROWS
+FROM tmp_071_parent p
+LEFT JOIN T_WC_WIKIDATA_ITEM i ON i.ID_WIKIDATA = p.ID_PARENT
+WHERE p.ID_PARENT IN ('Q19020', 'Q174389', 'Q1011547', 'Q732997', 'Q123737', 'Q179191', 'Q28444913')
+GROUP BY p.ID_PARENT, i.LABEL_EN
+ORDER BY CATEGORIES DESC;
+
+SELECT '=== D6. the 25 categories with the most wins and no P31 parent in the cone ===' AS section;
+
+SELECT c.ID_CATEGORY, COALESCE(a.AWARD_NAME, '') AS AWARD_NAME, c.WIN_ROWS,
+       (SELECT GROUP_CONCAT(p.ID_PARENT ORDER BY p.ID_PARENT SEPARATOR ' ') FROM tmp_071_parent p WHERE p.ID_CATEGORY = c.ID_CATEGORY) AS P31_PARENTS
+FROM tmp_071_category c
+LEFT JOIN T_WC_T2S_AWARD a ON a.ID_WIKIDATA = c.ID_CATEGORY AND a.AWARD_SOURCE = 'P166'
+WHERE NOT EXISTS (SELECT 1 FROM tmp_071_parent p JOIN T_WC_T2S_AWARD_CLASS ac ON ac.ID_CLASS = p.ID_PARENT
+                  WHERE p.ID_CATEGORY = c.ID_CATEGORY)
+ORDER BY c.WIN_ROWS DESC
+LIMIT 25;
+
+-- ---------------------------------------------------------------------------------------
+-- E. The acceptance cases, through this preview
+-- ---------------------------------------------------------------------------------------
+SELECT '=== E1. Katharine Hepburn (Q56016): her win rows ===' AS section;
+
+SELECT a.AWARD_NAME, q.YEAR_MIN AS AWARD_YEAR, q.WORK_MIN AS ID_WORK_WIKIDATA, m.TITLE AS MOVIE_FOR, q.CEREMONY_MIN AS ID_CEREMONY
+FROM tmp_071_win w
+JOIN T_WC_T2S_AWARD a ON a.ID_AWARD = w.ID_AWARD
+LEFT JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT
+LEFT JOIN T_WC_T2S_MOVIE m ON m.ID_WIKIDATA = q.WORK_MIN AND q.WORK_MIN <> ''
+WHERE w.ID_SUBJECT = 'Q56016' AND w.ENTITY_KIND = 'person'
+ORDER BY q.YEAR_MIN, a.AWARD_NAME;
+
+SELECT '=== E2. Oscars through the family Q19020: Hepburn (expected 4), Walt Disney (Q8704) ===' AS section;
+
+SELECT w.ID_SUBJECT, pe.PERSON_NAME, COUNT(*) AS OSCAR_ROWS, COUNT(DISTINCT w.ID_AWARD) AS OSCAR_CATEGORIES
+FROM tmp_071_win w
+JOIN T_WC_T2S_PERSON pe ON pe.ID_PERSON = w.ID_ENTITY
+WHERE w.ENTITY_KIND = 'person' AND w.ID_SUBJECT IN ('Q56016', 'Q8704') AND w.ID_AWARD IS NOT NULL
+  AND EXISTS (SELECT 1 FROM tmp_071_parent p WHERE p.ID_CATEGORY = w.ID_CATEGORY AND p.ID_PARENT = 'Q19020')
+GROUP BY w.ID_SUBJECT, pe.PERSON_NAME;
+
+SELECT '=== E3. Cesar for best film (Q645595) by year, from T2S movies ===' AS section;
+
+SELECT q.YEAR_MIN AS AWARD_YEAR, m.TITLE, m.ID_MOVIE
+FROM tmp_071_win w
+JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = w.ID_ENTITY
+LEFT JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT
+WHERE w.ENTITY_KIND = 'movie' AND w.ID_CATEGORY = 'Q645595'
+ORDER BY q.YEAR_MIN DESC, m.TITLE
+LIMIT 60;
+
+-- ---------------------------------------------------------------------------------------
+-- F. Key stability
+-- ---------------------------------------------------------------------------------------
+SELECT '=== F1. STATEMENT_GUID on the win statements ===' AS section;
+
+SELECT COUNT(*) AS WIN_ROWS,
+       SUM(STATEMENT_GUID IS NULL OR STATEMENT_GUID = '') AS WITHOUT_GUID,
+       MAX(CHAR_LENGTH(STATEMENT_GUID)) AS GUID_MAX_LENGTH,
+       MIN(ID_STATEMENT) AS ID_STATEMENT_MIN, MAX(ID_STATEMENT) AS ID_STATEMENT_MAX
+FROM tmp_071_win;
+
+SELECT '=== F2. one statement on several T2S entities of the same kind (shared Wikidata id) ===' AS section;
+
+SELECT ENTITY_KIND, COUNT(*) AS STATEMENTS_ON_SEVERAL_ENTITIES
+FROM (SELECT ENTITY_KIND, ID_STATEMENT FROM tmp_071_win GROUP BY ENTITY_KIND, ID_STATEMENT HAVING COUNT(*) > 1) x
+GROUP BY ENTITY_KIND;
+
+SELECT '=== F3. the same reading for nominations (P1411), in one line per kind ===' AS section;
+-- Only the size of the same change on process 47, to decide whether it follows.
+
+SELECT 'person' AS ENTITY_KIND, COUNT(*) AS NOMINATION_STATEMENTS, COUNT(DISTINCT v.ID_ITEM, p.ID_PERSON) AS DISTINCT_PAIRS
+FROM T_WC_WIKIDATA_STATEMENT s
+JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
+JOIN T_WC_T2S_PERSON p ON p.ID_WIKIDATA = s.ID_WIKIDATA
+WHERE s.ID_PROPERTY = 'P1411' AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated') AND p.ID_WIKIDATA <> ''
+UNION ALL
+SELECT 'movie', COUNT(*), COUNT(DISTINCT v.ID_ITEM, m.ID_MOVIE)
+FROM T_WC_WIKIDATA_STATEMENT s
+JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
+JOIN T_WC_T2S_MOVIE m ON m.ID_WIKIDATA = s.ID_WIKIDATA
+WHERE s.ID_PROPERTY = 'P1411' AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated') AND m.ID_WIKIDATA <> ''
+UNION ALL
+SELECT 'serie', COUNT(*), COUNT(DISTINCT v.ID_ITEM, t.ID_SERIE)
+FROM T_WC_WIKIDATA_STATEMENT s
+JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
+JOIN T_WC_T2S_SERIE t ON t.ID_WIKIDATA = s.ID_WIKIDATA
+WHERE s.ID_PROPERTY = 'P1411' AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated') AND t.ID_WIKIDATA <> '';
+
+SELECT NOW() AS NOW_;
