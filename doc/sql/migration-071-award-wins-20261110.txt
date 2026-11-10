@@ -1,0 +1,19 @@
+-- migration-071-award-wins.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-11-10 11:00:39 +0100
+--
++-----------------------+----------------------+-------------+-------------+------------+
+| TABLE_NAME            | COLUMN_NAME          | COLUMN_TYPE | IS_NULLABLE | COLUMN_KEY |
++-----------------------+----------------------+-------------+-------------+------------+
+| T_WC_T2S_AWARD        | ID_AWARD_PARENT      | int(11)     | YES         | MUL        |
+| T_WC_T2S_MOVIE_AWARD  | ID_STATEMENT         | bigint(20)  | YES         | MUL        |
+| T_WC_T2S_MOVIE_AWARD  | AWARD_YEAR           | int(11)     | YES         | MUL        |
+| T_WC_T2S_MOVIE_AWARD  | ID_CEREMONY_WIKIDATA | varchar(20) | YES         |            |
+| T_WC_T2S_PERSON_AWARD | ID_STATEMENT         | bigint(20)  | YES         | MUL        |
+| T_WC_T2S_PERSON_AWARD | AWARD_YEAR           | int(11)     | YES         | MUL        |
+| T_WC_T2S_PERSON_AWARD | ID_CEREMONY_WIKIDATA | varchar(20) | YES         |            |
+| T_WC_T2S_PERSON_AWARD | ID_MOVIE_FOR         | int(11)     | YES         | MUL        |
+| T_WC_T2S_PERSON_AWARD | ID_SERIE_FOR         | int(11)     | YES         | MUL        |
+| T_WC_T2S_SERIE_AWARD  | ID_STATEMENT         | bigint(20)  | YES         | MUL        |
+| T_WC_T2S_SERIE_AWARD  | AWARD_YEAR           | int(11)     | YES         | MUL        |
+| T_WC_T2S_SERIE_AWARD  | ID_CEREMONY_WIKIDATA | varchar(20) | YES         |            |
++-----------------------+----------------------+-------------+-------------+------------+

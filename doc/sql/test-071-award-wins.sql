@@ -136,11 +136,20 @@ SELECT COUNT(*) AS AWARD_ROWS, SUM(ID_AWARD_PARENT IS NOT NULL) AS WITH_PARENT, 
        SUM(ID_AWARD_PARENT = 10464) AS UNDER_ACADEMY_AWARDS, SUM(ID_AWARD_PARENT = ID_AWARD) AS OWN_PARENT_MUST_BE_0
 FROM T_WC_T2S_AWARD;
 
-SELECT '=== 14. a parent that is not an award row, or that has a parent itself: 0 and 0 (one level only) ===' AS section;
-SELECT SUM(f.ID_AWARD IS NULL) AS PARENT_MISSING, SUM(f.ID_AWARD_PARENT IS NOT NULL) AS PARENT_HAS_A_PARENT
+SELECT '=== 14. a parent that is not an award row: 0. CATEGORIES_UNDER_A_NESTED_FAMILY is a fact, not a fault: ID_AWARD_PARENT is the direct family, and a family may belong to a larger one ===' AS section;
+SELECT SUM(f.ID_AWARD IS NULL) AS PARENT_MISSING, SUM(f.ID_AWARD_PARENT IS NOT NULL) AS CATEGORIES_UNDER_A_NESTED_FAMILY
 FROM T_WC_T2S_AWARD c
 LEFT JOIN T_WC_T2S_AWARD f ON f.ID_AWARD = c.ID_AWARD_PARENT
 WHERE c.ID_AWARD_PARENT IS NOT NULL;
+
+SELECT '=== 14b. the nested families: a family that has a family itself, with its number of categories (a question on the larger family needs both levels) ===' AS section;
+SELECT f.ID_AWARD, f.AWARD_NAME, f.ID_AWARD_PARENT, g.AWARD_NAME AS LARGER_FAMILY, g.ID_AWARD_PARENT AS THIRD_LEVEL_MUST_BE_NULL,
+       (SELECT COUNT(*) FROM T_WC_T2S_AWARD c WHERE c.ID_AWARD_PARENT = f.ID_AWARD) AS CATEGORIES
+FROM T_WC_T2S_AWARD f
+JOIN T_WC_T2S_AWARD g ON g.ID_AWARD = f.ID_AWARD_PARENT
+WHERE EXISTS (SELECT 1 FROM T_WC_T2S_AWARD c WHERE c.ID_AWARD_PARENT = f.ID_AWARD)
+ORDER BY CATEGORIES DESC, f.ID_AWARD
+LIMIT 30;
 
 SELECT '=== 15. the family of four categories: Best Actress (269) has the Academy Awards today; Best Picture (146) only after the crawler load ===' AS section;
 SELECT c.ID_AWARD, c.AWARD_NAME, c.ID_AWARD_PARENT, f.AWARD_NAME AS FAMILY_NAME
