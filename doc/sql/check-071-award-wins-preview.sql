@@ -14,6 +14,7 @@
 --      (Academy Awards) from a generic class (film award)
 --   E. the acceptance cases of the ticket, read through this preview
 --   F. key stability: STATEMENT_GUID filled, one Wikidata id on several T2S entities
+--   G. second pass: the family as an instance of Q107655869, its three routes, several years
 
 SELECT NOW() AS NOW_;
 
@@ -299,7 +300,7 @@ LIMIT 25;
 -- ---------------------------------------------------------------------------------------
 SELECT '=== E1. Katharine Hepburn (Q56016): her win rows ===' AS section;
 
-SELECT a.AWARD_NAME, q.YEAR_MIN AS AWARD_YEAR, q.WORK_MIN AS ID_WORK_WIKIDATA, m.TITLE AS MOVIE_FOR, q.CEREMONY_MIN AS ID_CEREMONY
+SELECT a.AWARD_NAME, q.YEAR_MIN AS AWARD_YEAR, q.WORK_MIN AS ID_WORK_WIKIDATA, m.MOVIE_TITLE AS MOVIE_FOR, q.CEREMONY_MIN AS ID_CEREMONY
 FROM tmp_071_win w
 JOIN T_WC_T2S_AWARD a ON a.ID_AWARD = w.ID_AWARD
 LEFT JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT
@@ -318,13 +319,241 @@ GROUP BY w.ID_SUBJECT, pe.PERSON_NAME;
 
 SELECT '=== E3. Cesar for best film (Q645595) by year, from T2S movies ===' AS section;
 
-SELECT q.YEAR_MIN AS AWARD_YEAR, m.TITLE, m.ID_MOVIE
+SELECT q.YEAR_MIN AS AWARD_YEAR, m.MOVIE_TITLE, m.ID_MOVIE
 FROM tmp_071_win w
 JOIN T_WC_T2S_MOVIE m ON m.ID_MOVIE = w.ID_ENTITY
 LEFT JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT
 WHERE w.ENTITY_KIND = 'movie' AND w.ID_CATEGORY = 'Q645595'
-ORDER BY q.YEAR_MIN DESC, m.TITLE
+ORDER BY q.YEAR_MIN DESC, m.MOVIE_TITLE
 LIMIT 60;
+
+-- ---------------------------------------------------------------------------------------
+-- G. Second pass (2026-11-10), after the first reading of A to F
+--    The first run showed that a P31 parent is most often a class (award, film award,
+--    class of award). What Wikidata calls a family is an instance of Q107655869 "group of
+--    awards": Academy Awards, Cesar Award, Grammy Awards, Filmfare Awards all carry it.
+--    This pass measures that rule, the two other routes from a category to its family
+--    (P361 part of, P279 subclass of), and the statements carrying several years.
+-- ---------------------------------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_071_group;
+CREATE TEMPORARY TABLE tmp_071_group (PRIMARY KEY (ID_GROUP))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS
+SELECT gs.ID_WIKIDATA AS ID_GROUP,
+       MAX(gv.ID_ITEM = 'Q107655869') AS IS_GROUP,
+       MAX(gv.ID_ITEM = 'Q107467117') AS IS_TYPE
+FROM T_WC_WIKIDATA_ITEM_VALUE gv
+JOIN T_WC_WIKIDATA_STATEMENT gs ON gs.ID_STATEMENT = gv.ID_STATEMENT
+WHERE gv.ID_ITEM IN ('Q107655869', 'Q107467117') AND gs.ID_PROPERTY = 'P31'
+  AND (gs.`RANK` IS NULL OR gs.`RANK` <> 'deprecated')
+GROUP BY gs.ID_WIKIDATA;
+
+SELECT '=== G1. instances of group of awards (Q107655869) and of type of award (Q107467117) ===' AS section;
+
+SELECT SUM(IS_GROUP) AS GROUPS_OF_AWARDS, SUM(IS_TYPE) AS TYPES_OF_AWARD, SUM(IS_GROUP AND IS_TYPE) AS BOTH_AT_ONCE
+FROM tmp_071_group;
+
+-- One row per (category, group, route). A group that is also a type of award is kept apart.
+DROP TEMPORARY TABLE IF EXISTS tmp_071_link;
+CREATE TEMPORARY TABLE tmp_071_link (
+  ID_CATEGORY varchar(50) NOT NULL,
+  ID_GROUP varchar(50) NOT NULL,
+  ROUTE varchar(5) NOT NULL,
+  IS_TYPE tinyint(4) NOT NULL,
+  KEY ID_CATEGORY (ID_CATEGORY),
+  KEY ID_GROUP (ID_GROUP)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO tmp_071_link
+SELECT DISTINCT p.ID_CATEGORY, p.ID_PARENT, 'P31', g.IS_TYPE
+FROM tmp_071_parent p
+JOIN tmp_071_group g ON g.ID_GROUP = p.ID_PARENT AND g.IS_GROUP = 1;
+
+INSERT INTO tmp_071_link
+SELECT DISTINCT c.ID_CATEGORY, pv.ID_ITEM, 'P361', g.IS_TYPE
+FROM tmp_071_category c
+JOIN T_WC_WIKIDATA_STATEMENT ps ON ps.ID_WIKIDATA = c.ID_CATEGORY AND ps.ID_PROPERTY = 'P361'
+JOIN T_WC_WIKIDATA_ITEM_VALUE pv ON pv.ID_STATEMENT = ps.ID_STATEMENT
+JOIN tmp_071_group g ON g.ID_GROUP = pv.ID_ITEM AND g.IS_GROUP = 1
+WHERE (ps.`RANK` IS NULL OR ps.`RANK` <> 'deprecated');
+
+INSERT INTO tmp_071_link
+SELECT DISTINCT c.ID_CATEGORY, sc.ID_PARENT, 'P279', g.IS_TYPE
+FROM tmp_071_category c
+JOIN T_WC_WIKIDATA_SUBCLASS sc ON sc.ID_CHILD = c.ID_CATEGORY AND sc.DELETED = 0
+JOIN tmp_071_group g ON g.ID_GROUP = sc.ID_PARENT AND g.IS_GROUP = 1;
+
+DROP TEMPORARY TABLE IF EXISTS tmp_071_catfam;
+CREATE TEMPORARY TABLE tmp_071_catfam (PRIMARY KEY (ID_CATEGORY))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS
+SELECT ID_CATEGORY,
+       COUNT(DISTINCT CASE WHEN ROUTE = 'P31' AND IS_TYPE = 0 THEN ID_GROUP END) AS N_P31,
+       COUNT(DISTINCT CASE WHEN ROUTE = 'P31' THEN ID_GROUP END) AS N_P31_WITH_TYPES,
+       COUNT(DISTINCT CASE WHEN ROUTE = 'P361' AND IS_TYPE = 0 THEN ID_GROUP END) AS N_P361,
+       COUNT(DISTINCT CASE WHEN ROUTE = 'P279' AND IS_TYPE = 0 THEN ID_GROUP END) AS N_P279,
+       COUNT(DISTINCT CASE WHEN IS_TYPE = 0 THEN ID_GROUP END) AS N_ANY
+FROM tmp_071_link
+GROUP BY ID_CATEGORY;
+
+-- Wins per family, every route together, computed once (a temporary table cannot be read
+-- twice by the same statement).
+DROP TEMPORARY TABLE IF EXISTS tmp_071_groupwins;
+CREATE TEMPORARY TABLE tmp_071_groupwins (PRIMARY KEY (ID_GROUP))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS
+SELECT x.ID_GROUP, COUNT(*) AS CATEGORIES, SUM(c.WIN_ROWS) AS WIN_ROWS
+FROM (SELECT DISTINCT ID_GROUP, ID_CATEGORY FROM tmp_071_link) x
+JOIN tmp_071_category c ON c.ID_CATEGORY = x.ID_CATEGORY
+GROUP BY x.ID_GROUP;
+
+SELECT '=== G2. categories and wins that reach a family, by route (types of award left out) ===' AS section;
+
+SELECT COUNT(*) AS CATEGORIES,
+       SUM(c.WIN_ROWS) AS WIN_ROWS,
+       SUM(COALESCE(f.N_P31, 0) > 0) AS CAT_BY_P31,
+       SUM(CASE WHEN COALESCE(f.N_P31, 0) > 0 THEN c.WIN_ROWS ELSE 0 END) AS WINS_BY_P31,
+       SUM(COALESCE(f.N_P31, 0) = 0 AND COALESCE(f.N_P361, 0) > 0) AS CAT_ADDED_BY_P361,
+       SUM(CASE WHEN COALESCE(f.N_P31, 0) = 0 AND COALESCE(f.N_P361, 0) > 0 THEN c.WIN_ROWS ELSE 0 END) AS WINS_ADDED_BY_P361,
+       SUM(COALESCE(f.N_P31, 0) = 0 AND COALESCE(f.N_P361, 0) = 0 AND COALESCE(f.N_P279, 0) > 0) AS CAT_ADDED_BY_P279,
+       SUM(CASE WHEN COALESCE(f.N_P31, 0) = 0 AND COALESCE(f.N_P361, 0) = 0 AND COALESCE(f.N_P279, 0) > 0 THEN c.WIN_ROWS ELSE 0 END) AS WINS_ADDED_BY_P279,
+       SUM(COALESCE(f.N_ANY, 0) = 0) AS CAT_WITHOUT_FAMILY,
+       SUM(CASE WHEN COALESCE(f.N_ANY, 0) = 0 THEN c.WIN_ROWS ELSE 0 END) AS WINS_WITHOUT_FAMILY,
+       SUM(COALESCE(f.N_P31, 0) = 0 AND COALESCE(f.N_P31_WITH_TYPES, 0) > 0) AS CAT_ONLY_A_TYPE_BY_P31
+FROM tmp_071_category c
+LEFT JOIN tmp_071_catfam f ON f.ID_CATEGORY = c.ID_CATEGORY;
+
+SELECT '=== G3a. how many families a category reaches by P31 alone ===' AS section;
+
+SELECT COALESCE(f.N_P31, 0) AS FAMILIES, COUNT(*) AS CATEGORIES, SUM(c.WIN_ROWS) AS WIN_ROWS
+FROM tmp_071_category c LEFT JOIN tmp_071_catfam f ON f.ID_CATEGORY = c.ID_CATEGORY
+GROUP BY COALESCE(f.N_P31, 0);
+
+SELECT '=== G3b. how many families a category reaches by P31, P361 or P279 ===' AS section;
+
+SELECT COALESCE(f.N_ANY, 0) AS FAMILIES, COUNT(*) AS CATEGORIES, SUM(c.WIN_ROWS) AS WIN_ROWS
+FROM tmp_071_category c LEFT JOIN tmp_071_catfam f ON f.ID_CATEGORY = c.ID_CATEGORY
+GROUP BY COALESCE(f.N_ANY, 0);
+
+SELECT '=== G4. the 80 families with the most wins, with the categories each route gives ===' AS section;
+
+SELECT l.ID_GROUP,
+       COALESCE(i.LABEL_EN, '') AS LABEL_EN,
+       MAX(l.IS_TYPE) AS ALSO_A_TYPE,
+       EXISTS (SELECT 1 FROM T_WC_T2S_AWARD a WHERE a.ID_WIKIDATA = l.ID_GROUP AND a.AWARD_SOURCE = 'P166') AS IS_T2S_AWARD,
+       gw.CATEGORIES,
+       COUNT(DISTINCT CASE WHEN l.ROUTE = 'P31' THEN l.ID_CATEGORY END) AS CAT_P31,
+       COUNT(DISTINCT CASE WHEN l.ROUTE = 'P361' THEN l.ID_CATEGORY END) AS CAT_P361,
+       COUNT(DISTINCT CASE WHEN l.ROUTE = 'P279' THEN l.ID_CATEGORY END) AS CAT_P279,
+       gw.WIN_ROWS
+FROM tmp_071_link l
+JOIN tmp_071_groupwins gw ON gw.ID_GROUP = l.ID_GROUP
+LEFT JOIN T_WC_WIKIDATA_ITEM i ON i.ID_WIKIDATA = l.ID_GROUP
+GROUP BY l.ID_GROUP, i.LABEL_EN, gw.CATEGORIES, gw.WIN_ROWS
+ORDER BY gw.WIN_ROWS DESC, l.ID_GROUP
+LIMIT 80;
+
+SELECT '=== G5. the reference families, by route, and what they are instances of ===' AS section;
+
+SELECT r.ID_GROUP,
+       COALESCE(i.LABEL_EN, '') AS LABEL_EN,
+       (SELECT GROUP_CONCAT(DISTINCT v1.ID_ITEM ORDER BY v1.ID_ITEM SEPARATOR ' ')
+        FROM T_WC_WIKIDATA_STATEMENT s1 JOIN T_WC_WIKIDATA_ITEM_VALUE v1 ON v1.ID_STATEMENT = s1.ID_STATEMENT
+        WHERE s1.ID_WIKIDATA = r.ID_GROUP AND s1.ID_PROPERTY = 'P31') AS OWN_P31,
+       COALESCE(x.CAT_P31, 0) AS CAT_P31, COALESCE(x.CAT_P361, 0) AS CAT_P361, COALESCE(x.CAT_P279, 0) AS CAT_P279,
+       COALESCE(gw.CATEGORIES, 0) AS CATEGORIES, COALESCE(gw.WIN_ROWS, 0) AS WIN_ROWS
+FROM (SELECT 'Q19020' AS ID_GROUP UNION ALL SELECT 'Q174389' UNION ALL SELECT 'Q1011547' UNION ALL SELECT 'Q732997'
+      UNION ALL SELECT 'Q123737' UNION ALL SELECT 'Q1044427' UNION ALL SELECT 'Q28444913' UNION ALL SELECT 'Q179191'
+      UNION ALL SELECT 'Q41254' UNION ALL SELECT 'Q37049' UNION ALL SELECT 'Q7191') r
+LEFT JOIN T_WC_WIKIDATA_ITEM i ON i.ID_WIKIDATA = r.ID_GROUP
+LEFT JOIN (SELECT ID_GROUP,
+                  COUNT(DISTINCT CASE WHEN ROUTE = 'P31' THEN ID_CATEGORY END) AS CAT_P31,
+                  COUNT(DISTINCT CASE WHEN ROUTE = 'P361' THEN ID_CATEGORY END) AS CAT_P361,
+                  COUNT(DISTINCT CASE WHEN ROUTE = 'P279' THEN ID_CATEGORY END) AS CAT_P279
+           FROM tmp_071_link GROUP BY ID_GROUP) x ON x.ID_GROUP = r.ID_GROUP
+LEFT JOIN tmp_071_groupwins gw ON gw.ID_GROUP = r.ID_GROUP;
+
+SELECT '=== G6. the 25 categories with the most wins that reach several families by P31 ===' AS section;
+
+SELECT c.ID_CATEGORY, COALESCE(a.AWARD_NAME, '') AS AWARD_NAME, c.WIN_ROWS,
+       (SELECT GROUP_CONCAT(DISTINCT CONCAT(l.ID_GROUP, ' ', COALESCE(i.LABEL_EN, '')) ORDER BY l.ID_GROUP SEPARATOR ' / ')
+        FROM tmp_071_link l LEFT JOIN T_WC_WIKIDATA_ITEM i ON i.ID_WIKIDATA = l.ID_GROUP
+        WHERE l.ID_CATEGORY = c.ID_CATEGORY AND l.ROUTE = 'P31' AND l.IS_TYPE = 0) AS FAMILIES
+FROM tmp_071_category c
+JOIN tmp_071_catfam f ON f.ID_CATEGORY = c.ID_CATEGORY AND f.N_P31 > 1
+LEFT JOIN T_WC_T2S_AWARD a ON a.ID_WIKIDATA = c.ID_CATEGORY AND a.AWARD_SOURCE = 'P166'
+ORDER BY c.WIN_ROWS DESC
+LIMIT 25;
+
+SELECT '=== G7. the 40 categories with the most wins by T2S movies or series and no family by any route ===' AS section;
+
+SELECT x.ID_CATEGORY, COALESCE(a.AWARD_NAME, '') AS AWARD_NAME, x.SCREEN_WINS,
+       (SELECT GROUP_CONCAT(p.ID_PARENT ORDER BY p.ID_PARENT SEPARATOR ' ') FROM tmp_071_parent p WHERE p.ID_CATEGORY = x.ID_CATEGORY) AS P31_PARENTS,
+       (SELECT GROUP_CONCAT(DISTINCT pv.ID_ITEM ORDER BY pv.ID_ITEM SEPARATOR ' ')
+        FROM T_WC_WIKIDATA_STATEMENT ps JOIN T_WC_WIKIDATA_ITEM_VALUE pv ON pv.ID_STATEMENT = ps.ID_STATEMENT
+        WHERE ps.ID_WIKIDATA = x.ID_CATEGORY AND ps.ID_PROPERTY = 'P361') AS P361_PARENTS
+FROM (SELECT w.ID_CATEGORY, COUNT(*) AS SCREEN_WINS
+      FROM tmp_071_win w
+      WHERE w.ID_AWARD IS NOT NULL AND w.ENTITY_KIND IN ('movie', 'serie')
+      GROUP BY w.ID_CATEGORY) x
+LEFT JOIN tmp_071_catfam f ON f.ID_CATEGORY = x.ID_CATEGORY
+LEFT JOIN T_WC_T2S_AWARD a ON a.ID_WIKIDATA = x.ID_CATEGORY AND a.AWARD_SOURCE = 'P166'
+WHERE COALESCE(f.N_ANY, 0) = 0
+ORDER BY x.SCREEN_WINS DESC
+LIMIT 40;
+
+-- Statements carrying several distinct years: one statement that records several wins.
+DROP TEMPORARY TABLE IF EXISTS tmp_071_years;
+CREATE TEMPORARY TABLE tmp_071_years (PRIMARY KEY (ID_STATEMENT))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS
+SELECT s.ID_STATEMENT,
+       COUNT(DISTINCT qt.YEAR_VALUE) AS N_YEARS,
+       GROUP_CONCAT(DISTINCT qt.YEAR_VALUE ORDER BY qt.YEAR_VALUE SEPARATOR ' ') AS YEARS
+FROM tmp_071_stmt s
+JOIN T_WC_WIKIDATA_STATEMENT_QUALIFIER sq ON sq.ID_STATEMENT = s.ID_STATEMENT AND sq.ID_QUALIFIER_PROPERTY = 'P585'
+JOIN T_WC_WIKIDATA_QUALIFIER_TIME_VALUE qt ON qt.ID_STATEMENT_QUALIFIER = sq.ID_STATEMENT_QUALIFIER
+GROUP BY s.ID_STATEMENT
+HAVING COUNT(DISTINCT qt.YEAR_VALUE) > 1;
+
+SELECT '=== G8. statements with several distinct years: rows one row per (statement, year) would add ===' AS section;
+
+SELECT w.ENTITY_KIND,
+       COUNT(*) AS STATEMENTS_WITH_SEVERAL_YEARS,
+       SUM(y.N_YEARS) - COUNT(*) AS ROWS_ADDED_IF_SPLIT_BY_YEAR,
+       MAX(y.N_YEARS) AS MOST_YEARS_ON_ONE,
+       SUM(COALESCE(q.N_P1686, 0) = 0) AS WITHOUT_WORK,
+       SUM(COALESCE(q.N_P1686, 0) = 1) AS WITH_ONE_WORK,
+       SUM(COALESCE(q.N_P1686, 0) > 1) AS WITH_SEVERAL_WORKS,
+       SUM(COALESCE(q.N_P1686, 0) > 1 AND q.N_P1686 = y.N_YEARS) AS AS_MANY_WORKS_AS_YEARS
+FROM tmp_071_win w
+JOIN tmp_071_years y ON y.ID_STATEMENT = w.ID_STATEMENT
+LEFT JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT
+WHERE w.ID_AWARD IS NOT NULL
+GROUP BY w.ENTITY_KIND;
+
+SELECT '=== G9. the 25 best known persons with a statement carrying several years ===' AS section;
+
+SELECT pe.PERSON_NAME, a.AWARD_NAME, y.YEARS, COALESCE(q.N_P1686, 0) AS WORKS
+FROM tmp_071_win w
+JOIN tmp_071_years y ON y.ID_STATEMENT = w.ID_STATEMENT
+JOIN T_WC_T2S_PERSON pe ON pe.ID_PERSON = w.ID_ENTITY
+JOIN T_WC_T2S_AWARD a ON a.ID_AWARD = w.ID_AWARD
+LEFT JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT
+WHERE w.ENTITY_KIND = 'person'
+ORDER BY pe.POPULARITY DESC
+LIMIT 25;
+
+SELECT '=== G10. statements with several works (P1686) and at most one year: 15 examples ===' AS section;
+
+SELECT pe.PERSON_NAME, a.AWARD_NAME, q.YEAR_MIN AS AWARD_YEAR, q.N_P1686 AS WORKS
+FROM tmp_071_win w
+JOIN tmp_071_qual q ON q.ID_STATEMENT = w.ID_STATEMENT AND q.N_P1686 > 1
+JOIN T_WC_T2S_PERSON pe ON pe.ID_PERSON = w.ID_ENTITY
+JOIN T_WC_T2S_AWARD a ON a.ID_AWARD = w.ID_AWARD
+WHERE w.ENTITY_KIND = 'person' AND NOT EXISTS (SELECT 1 FROM tmp_071_years y WHERE y.ID_STATEMENT = w.ID_STATEMENT)
+ORDER BY pe.POPULARITY DESC
+LIMIT 15;
 
 -- ---------------------------------------------------------------------------------------
 -- F. Key stability
