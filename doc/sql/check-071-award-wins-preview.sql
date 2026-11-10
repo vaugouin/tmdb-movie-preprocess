@@ -15,6 +15,7 @@
 --   E. the acceptance cases of the ticket, read through this preview
 --   F. key stability: STATEMENT_GUID filled, one Wikidata id on several T2S entities
 --   G. second pass: the family as an instance of Q107655869, its three routes, several years
+--   H. third pass: what the family rule misses (P361 is not loaded on the categories)
 
 SELECT NOW() AS NOW_;
 
@@ -592,5 +593,124 @@ FROM T_WC_WIKIDATA_STATEMENT s
 JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
 JOIN T_WC_T2S_SERIE t ON t.ID_WIKIDATA = s.ID_WIKIDATA
 WHERE s.ID_PROPERTY = 'P1411' AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated') AND t.ID_WIKIDATA <> '';
+
+-- ---------------------------------------------------------------------------------------
+-- H. Third pass (2026-11-10): what the family rule misses, and why
+--    G7 lists "Academy Award for Best Picture" (Q102427) and "for Best Director" (Q103360)
+--    without a family. On Wikidata both declare the Academy Awards by P361 (part of), not
+--    by P31. A category is a cached entity for wikidata-crawler, which loads only a short
+--    list of properties for it (P31, P279, not P361). This pass measures the hole.
+--    The name filters below are a yardstick for this measure only, never a build rule.
+-- ---------------------------------------------------------------------------------------
+SELECT '=== H1. server version ===' AS section;
+
+SELECT VERSION() AS MARIADB_VERSION;
+
+SELECT '=== H2. what the base holds on Q19020, Q102427, Q103360, Q103618: statements by property ===' AS section;
+
+SELECT s.ID_WIKIDATA, s.ID_PROPERTY, COUNT(*) AS STATEMENTS,
+       GROUP_CONCAT(DISTINCT v.ID_ITEM ORDER BY v.ID_ITEM SEPARATOR ' ') AS ITEM_VALUES
+FROM T_WC_WIKIDATA_STATEMENT s
+LEFT JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
+WHERE s.ID_WIKIDATA IN ('Q19020', 'Q102427', 'Q103360', 'Q103618')
+GROUP BY s.ID_WIKIDATA, s.ID_PROPERTY
+ORDER BY s.ID_WIKIDATA, s.ID_PROPERTY;
+
+SELECT '=== H3. properties loaded on the award categories (all 18117), by number of categories ===' AS section;
+
+SELECT s.ID_PROPERTY, COUNT(DISTINCT s.ID_WIKIDATA) AS CATEGORIES, COUNT(*) AS STATEMENTS
+FROM tmp_071_category c
+JOIN T_WC_WIKIDATA_STATEMENT s ON s.ID_WIKIDATA = c.ID_CATEGORY
+GROUP BY s.ID_PROPERTY
+ORDER BY CATEGORIES DESC
+LIMIT 25;
+
+SELECT '=== H4. the yardstick by name: categories and wins with and without a family today ===' AS section;
+
+SELECT x.NAME_STARTS_WITH,
+       COUNT(*) AS CATEGORIES,
+       SUM(x.WIN_ROWS) AS WIN_ROWS,
+       SUM(x.HAS_FAMILY) AS CAT_WITH_FAMILY,
+       SUM(CASE WHEN x.HAS_FAMILY = 1 THEN x.WIN_ROWS ELSE 0 END) AS WINS_WITH_FAMILY,
+       SUM(x.HAS_FAMILY = 0) AS CAT_WITHOUT_FAMILY,
+       SUM(CASE WHEN x.HAS_FAMILY = 0 THEN x.WIN_ROWS ELSE 0 END) AS WINS_WITHOUT_FAMILY
+FROM (SELECT CASE WHEN a.AWARD_NAME LIKE 'Academy Award%' THEN 'Academy Award'
+                  WHEN a.AWARD_NAME LIKE 'César%' THEN 'Cesar'
+                  WHEN a.AWARD_NAME LIKE 'Golden Globe%' THEN 'Golden Globe'
+                  WHEN a.AWARD_NAME LIKE 'BAFTA%' OR a.AWARD_NAME LIKE 'British Academy Film%' THEN 'BAFTA'
+                  WHEN a.AWARD_NAME LIKE 'Primetime Emmy%' THEN 'Primetime Emmy'
+                  WHEN a.AWARD_NAME LIKE 'Screen Actors Guild%' THEN 'Screen Actors Guild'
+                  WHEN a.AWARD_NAME LIKE 'Goya%' THEN 'Goya'
+                  WHEN a.AWARD_NAME LIKE 'David di Donatello%' THEN 'David di Donatello'
+                  WHEN a.AWARD_NAME LIKE 'Saturn Award%' THEN 'Saturn Award'
+                  WHEN a.AWARD_NAME LIKE 'Tony Award%' THEN 'Tony Award'
+                  WHEN a.AWARD_NAME LIKE 'Grammy%' THEN 'Grammy'
+             END AS NAME_STARTS_WITH,
+             c.WIN_ROWS,
+             COALESCE(f.N_ANY, 0) > 0 AS HAS_FAMILY
+      FROM tmp_071_category c
+      JOIN T_WC_T2S_AWARD a ON a.ID_WIKIDATA = c.ID_CATEGORY AND a.AWARD_SOURCE = 'P166'
+      LEFT JOIN tmp_071_catfam f ON f.ID_CATEGORY = c.ID_CATEGORY) x
+WHERE x.NAME_STARTS_WITH IS NOT NULL
+GROUP BY x.NAME_STARTS_WITH
+ORDER BY WIN_ROWS DESC;
+
+SELECT '=== H5. the awards named Academy Award... that reach no family today ===' AS section;
+
+SELECT c.ID_CATEGORY, a.AWARD_NAME, c.WIN_ROWS,
+       (SELECT GROUP_CONCAT(p.ID_PARENT ORDER BY p.ID_PARENT SEPARATOR ' ') FROM tmp_071_parent p WHERE p.ID_CATEGORY = c.ID_CATEGORY) AS P31_PARENTS
+FROM tmp_071_category c
+JOIN T_WC_T2S_AWARD a ON a.ID_WIKIDATA = c.ID_CATEGORY AND a.AWARD_SOURCE = 'P166'
+LEFT JOIN tmp_071_catfam f ON f.ID_CATEGORY = c.ID_CATEGORY
+WHERE a.AWARD_NAME LIKE 'Academy Award%' AND COALESCE(f.N_ANY, 0) = 0
+ORDER BY c.WIN_ROWS DESC;
+
+SELECT '=== H6. families that have a family themselves (group of awards under a group of awards) ===' AS section;
+-- A temporary table cannot be read twice in one statement: the twin stands for the parent side.
+
+DROP TEMPORARY TABLE IF EXISTS tmp_071_grouptwin;
+CREATE TEMPORARY TABLE tmp_071_grouptwin (PRIMARY KEY (ID_GROUP))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+AS SELECT ID_GROUP, IS_GROUP, IS_TYPE FROM tmp_071_group;
+
+DROP TEMPORARY TABLE IF EXISTS tmp_071_gparent;
+CREATE TEMPORARY TABLE tmp_071_gparent (
+  ID_CHILD varchar(50) NOT NULL,
+  ID_PARENT varchar(50) NOT NULL,
+  ROUTE varchar(5) NOT NULL,
+  KEY ID_CHILD (ID_CHILD)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO tmp_071_gparent
+SELECT DISTINCT g.ID_GROUP, v.ID_ITEM, 'P31'
+FROM tmp_071_group g
+JOIN T_WC_WIKIDATA_STATEMENT s ON s.ID_WIKIDATA = g.ID_GROUP AND s.ID_PROPERTY = 'P31'
+JOIN T_WC_WIKIDATA_ITEM_VALUE v ON v.ID_STATEMENT = s.ID_STATEMENT
+JOIN tmp_071_grouptwin p ON p.ID_GROUP = v.ID_ITEM AND p.IS_GROUP = 1 AND p.IS_TYPE = 0
+WHERE g.IS_GROUP = 1 AND (s.`RANK` IS NULL OR s.`RANK` <> 'deprecated');
+
+INSERT INTO tmp_071_gparent
+SELECT DISTINCT g.ID_GROUP, sc.ID_PARENT, 'P279'
+FROM tmp_071_group g
+JOIN T_WC_WIKIDATA_SUBCLASS sc ON sc.ID_CHILD = g.ID_GROUP AND sc.DELETED = 0
+JOIN tmp_071_grouptwin p ON p.ID_GROUP = sc.ID_PARENT AND p.IS_GROUP = 1 AND p.IS_TYPE = 0
+WHERE g.IS_GROUP = 1;
+
+SELECT ROUTE, COUNT(*) AS LINKS, COUNT(DISTINCT ID_CHILD) AS FAMILIES_WITH_A_PARENT_FAMILY FROM tmp_071_gparent GROUP BY ROUTE;
+
+SELECT x.ID_CHILD, COALESCE(ci.LABEL_EN, '') AS FAMILY, x.ROUTE, x.ID_PARENT, COALESCE(pi.LABEL_EN, '') AS PARENT_FAMILY,
+       COALESCE(gw.WIN_ROWS, 0) AS WIN_ROWS
+FROM tmp_071_gparent x
+LEFT JOIN T_WC_WIKIDATA_ITEM ci ON ci.ID_WIKIDATA = x.ID_CHILD
+LEFT JOIN T_WC_WIKIDATA_ITEM pi ON pi.ID_WIKIDATA = x.ID_PARENT
+LEFT JOIN tmp_071_groupwins gw ON gw.ID_GROUP = x.ID_CHILD
+ORDER BY WIN_ROWS DESC, x.ID_CHILD, x.ID_PARENT
+LIMIT 40;
+
+SELECT '=== H7. years a build would refuse (before 1000 or after next year) ===' AS section;
+
+SELECT SUM(YEAR_MIN < 1000) AS BEFORE_1000, SUM(YEAR_MIN BETWEEN 1000 AND 1879) AS FROM_1000_TO_1879,
+       SUM(YEAR_MAX > YEAR(CURDATE()) + 1) AS AFTER_NEXT_YEAR
+FROM tmp_071_qual WHERE N_P585 > 0;
 
 SELECT NOW() AS NOW_;
