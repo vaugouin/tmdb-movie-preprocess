@@ -1,0 +1,340 @@
+-- check-071-win-query.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-11-10 09:31:18 +0100
+--
++-------------------------------------------------------------------------------------+
+| section                                                                             |
++-------------------------------------------------------------------------------------+
+| === A. the -071 columns present today (none before the migration, twelve after) === |
++-------------------------------------------------------------------------------------+
++-------------------------------------------------------------------------------------+
+| section                                                                             |
++-------------------------------------------------------------------------------------+
+| === B. plan of the win query: persons, Academy Award for Best Actress (Q103618) === |
++-------------------------------------------------------------------------------------+
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------+---------+-------------------------------------+------+-----------------------------------------------------------+
+| id   | select_type | table | type   | possible_keys                                                                                                                                                                                                          | key                                                      | key_len | ref                                 | rows | Extra                                                     |
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------+---------+-------------------------------------+------+-----------------------------------------------------------+
+|    1 | SIMPLE      | lv    | ref    | PRIMARY,IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM,IDX_T_WC_WIKIDATA_ITEM_VALUE_STATEMENT_ITEM                                                                                                                               | IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM                     | 202     | const                               | 1132 | Using where; Using index; Using temporary; Using filesort |
+|    1 | SIMPLE      | sl    | eq_ref | PRIMARY,IDX_T_WC_WIKIDATA_STATEMENT_ID_WIKIDATA,IDX_T_WC_WIKIDATA_STATEMENT_ID_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_RANK,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_VALUE_TYPE | PRIMARY                                                  | 8       | vaugouindb.lv.ID_STATEMENT          | 1    | Using where                                               |
+|    1 | SIMPLE      | q     | ref    | IDX_T_WC_WIKIDATA_STATEMENT_QUALIFIER_STATEMENT,IDX_T_WC_WIKIDATA_STATEMENT_QUALIFIER_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_QUALIFIER_STATEMENT_PROPERTY                                                                | IDX_T_WC_WIKIDATA_STATEMENT_QUALIFIER_STATEMENT_PROPERTY | 8       | vaugouindb.lv.ID_STATEMENT          | 1    | Using where; Using index                                  |
+|    1 | SIMPLE      | p2    | ref    | ID_WIKIDATA                                                                                                                                                                                                            | ID_WIKIDATA                                              | 203     | vaugouindb.sl.ID_WIKIDATA           | 1    | Using index condition                                     |
+|    1 | SIMPLE      | qt    | eq_ref | PRIMARY                                                                                                                                                                                                                | PRIMARY                                                  | 8       | vaugouindb.q.ID_STATEMENT_QUALIFIER | 1    | Using where                                               |
+|    1 | SIMPLE      | qi    | eq_ref | PRIMARY,IDX_T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE_PARENT_ITEM                                                                                                                                                             | PRIMARY                                                  | 8       | vaugouindb.q.ID_STATEMENT_QUALIFIER | 1    | Using where                                               |
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------+---------+-------------------------------------+------+-----------------------------------------------------------+
++-------------------------------------------------+
+| section                                         |
++-------------------------------------------------+
+| === C. its size: lines, statements, persons === |
++-------------------------------------------------+
++-------------+------------+---------+
+| QUERY_LINES | STATEMENTS | PERSONS |
++-------------+------------+---------+
+|         300 |        100 |      82 |
++-------------+------------+---------+
++------------------------------------------------------------------------------------------------------------+
+| section                                                                                                    |
++------------------------------------------------------------------------------------------------------------+
+| === D. Katharine Hepburn (6598): four statements expected, years 1934, 1968, 1969, 1982, one work each === |
++------------------------------------------------------------------------------------------------------------+
++-----------+------------+---------------------+-----------------------+------------+-------------------+
+| ID_PERSON | POPULARITY | ID_STATEMENT        | ID_QUALIFIER_PROPERTY | YEAR_VALUE | ID_QUALIFIER_ITEM |
++-----------+------------+---------------------+-----------------------+------------+-------------------+
+|      6598 |     1.3396 |  956682621094323476 | P1686                 |       NULL | Q572789           |
+|      6598 |     1.3396 |  956682621094323476 | P585                  |       1934 | NULL              |
+|      6598 |     1.3396 |  956682621094323476 | P805                  |       NULL | Q508570           |
+|      6598 |     1.3396 | 2512247346306807467 | P1686                 |       NULL | Q736969           |
+|      6598 |     1.3396 | 2512247346306807467 | P585                  |       1968 | NULL              |
+|      6598 |     1.3396 | 2512247346306807467 | P805                  |       NULL | Q1065291          |
+|      6598 |     1.3396 | 6786521731806302717 | P1686                 |       NULL | Q1195311          |
+|      6598 |     1.3396 | 6786521731806302717 | P585                  |       1969 | NULL              |
+|      6598 |     1.3396 | 6786521731806302717 | P805                  |       NULL | Q544731           |
+|      6598 |     1.3396 | 6873669002305204318 | P1686                 |       NULL | Q451603           |
+|      6598 |     1.3396 | 6873669002305204318 | P585                  |       1982 | NULL              |
+|      6598 |     1.3396 | 6873669002305204318 | P805                  |       NULL | Q28969            |
++-----------+------------+---------------------+-----------------------+------------+-------------------+
++-------------------------------------------------------------------------------+
+| section                                                                       |
++-------------------------------------------------------------------------------+
+| === E. the works of those four wins, resolved as Process 44 resolves them === |
++-------------------------------------------------------------------------------+
++-------------+----------+
+| ID_WIKIDATA | ID_MOVIE |
++-------------+----------+
+| Q1195311    |    18988 |
+| Q451603     |    11816 |
+| Q572789     |    31777 |
+| Q736969     |     1879 |
++-------------+----------+
++----------------------------------------------------------------------------------------------+
+| section                                                                                      |
++----------------------------------------------------------------------------------------------+
+| === F. movies, Cesar Award for Best Film (Q645595): the lines of 2010 (A Prophet, 21575) === |
++----------------------------------------------------------------------------------------------+
++----------+----------------------+---------------------+-----------------------+------------+-------------------+
+| ID_MOVIE | IMDB_RATING_WEIGHTED | ID_STATEMENT        | ID_QUALIFIER_PROPERTY | YEAR_VALUE | ID_QUALIFIER_ITEM |
++----------+----------------------+---------------------+-----------------------+------------+-------------------+
+|    21575 |    7.666472559682978 | 8163080886065736505 | P585                  |       2010 | NULL              |
++----------+----------------------+---------------------+-----------------------+------------+-------------------+
++-----------------------------------------------------------------------------------------+
+| section                                                                                 |
++-----------------------------------------------------------------------------------------+
+| === G. the year of the ceremonies quoted by the Best Actress wins (ceremony lookup) === |
++-----------------------------------------------------------------------------------------+
++-------------+------------+
+| ID_WIKIDATA | YEAR_VALUE |
++-------------+------------+
+| Q109886     |       1929 |
+| Q178809     |       1930 |
+| Q508496     |       1930 |
+| Q508539     |       1931 |
+| Q508662     |       1932 |
+| Q508570     |       1934 |
+| Q508451     |       1935 |
+| Q132080     |       1936 |
+| Q508426     |       1937 |
+| Q508601     |       1938 |
+| Q508390     |       1939 |
+| Q508513     |       1940 |
+| Q508554     |       1941 |
+| Q508406     |       1942 |
+| Q508528     |       1943 |
+| Q148609     |       1944 |
+| Q917159     |       1945 |
+| Q917178     |       1946 |
+| Q917174     |       1947 |
+| Q303473     |       1948 |
+| Q917170     |       1949 |
+| Q521644     |       1950 |
+| Q917076     |       1951 |
+| Q917184     |       1952 |
+| Q614408     |       1953 |
+| Q516479     |       1954 |
+| Q608130     |       1955 |
+| Q279914     |       1956 |
+| Q787207     |       1957 |
+| Q684095     |       1958 |
+| Q178975     |       1959 |
+| Q917167     |       1960 |
+| Q917071     |       1961 |
+| Q917163     |       1962 |
+| Q917148     |       1963 |
+| Q917143     |       1964 |
+| Q917138     |       1965 |
+| Q917067     |       1966 |
+| Q167214     |       1967 |
+| Q1065291    |       1968 |
+| Q544731     |       1969 |
+| Q221467     |       1970 |
+| Q937162     |       1971 |
+| Q289412     |       1972 |
+| Q918125     |       1973 |
+| Q570921     |       1974 |
+| Q369706     |       1975 |
+| Q388978     |       1976 |
+| Q611050     |       1977 |
+| Q282159     |       1978 |
+| Q1065282    |       1979 |
+| Q543438     |       1980 |
+| Q767355     |       1981 |
+| Q28969      |       1982 |
+| Q41918      |       1983 |
+| Q47193      |       1984 |
+| Q427425     |       1985 |
+| Q938235     |       1986 |
+| Q917235     |       1987 |
+| Q257443     |       1988 |
+| Q924339     |       1989 |
+| Q910864     |       1990 |
+| Q910856     |       1991 |
+| Q857047     |       1992 |
+| Q222461     |       1993 |
+| Q944352     |       1994 |
+| Q857001     |       1995 |
+| Q903494     |       1996 |
+| Q903336     |       1997 |
+| Q536749     |       1998 |
+| Q263239     |       1999 |
+| Q429319     |       2000 |
+| Q751924     |       2001 |
+| Q753167     |       2002 |
+| Q740425     |       2003 |
+| Q458646     |       2004 |
+| Q504962     |       2005 |
+| Q319132     |       2006 |
+| Q213699     |       2007 |
+| Q215132     |       2008 |
+| Q190441     |       2009 |
+| Q189836     |       2010 |
+| Q183355     |       2011 |
+| Q180675     |       2012 |
+| Q248688     |       2013 |
+| Q13419956   |       2014 |
+| Q16773560   |       2015 |
+| Q20022969   |       2016 |
+| Q22076019   |       2017 |
+| Q24636843   |       2018 |
+| Q59456966   |       2019 |
+| Q47496499   |       2020 |
+| Q57246152   |       2021 |
+| Q66707597   |       2022 |
+| Q66707607   |       2023 |
+| Q85314819   |       2024 |
+| Q85315076   |       2025 |
+| Q85315079   |       2026 |
++-------------+------------+
++--------------------------------------------------------------------------------------------------+
+| section                                                                                          |
++--------------------------------------------------------------------------------------------------+
+| === H. family route P31: plan, size, and the categories it gives the Academy Awards (Q19020) === |
++--------------------------------------------------------------------------------------------------+
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------+---------+----------------------------+------+---------------------------------------------------+
+| id   | select_type | table | type   | possible_keys                                                                                                                                                                                                          | key                                  | key_len | ref                        | rows | Extra                                             |
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------+---------+----------------------------+------+---------------------------------------------------+
+|    1 | PRIMARY     | gv    | ref    | PRIMARY,IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM,IDX_T_WC_WIKIDATA_ITEM_VALUE_STATEMENT_ITEM                                                                                                                               | IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM | 202     | const                      | 1158 | Using where; Using index; Start temporary         |
+|    1 | PRIMARY     | gs    | eq_ref | PRIMARY,IDX_T_WC_WIKIDATA_STATEMENT_ID_WIKIDATA,IDX_T_WC_WIKIDATA_STATEMENT_ID_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_RANK,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_VALUE_TYPE | PRIMARY                              | 8       | vaugouindb.gv.ID_STATEMENT | 1    | Using where                                       |
+|    1 | PRIMARY     | f     | ref    | AWARD_SOURCE,ID_WIKIDATA                                                                                                                                                                                               | ID_WIKIDATA                          | 83      | vaugouindb.gs.ID_WIKIDATA  | 1    | Using index condition; Using where; End temporary |
+|    1 | PRIMARY     | lv    | ref    | PRIMARY,IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM,IDX_T_WC_WIKIDATA_ITEM_VALUE_STATEMENT_ITEM                                                                                                                               | IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM | 202     | vaugouindb.f.ID_WIKIDATA   | 7    | Using where; Using index                          |
+|    1 | PRIMARY     | ls    | eq_ref | PRIMARY,IDX_T_WC_WIKIDATA_STATEMENT_ID_WIKIDATA,IDX_T_WC_WIKIDATA_STATEMENT_ID_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_RANK,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_VALUE_TYPE | PRIMARY                              | 8       | vaugouindb.lv.ID_STATEMENT | 1    | Using where                                       |
+|    1 | PRIMARY     | c     | ref    | AWARD_SOURCE,ID_WIKIDATA                                                                                                                                                                                               | ID_WIKIDATA                          | 83      | vaugouindb.ls.ID_WIKIDATA  | 1    | Using index condition; Using where                |
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------+---------+----------------------------+------+---------------------------------------------------+
++-------+-------+------------+----------+
+| ROUTE | PAIRS | CATEGORIES | FAMILIES |
++-------+-------+------------+----------+
+| P31   |  1487 |       1485 |      194 |
++-------+-------+------------+----------+
++-------+-----------------+----------+-------------+----------------------------------------------------------+
+| ROUTE | ID_AWARD_FAMILY | ID_AWARD | ID_WIKIDATA | AWARD_NAME                                               |
++-------+-----------------+----------+-------------+----------------------------------------------------------+
+| P31   |           10464 |    30986 | Q137423654  | Academy Award for Achievement in Casting                 |
+| P31   |           10464 |      297 | Q103916     | Academy Award for Best Actor                             |
+| P31   |           10464 |      269 | Q103618     | Academy Award for Best Actress                           |
+| P31   |           10464 |      872 | Q106800     | Academy Award for Best Animated Feature                  |
+| P31   |           10464 |    29909 | Q917808     | Academy Award for Best Animated Short Film               |
+| P31   |           10464 |    12594 | Q22253133   | Academy Award for Best Art Direction, Black and White    |
+| P31   |           10464 |    12593 | Q22253131   | Academy Award for Best Art Direction, Color              |
+| P31   |           10464 |    22076 | Q501004     | Academy Award for Best Assistant Director                |
+| P31   |           10464 |     5004 | Q131520     | Academy Award for Best Cinematography                    |
+| P31   |           10464 |    12380 | Q21995139   | Academy Award for Best Cinematography, Black-and-White   |
+| P31   |           10464 |    12379 | Q21995136   | Academy Award for Best Cinematography, Color             |
+| P31   |           10464 |    15182 | Q277536     | Academy Award for Best Costume Design                    |
+| P31   |           10464 |    12542 | Q22120095   | Academy Award for Best Costume Design, Black-and-White   |
+| P31   |           10464 |    12541 | Q22120066   | Academy Award for Best Costume Design, Color             |
+| P31   |           10464 |    22030 | Q498690     | Academy Award for Best Dance Direction                   |
+| P31   |           10464 |    18117 | Q3451157    | Academy Award for Best Director (Comedy Picture)         |
+| P31   |           10464 |    12381 | Q21995338   | Academy Award for Best Director (Dramatic Picture)       |
+| P31   |           10464 |     6157 | Q1425151    | Academy Award for Best Documentary (Short Subject)       |
+| P31   |           10464 |     1730 | Q111332     | Academy Award for Best Documentary Feature Film          |
+| P31   |           10464 |    19294 | Q3886463    | Academy Award for Best Engineering Effects               |
+| P31   |           10464 |    15462 | Q281939     | Academy Award for Best Film Editing                      |
+| P31   |           10464 |      542 | Q105304     | Academy Award for Best International Feature Film        |
+| P31   |           10464 |    19295 | Q3886464    | Academy Award for Best Live Action Short Film, Comedy    |
+| P31   |           10464 |    21656 | Q487136     | Academy Award for Best Makeup and Hairstyling            |
+| P31   |           10464 |    12772 | Q22752868   | Academy Award for Best Original Dramatic or Comedy Score |
+| P31   |           10464 |    12580 | Q22235329   | Academy Award for Best Original Dramatic Score           |
+| P31   |           10464 |    12579 | Q22235305   | Academy Award for Best Original Musical or Comedy Score  |
+| P31   |           10464 |    21058 | Q4671338    | Academy Award for Best Original Musical Score            |
+| P31   |           10464 |    21736 | Q488651     | Academy Award for Best Original Score                    |
+| P31   |           10464 |    12770 | Q22752734   | Academy Award for Best Original Score, no Musical        |
+| P31   |           10464 |     1885 | Q112243     | Academy Award for Best Original Song                     |
+| P31   |           10464 |    12666 | Q22344608   | Academy Award for Best Original Song Score               |
+| P31   |           10464 |    15189 | Q277751     | Academy Award for Best Production Design                 |
+| P31   |           10464 |    12771 | Q22752811   | Academy Award for Best Score, Adaptation or Treatment    |
+| P31   |           10464 |    28960 | Q830079     | Academy Award for Best Sound                             |
+| P31   |           10464 |    12846 | Q22917729   | Academy Award for Best Special Effects                   |
+| P31   |           10464 |      752 | Q106291     | Academy Award for Best Supporting Actor                  |
+| P31   |           10464 |      753 | Q106301     | Academy Award for Best Supporting Actress                |
+| P31   |           10464 |    45562 | Q3886486    | Academy Award for Best Title Writing                     |
+| P31   |           10464 |    19450 | Q393686     | Academy Award for Best Visual Effects                    |
+| P31   |           10464 |    12538 | Q22117120   | Academy Award for Best Writing                           |
+| P31   |           10464 |      985 | Q107258     | Academy Award for Best Writing, Adapted Screenplay       |
+| P31   |           10464 |    19715 | Q41417      | Academy Award for Best Writing, Original Screenplay      |
+| P31   |           10464 |    29366 | Q8636       | Academy Award for Technical Achievement                  |
+| P31   |           10464 |     2606 | Q116197098  | Academy Award of Commendation                            |
+| P31   |           10464 |    36086 | Q8624       | Academy Award of Merit                                   |
+| P31   |           10464 |    27239 | Q727328     | Academy Honorary Award                                   |
+| P31   |           10464 |    21798 | Q489705     | Academy Juvenile Award                                   |
+| P31   |           10464 |    29344 | Q8610       | Academy Scientific and Technical Award                   |
+| P31   |           10464 |    29145 | Q844273     | Irving G. Thalberg Memorial Award                        |
+| P31   |           10464 |    34149 | Q1699048    | John A. Bonner Medal of Commendation                     |
+| P31   |           10464 |    28929 | Q8250869    | Scientific and Engineering Award                         |
+| P31   |           10464 |    11364 | Q2032630    | Special Achievement Academy Award                        |
++-------+-----------------+----------+-------------+----------------------------------------------------------+
++---------------------------------------------------------------------------------------------------+
+| section                                                                                           |
++---------------------------------------------------------------------------------------------------+
+| === H. family route P361: plan, size, and the categories it gives the Academy Awards (Q19020) === |
++---------------------------------------------------------------------------------------------------+
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------+---------+----------------------------+------+---------------------------------------------------+
+| id   | select_type | table | type   | possible_keys                                                                                                                                                                                                          | key                                  | key_len | ref                        | rows | Extra                                             |
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------+---------+----------------------------+------+---------------------------------------------------+
+|    1 | PRIMARY     | gv    | ref    | PRIMARY,IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM,IDX_T_WC_WIKIDATA_ITEM_VALUE_STATEMENT_ITEM                                                                                                                               | IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM | 202     | const                      | 1158 | Using where; Using index; Start temporary         |
+|    1 | PRIMARY     | gs    | eq_ref | PRIMARY,IDX_T_WC_WIKIDATA_STATEMENT_ID_WIKIDATA,IDX_T_WC_WIKIDATA_STATEMENT_ID_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_RANK,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_VALUE_TYPE | PRIMARY                              | 8       | vaugouindb.gv.ID_STATEMENT | 1    | Using where                                       |
+|    1 | PRIMARY     | f     | ref    | AWARD_SOURCE,ID_WIKIDATA                                                                                                                                                                                               | ID_WIKIDATA                          | 83      | vaugouindb.gs.ID_WIKIDATA  | 1    | Using index condition; Using where; End temporary |
+|    1 | PRIMARY     | lv    | ref    | PRIMARY,IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM,IDX_T_WC_WIKIDATA_ITEM_VALUE_STATEMENT_ITEM                                                                                                                               | IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM | 202     | vaugouindb.f.ID_WIKIDATA   | 7    | Using where; Using index                          |
+|    1 | PRIMARY     | ls    | eq_ref | PRIMARY,IDX_T_WC_WIKIDATA_STATEMENT_ID_WIKIDATA,IDX_T_WC_WIKIDATA_STATEMENT_ID_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_RANK,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_VALUE_TYPE | PRIMARY                              | 8       | vaugouindb.lv.ID_STATEMENT | 1    | Using where                                       |
+|    1 | PRIMARY     | c     | ref    | AWARD_SOURCE,ID_WIKIDATA                                                                                                                                                                                               | ID_WIKIDATA                          | 83      | vaugouindb.ls.ID_WIKIDATA  | 1    | Using index condition; Using where                |
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------+---------+----------------------------+------+---------------------------------------------------+
++-------+-------+------------+----------+
+| ROUTE | PAIRS | CATEGORIES | FAMILIES |
++-------+-------+------------+----------+
+| P361  |     1 |          1 |        1 |
++-------+-------+------------+----------+
++---------------------------------------------------------------------------------------------------+
+| section                                                                                           |
++---------------------------------------------------------------------------------------------------+
+| === H. family route P527: plan, size, and the categories it gives the Academy Awards (Q19020) === |
++---------------------------------------------------------------------------------------------------+
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------+---------+--------------------------------+------+---------------------------------------------------+
+| id   | select_type | table | type   | possible_keys                                                                                                                                                                                                          | key                                           | key_len | ref                            | rows | Extra                                             |
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------+---------+--------------------------------+------+---------------------------------------------------+
+|    1 | PRIMARY     | gv    | ref    | PRIMARY,IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM,IDX_T_WC_WIKIDATA_ITEM_VALUE_STATEMENT_ITEM                                                                                                                               | IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM          | 202     | const                          | 1158 | Using where; Using index; Start temporary         |
+|    1 | PRIMARY     | gs    | eq_ref | PRIMARY,IDX_T_WC_WIKIDATA_STATEMENT_ID_WIKIDATA,IDX_T_WC_WIKIDATA_STATEMENT_ID_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_RANK,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_VALUE_TYPE | PRIMARY                                       | 8       | vaugouindb.gv.ID_STATEMENT     | 1    | Using where                                       |
+|    1 | PRIMARY     | f     | ref    | AWARD_SOURCE,ID_WIKIDATA                                                                                                                                                                                               | ID_WIKIDATA                                   | 83      | vaugouindb.gs.ID_WIKIDATA      | 1    | Using index condition; Using where; End temporary |
+|    1 | PRIMARY     | ls    | ref    | PRIMARY,IDX_T_WC_WIKIDATA_STATEMENT_ID_WIKIDATA,IDX_T_WC_WIKIDATA_STATEMENT_ID_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_RANK,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_PROPERTY,IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_VALUE_TYPE | IDX_T_WC_WIKIDATA_STATEMENT_WIKIDATA_PROPERTY | 404     | vaugouindb.f.ID_WIKIDATA,const | 1    | Using index condition; Using where                |
+|    1 | PRIMARY     | lv    | eq_ref | PRIMARY,IDX_T_WC_WIKIDATA_ITEM_VALUE_ID_ITEM,IDX_T_WC_WIKIDATA_ITEM_VALUE_STATEMENT_ITEM                                                                                                                               | PRIMARY                                       | 8       | vaugouindb.ls.ID_STATEMENT     | 1    |                                                   |
+|    1 | PRIMARY     | c     | ref    | AWARD_SOURCE,ID_WIKIDATA                                                                                                                                                                                               | ID_WIKIDATA                                   | 83      | vaugouindb.lv.ID_ITEM          | 1    | Using index condition; Using where                |
++------+-------------+-------+--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------+---------+--------------------------------+------+---------------------------------------------------+
++-------+-------+------------+----------+
+| ROUTE | PAIRS | CATEGORIES | FAMILIES |
++-------+-------+------------+----------+
+| P527  |    46 |         46 |        3 |
++-------+-------+------------+----------+
++-------------------------------------------------------------------------------------------------------+
+| section                                                                                               |
++-------------------------------------------------------------------------------------------------------+
+| === I. French names: Best Actress (269) and the row the French question resolved to on 2026-11-10 === |
++-------------------------------------------------------------------------------------------------------+
++----------+-------------+---------------------------------------------------------------+--------------------------------------------------------+--------------+
+| ID_AWARD | ID_WIKIDATA | AWARD_NAME                                                    | AWARD_NAME_FR                                          | PERSON_COUNT |
++----------+-------------+---------------------------------------------------------------+--------------------------------------------------------+--------------+
+|      269 | Q103618     | Academy Award for Best Actress                                | Oscar de la meilleure actrice                          |           82 |
+|    26480 | Q687123     | BAFTA Award for Best Actress in a Leading Role                | British Academy Film Award de la meilleure actrice     |           58 |
+|     9894 | Q18358738   | Blue Ribbon Awards for Best Actress                           | Prix Blue Ribbon de la meilleure actrice               |           49 |
+|    18895 | Q376834     | Silver Bear for Best Actress                                  | Ours d'argent de la meilleure actrice                  |           48 |
+|    29598 | Q889837     | Bodil Award for Best Actress in a Leading Role                | Bodil de la meilleure actrice                          |           42 |
+|    21442 | Q4790397    | Ariel Award for Best Actress                                  | Ariel de la meilleure actrice                          |           42 |
+|    19211 | Q3870555    | Nastro d'Argento for Best Actress                             | ruban d'argent de la meilleure actrice                 |           39 |
+|     5839 | Q1377738    | European Film Award for Best Actress                          | prix du cinéma européen de la meilleure actrice        |           39 |
+|    13720 | Q24241      | César Award for Best Actress                                  | César de la meilleure actrice                          |           37 |
+|    10373 | Q18910417   | Amanda Award for Best Actress                                 | prix Amanda de la meilleure actrice                    |           32 |
+|     8949 | Q1714069    | Jussi Award for Best Leading Actress                          | prix Jussi de la meilleure actrice                     |           30 |
+|     8676 | Q16977394   | Mainichi Film Award for Best Actress                          | prix Mainichi de la meilleure actrice                  |           27 |
+|     5872 | Q1379415    | Goya Award for Best Actress                                   | prix Goya de la meilleure actrice                      |           27 |
+|     6935 | Q1538926    | Robert Award for Best Actress in a Leading Role               | Robert de la meilleure actrice                         |           26 |
+|     7094 | Q1554225    | Guldbagge Award for Best Actress in a Leading Role            | prix Guldbagge de la meilleure actrice                 |           25 |
+|     6903 | Q1535532    | Golden Calf for Best Actress                                  | Veau d'or de la meilleure actrice                      |           24 |
+|    24833 | Q610152     | Silver Shell for Best Actress                                 | Coquille d'argent de la meilleure actrice              |           23 |
+|     6117 | Q1419495    | National Board of Review Award for Best Actress               | National Board of Review Award de la meilleure actrice |           22 |
+|     6072 | Q1414482    | Filmfare Award for Best Actress                               | Filmfare Award de la meilleure actrice                 |           22 |
+|    15014 | Q27230322   | Ophir Award for Best Actress                                  | Ophir de la meilleure actrice                          |           21 |
+|    23628 | Q5579144    | Golden Arena for Best Actress                                 | Arène d'or de la meilleure actrice                     |           20 |
+|    53909 | Q3772364    |                                                               | Globe d'or de la meilleure actrice                     |           19 |
+|    25823 | Q6500774    | Laurence Olivier Award for Best Actress                       | prix Laurence Olivier de la meilleure actrice          |           16 |
+|     3424 | Q1204815    | German Film Award for Best Actress                            | Deutscher Filmpreis de la meilleure actrice            |           16 |
+|     8740 | Q17001109   | Africa Movie Academy Award for Best Actress in a Leading Role | Africa Movie Academy Award de la meilleure actrice     |           15 |
+|     2261 | Q114347999  | Butaca Award for best Catalan film actress                    | Prix Butaca de la meilleure actrice                    |           15 |
+|     7742 | Q16157269   | Gaudí Award for Best Actress in a Leading Role                | prix Gaudi de la meilleure actrice                     |           14 |
+|     6066 | Q1413741    | Saturn Award for Best Actress                                 | Saturn Award de la meilleure actrice                   |           14 |
+|    14261 | Q2544851    | Independent Spirit Award for Best Female Lead                 | Independent Spirit Award de la meilleure actrice       |           13 |
+|    52948 | Q131182669  |                                                               | Prix Mestre Mateo de la meilleure actrice              |           11 |
++----------+-------------+---------------------------------------------------------------+--------------------------------------------------------+--------------+

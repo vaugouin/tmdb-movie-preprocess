@@ -47,6 +47,10 @@ from tmdb_preprocess_helpers import (
     DBL_GROUP_WORK_MIN_SHARE,
     f_awarddrivingsql,
     f_awardlinksql,
+    f_awardwinschemamissing,
+    f_awardwincaches,
+    f_awardwinsync,
+    f_awardfamilysync,
     f_persondrivingsql,
     f_personlinkfromsql,
     f_persongrouppurgesql,
@@ -217,6 +221,10 @@ try:
             # build of the two tables, and reruns on demand. In main, 52 follows 4 and 5.
             # Run with TMDB_PREPROCESS_SCOPE=title-alias.
             arrprocessscopetitlealias = {52: 'T2S_TITLE_ALIAS'}
+            # Awards only (Process 44, TMDB-MOVIE-PREPROCESS-071): the first build of the win rows
+            # once doc/sql/migration-071-award-wins.sql is applied, and reruns on demand. In main,
+            # 44 follows 43. Run with TMDB_PREPROCESS_SCOPE=awards.
+            arrprocessscopeawards = {44: 'T2S_AWARD'}
             strprocessscope = os.getenv("TMDB_PREPROCESS_SCOPE", "main").strip().lower()
             if strprocessscope == "wikidata-topics":
                 arrprocessscope = arrprocessscopewikidatatopics
@@ -244,6 +252,8 @@ try:
                 arrprocessscope = arrprocessscopegenrealias
             elif strprocessscope in ("title-alias", "title-aliases"):
                 arrprocessscope = arrprocessscopetitlealias
+            elif strprocessscope in ("awards", "award"):
+                arrprocessscope = arrprocessscopeawards
             else:
                 strprocessscope = "main"
                 arrprocessscope = arrprocessscopemain
@@ -2848,6 +2858,27 @@ SET
                 elif intindex == 44:
                     #----------------------------------------------------
                     print("T2S_AWARD processing")
+                    # TMDB-MOVIE-PREPROCESS-071: a link row is one win (one P166 statement and
+                    # one year), which needs the columns of doc/sql/migration-071-award-wins.sql.
+                    # A git pull can bring this code to the VPS before the DDL is applied, and
+                    # the loop has no try: without the columns the process skips itself and
+                    # says why, the award tables stay as they were.
+                    arrawardwinmissing = f_awardwinschemamissing()
+                    if arrawardwinmissing:
+                        strawardwinskipreason = "missing columns (apply doc/sql/migration-071-award-wins.sql): " + ", ".join(arrawardwinmissing)
+                        print(f"44: T2S_AWARD SKIPPED, {strawardwinskipreason}.")
+                        cp.f_setservervariable("strtmdbmoviepreprocessawardwinskipreason", strawardwinskipreason, "Why the last T2S award build (process 44) skipped itself, empty when it ran", 0)
+                        continue
+                    # The wins of an award are replaced as a whole (rows no longer wanted are
+                    # deleted even when the award has none left), so a statement table read
+                    # half-loaded would drop live wins for a day: skip while the crawler loads,
+                    # the next night catches up.
+                    strwikidataloadbusy = f_wikidataloadbusy("44")
+                    if strwikidataloadbusy:
+                        print(f"44: T2S_AWARD SKIPPED, {strwikidataloadbusy}.")
+                        cp.f_setservervariable("strtmdbmoviepreprocessawardwinskipreason", strwikidataloadbusy, "Why the last T2S award build (process 44) skipped itself, empty when it ran", 0)
+                        continue
+                    cp.f_setservervariable("strtmdbmoviepreprocessawardwinskipreason", "", "Why the last T2S award build (process 44) skipped itself, empty when it ran", 0)
                     # TMDB-MOVIE-PREPROCESS-036 : le cone P279 sous Q618779 dit ce qui est une
                     # recompense. Reconstruit ici depuis T_WC_WIKIDATA_SUBCLASS, que le crawler
                     # Wikidata reecrit a chaque run, d'ou le garde-fou : en dessous du plancher on
@@ -2858,6 +2889,12 @@ SET
                         continue
                     telaward = EntityTelemetry("award", 44, "award")
                     telaward.begin()
+                    # TMDB-MOVIE-PREPROCESS-071: lookups shared by every award of the run (work
+                    # to movie / series, ceremony to year) and the run totals.
+                    dictawardwincaches = f_awardwincaches()
+                    lngawardyearmax = datetime.now(cp.paris_tz).year + 1
+                    lngawardwinrows = 0
+                    lngawardwindeleted = 0
 
                     strpropertyid = "P166"
                     strawardsource = strpropertyid
@@ -2947,83 +2984,25 @@ SET
                         telaward.created()
                         telaward.set_entity_id(lngawardid)
 
-                        # Link to movies
-                        strsqlmovies = f_awardlinksql("T_WC_T2S_MOVIE", "m", "ID_MOVIE", "IMDB_RATING_WEIGHTED")
-                        cursor2.execute(strsqlmovies, (strpropertyid, strawardwikidataid))
-                        results_movies = cursor2.fetchall()
-                        lngmoviecount = len(results_movies)
-                        lngdisplayorder = 0
-                        arrcurrentmovieids = []
-                        for rowm in results_movies:
-                            lngdisplayorder += 1
-                            lngmovieid = rowm["ID_MOVIE"]
-                            arrcurrentmovieids.append(str(lngmovieid))
-                            arrmovieawardcouples = {
-                                'ID_MOVIE': lngmovieid,
-                                'ID_AWARD': lngawardid,
-                                'DISPLAY_ORDER': lngdisplayorder
-                            }
-                            strsqlupdatecondition2 = "ID_MOVIE = " + str(lngmovieid) + " AND ID_AWARD = " + str(lngawardid)
-                            cp.f_sqlupdatearray("T_WC_T2S_MOVIE_AWARD", arrmovieawardcouples, strsqlupdatecondition2, 1)
-                        if arrcurrentmovieids:
-                            strsqldelete = "DELETE FROM T_WC_T2S_MOVIE_AWARD WHERE ID_AWARD = " + str(lngawardid) + " AND ID_MOVIE NOT IN (" + ",".join(arrcurrentmovieids) + ") "
-                            print(strsqldelete)
-                            cursor2.execute(strsqldelete)
-                            strsqldelete = "DELETE ma1 FROM T_WC_T2S_MOVIE_AWARD ma1 INNER JOIN T_WC_T2S_MOVIE_AWARD ma2 ON ma1.ID_AWARD = ma2.ID_AWARD AND ma1.ID_MOVIE = ma2.ID_MOVIE AND ma1.ID_ROW > ma2.ID_ROW WHERE ma1.ID_AWARD = " + str(lngawardid)
-                            print(strsqldelete)
-                            cursor2.execute(strsqldelete)
-
-                        # Link to series
-                        strsqlseries = f_awardlinksql("T_WC_T2S_SERIE", "s", "ID_SERIE", "IMDB_RATING_WEIGHTED")
-                        cursor4.execute(strsqlseries, (strpropertyid, strawardwikidataid))
-                        results_series = cursor4.fetchall()
-                        lngseriecount = len(results_series)
-                        lngdisplayorder = 0
-                        arrcurrentserieids = []
-                        for rows in results_series:
-                            lngdisplayorder += 1
-                            lngserieid = rows["ID_SERIE"]
-                            arrcurrentserieids.append(str(lngserieid))
-                            arrserieawardcouples = {
-                                'ID_SERIE': lngserieid,
-                                'ID_AWARD': lngawardid,
-                                'DISPLAY_ORDER': lngdisplayorder
-                            }
-                            strsqlupdatecondition2 = "ID_SERIE = " + str(lngserieid) + " AND ID_AWARD = " + str(lngawardid)
-                            cp.f_sqlupdatearray("T_WC_T2S_SERIE_AWARD", arrserieawardcouples, strsqlupdatecondition2, 1)
-                        if arrcurrentserieids:
-                            strsqldelete = "DELETE FROM T_WC_T2S_SERIE_AWARD WHERE ID_AWARD = " + str(lngawardid) + " AND ID_SERIE NOT IN (" + ",".join(arrcurrentserieids) + ") "
-                            print(strsqldelete)
-                            cursor2.execute(strsqldelete)
-                            strsqldelete = "DELETE sa1 FROM T_WC_T2S_SERIE_AWARD sa1 INNER JOIN T_WC_T2S_SERIE_AWARD sa2 ON sa1.ID_AWARD = sa2.ID_AWARD AND sa1.ID_SERIE = sa2.ID_SERIE AND sa1.ID_ROW > sa2.ID_ROW WHERE sa1.ID_AWARD = " + str(lngawardid)
-                            print(strsqldelete)
-                            cursor2.execute(strsqldelete)
-
-                        # Link to persons
-                        strsqlpersons = f_awardlinksql("T_WC_T2S_PERSON", "p2", "ID_PERSON", "POPULARITY")
-                        cursor5.execute(strsqlpersons, (strpropertyid, strawardwikidataid))
-                        results_persons = cursor5.fetchall()
-                        lngpersoncount = len(results_persons)
-                        lngdisplayorder = 0
-                        arrcurrentpersonids = []
-                        for rowp in results_persons:
-                            lngdisplayorder += 1
-                            lngpersonid = rowp["ID_PERSON"]
-                            arrcurrentpersonids.append(str(lngpersonid))
-                            arrpersonawardcouples = {
-                                'ID_PERSON': lngpersonid,
-                                'ID_AWARD': lngawardid,
-                                'DISPLAY_ORDER': lngdisplayorder
-                            }
-                            strsqlupdatecondition2 = "ID_PERSON = " + str(lngpersonid) + " AND ID_AWARD = " + str(lngawardid)
-                            cp.f_sqlupdatearray("T_WC_T2S_PERSON_AWARD", arrpersonawardcouples, strsqlupdatecondition2, 1)
-                        if arrcurrentpersonids:
-                            strsqldelete = "DELETE FROM T_WC_T2S_PERSON_AWARD WHERE ID_AWARD = " + str(lngawardid) + " AND ID_PERSON NOT IN (" + ",".join(arrcurrentpersonids) + ") "
-                            print(strsqldelete)
-                            cursor2.execute(strsqldelete)
-                            strsqldelete = "DELETE pa1 FROM T_WC_T2S_PERSON_AWARD pa1 INNER JOIN T_WC_T2S_PERSON_AWARD pa2 ON pa1.ID_AWARD = pa2.ID_AWARD AND pa1.ID_PERSON = pa2.ID_PERSON AND pa1.ID_ROW > pa2.ID_ROW WHERE pa1.ID_AWARD = " + str(lngawardid)
-                            print(strsqldelete)
-                            cursor2.execute(strsqldelete)
+                        # TMDB-MOVIE-PREPROCESS-071: one link row per win. f_awardwinsync writes
+                        # the wins of this award (year, ceremony, and on a person the work
+                        # rewarded), then deletes by ID_ROW whatever is no longer one. The
+                        # counts are distinct winners, not rows: four Oscars are one person.
+                        lngmoviecount, lngwinrows, lngwindeleted = f_awardwinsync(
+                            cursor2, "T_WC_T2S_MOVIE_AWARD", "T_WC_T2S_MOVIE", "m", "ID_MOVIE", "IMDB_RATING_WEIGHTED",
+                            strpropertyid, strawardwikidataid, lngawardid, dictawardwincaches, lngawardyearmax)
+                        lngawardwinrows += lngwinrows
+                        lngawardwindeleted += lngwindeleted
+                        lngseriecount, lngwinrows, lngwindeleted = f_awardwinsync(
+                            cursor4, "T_WC_T2S_SERIE_AWARD", "T_WC_T2S_SERIE", "s", "ID_SERIE", "IMDB_RATING_WEIGHTED",
+                            strpropertyid, strawardwikidataid, lngawardid, dictawardwincaches, lngawardyearmax)
+                        lngawardwinrows += lngwinrows
+                        lngawardwindeleted += lngwindeleted
+                        lngpersoncount, lngwinrows, lngwindeleted = f_awardwinsync(
+                            cursor5, "T_WC_T2S_PERSON_AWARD", "T_WC_T2S_PERSON", "p2", "ID_PERSON", "POPULARITY",
+                            strpropertyid, strawardwikidataid, lngawardid, dictawardwincaches, lngawardyearmax)
+                        lngawardwinrows += lngwinrows
+                        lngawardwindeleted += lngwindeleted
 
                         arrawardcounts = {
                             'MOVIE_COUNT': lngmoviecount,
@@ -3050,13 +3029,15 @@ SET
                         cursor2.execute(strsqldelete)
                         telaward.deleted(cursor2.rowcount)
 
-                        # Update T_WC_T2S_AWARD.POPULARITY from persons
+                        # Update T_WC_T2S_AWARD.POPULARITY from persons.
+                        # TMDB-MOVIE-PREPROCESS-071: the three averages below read DISTINCT
+                        # (award, winner) pairs, a link row being a win and no longer a winner.
                         strsql = """UPDATE T_WC_T2S_AWARD t
 JOIN (
     SELECT
         mt.ID_AWARD,
         AVG(p.POPULARITY) AS AVG_POPULARITY
-    FROM T_WC_T2S_PERSON_AWARD mt
+    FROM (SELECT DISTINCT ID_AWARD, ID_PERSON FROM T_WC_T2S_PERSON_AWARD) mt
     INNER JOIN T_WC_T2S_PERSON p
         ON p.ID_PERSON = mt.ID_PERSON
     GROUP BY mt.ID_AWARD
@@ -3075,7 +3056,7 @@ JOIN (
         mt.ID_AWARD,
         AVG(m.IMDB_RATING) AS AVG_IMDB_RATING,
         AVG(m.IMDB_RATING_WEIGHTED) AS AVG_IMDB_RATING_WEIGHTED
-    FROM T_WC_T2S_MOVIE_AWARD mt
+    FROM (SELECT DISTINCT ID_AWARD, ID_MOVIE FROM T_WC_T2S_MOVIE_AWARD) mt
     INNER JOIN T_WC_T2S_MOVIE m
         ON m.ID_MOVIE = mt.ID_MOVIE
     GROUP BY mt.ID_AWARD
@@ -3095,7 +3076,7 @@ JOIN (
         mt.ID_AWARD,
         AVG(s.IMDB_RATING) AS AVG_IMDB_RATING,
         AVG(s.IMDB_RATING_WEIGHTED) AS AVG_IMDB_RATING_WEIGHTED
-    FROM T_WC_T2S_SERIE_AWARD mt
+    FROM (SELECT DISTINCT ID_AWARD, ID_SERIE FROM T_WC_T2S_SERIE_AWARD) mt
     INNER JOIN T_WC_T2S_SERIE s
         ON s.ID_SERIE = mt.ID_SERIE
     GROUP BY mt.ID_AWARD
@@ -3122,6 +3103,16 @@ SET
                         strsqldelete = "DELETE FROM " + strsqltablename + " WHERE ID_AWARD NOT IN (SELECT ID_AWARD FROM T_WC_T2S_AWARD) "
                         print(strsqldelete)
                         cursor2.execute(strsqldelete)
+
+                        # TMDB-MOVIE-PREPROCESS-071: the family of each category
+                        # (ID_AWARD_PARENT), after the purge so that a family that has just
+                        # left the table is no longer a parent. See f_awardfamilysync.
+                        cp.connectioncp.commit()
+                        tupawardfamily = f_awardfamilysync(cursor2)
+                        if tupawardfamily is not None:
+                            cp.f_setservervariable("strtmdbmoviepreprocessawardfamilycount", str(tupawardfamily[0]), "Number of award categories linked to a family (ID_AWARD_PARENT) by the last T2S award build (process 44)", 0)
+                        cp.f_setservervariable("strtmdbmoviepreprocessawardwinrowcount", str(lngawardwinrows), "Number of win rows (movie, series and person) wanted by the last T2S award build (process 44)", 0)
+                        cp.f_setservervariable("strtmdbmoviepreprocessawardwindeletedcount", str(lngawardwindeleted), "Number of link rows deleted by the last T2S award build (process 44): withdrawn wins, duplicates, pre-071 rows", 0)
 
                     telaward.finish()
 

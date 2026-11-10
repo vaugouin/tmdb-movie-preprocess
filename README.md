@@ -25,6 +25,7 @@ for intindex, strdesc in arrprocessscope.items():
 - `group-works` (alias `group-work`), **only** Process 74 (TMDB-MOVIE-PREPROCESS-059): rebuild `T_WC_T2S_GROUP_MOVIE` and `T_WC_T2S_GROUP_SERIE`, a group's works. Wrapper: `tmdb-movie-preprocess-group-works.sh`. Prerequisite once: `doc/sql/migration-t2s-group-work.sql`. Acceptance: `doc/sql/test-059-group-work.sql`. In `main` it runs after 73, hence after 43 and 9, 10, 29, 31 whose outputs it reads.
 - `finance` (aliases `work-finance`, `box-office`), **only** Process 75 (TMDB-MOVIE-PREPROCESS-066): rebuild `T_WC_T2S_WORK_FINANCE`, the budgets and box office of the movies and series from Wikidata, by place and date. Wrapper: `tmdb-movie-preprocess-finance.sh`. The table is created by the process. Acceptance: `doc/sql/test-066-work-finance.sql`. In `main` it runs after 74, hence after 72 whose locations it links.
 - `genre-alias` (alias `genres-aliases`), **only** Processes 51 and 50 (`T_WC_T2S_PERSON_ALSO_KNOWN_AS`, then `T_WC_T2S_GENRE` and `T_WC_T2S_GENRE_LANG`). For the first build of the three tables and reruns on demand; in `main`, 51 runs right after 6 and 50 right before 11. Wrapper: `tmdb-movie-preprocess-genre-alias.sh`.
+- `awards` (alias `award`), **only** Process 44 (TMDB-MOVIE-PREPROCESS-071): rebuild `T_WC_T2S_AWARD` and the three win tables `T_WC_T2S_MOVIE_AWARD`, `T_WC_T2S_SERIE_AWARD`, `T_WC_T2S_PERSON_AWARD`. For the first build of the win rows and reruns on demand; in `main`, 44 runs right after 43. Wrapper: `tmdb-movie-preprocess-awards.sh`. Prerequisite once: `doc/sql/migration-071-award-wins.sql` (without it the process skips itself and says so). Acceptance: `doc/sql/test-071-award-wins.sql`.
 - `title-alias` (alias `title-aliases`), **only** Process 52 (`T_WC_T2S_MOVIE_TITLE_ALIAS`, `T_WC_T2S_SERIE_TITLE_ALIAS`). For the first build and reruns on demand; in `main`, 52 runs right after 4 and 5. Wrapper: `tmdb-movie-preprocess-title-alias.sh`.
 - `neighbours` (aliases `neighbors`, `similar-recommendations`) — **only** Processes 36-39 (rebuild the T2S `similar` / `recommendation` neighbour tables from the raw `T_WC_TMDB_*` twins). Handy as a **unit test** right after creating the four T2S tables, without the whole pipeline. Wrapper: `tmdb-movie-preprocess-neighbours.sh`.
 - `assertion-refresh` (alias `assertions`), **only** Process 70 (rebuild `ASSERTIONS_QUERY_RESULT` of the living evaluations, e.g. right after seeding new showcase samples). Wrapper: `tmdb-movie-preprocess-assertion-refresh.sh`.
@@ -1063,9 +1064,9 @@ A group's works (TMDB-MOVIE-PREPROCESS-059): the films and series a group made, 
 
 ### Process 44 — T2S_AWARD
 
-Builds award records from the Wikidata "award received" property (P166).
+Builds award records from the Wikidata "award received" property (P166). Since TMDB-MOVIE-PREPROCESS-071 (1.1.54) a row of the three link tables is **one win** (one P166 statement and one year), with the year, the ceremony and, for a person, the work rewarded; an award category points to its family through `ID_AWARD_PARENT`.
 
-**Reads:** `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE` (V2), `T_WC_WIKIDATA_SUBCLASS` (award cone), `T_WC_WIKIDATA_ITEM` / `T_WC_WIKIDATA_ITEM_V1` (labels), `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
+**Reads:** `T_WC_WIKIDATA_STATEMENT` + `T_WC_WIKIDATA_ITEM_VALUE` (V2), `T_WC_WIKIDATA_STATEMENT_QUALIFIER` + `T_WC_WIKIDATA_QUALIFIER_TIME_VALUE` + `T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE` (qualifiers P585, P1686, P805), `T_WC_WIKIDATA_TIME_VALUE` (year of a ceremony), `T_WC_WIKIDATA_SUBCLASS` (award cone), `T_WC_WIKIDATA_ITEM` / `T_WC_WIKIDATA_ITEM_V1` (labels), `T_WC_T2S_MOVIE`, `T_WC_T2S_SERIE`, `T_WC_T2S_PERSON`
 **Writes:** `T_WC_T2S_AWARD_CLASS` (the P279 cone under `Q618779`), `T_WC_T2S_AWARD`, `T_WC_T2S_MOVIE_AWARD`, `T_WC_T2S_SERIE_AWARD`, `T_WC_T2S_PERSON_AWARD`
 
 **Selection strategy (pre-filter).** The driving query selects only P166 items that have **≥ 1 linked T2S movie, series, or person** — not every distinct item value of the property. Items whose award recipients are not tracked in the T2S read model would produce an award row with zero links (pure noise), so they are skipped via three OR'd `EXISTS` probes against `T_WC_T2S_MOVIE` / `T_WC_T2S_SERIE` / `T_WC_T2S_PERSON` (all `ID_WIKIDATA`-indexed), mirroring the per-item link queries:
@@ -1091,9 +1092,24 @@ The query is built by `f_awarddrivingsql()` in `tmdb_preprocess_helpers.py`, sha
 - Selects the qualifying P166 items (per the pre-filter above).
 - For each award item, retrieves English/French label and description; `WIKIPEDIA_IMAGE_PATH` is resolved with the shared helper lookup.
 - Inserts/updates `T_WC_T2S_AWARD`.
-- Links movies and series that received the award in `IMDB_RATING_WEIGHTED DESC` order, and links persons in their existing person ordering, into the respective junction tables with incremental display order.
+- Writes the wins of the award into the three link tables with `f_awardwinsync()`, movies and series in `IMDB_RATING_WEIGHTED DESC` order, persons in `POPULARITY DESC` order (see "One row per win" below).
 - Stale delete (inverse of the pre-filter): removes any award whose item no longer has ≥ 1 linked T2S entity (covers items gone from Wikidata, now-empty awards, and awards degraded to zero tracked recipients); orphan junction rows are then cleaned via `ID_AWARD NOT IN (SELECT ID_AWARD FROM T_WC_T2S_AWARD)` on each junction table.
-- Post-processing: updates average `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `POPULARITY` on `T_WC_T2S_AWARD` from linked entities.
+- Post-processing: updates average `IMDB_RATING`, `IMDB_RATING_WEIGHTED`, and `POPULARITY` on `T_WC_T2S_AWARD` from linked entities, each entity counted once whatever its number of wins.
+- Families: `f_awardfamilysync()` fills `T_WC_T2S_AWARD.ID_AWARD_PARENT`.
+
+**One row per win (TMDB-MOVIE-PREPROCESS-071).** Prerequisite once: `doc/sql/migration-071-award-wins.sql` (twelve columns). While a column is missing, or while wikidata-crawler is loading, the process skips itself, prints why and writes the reason to the server variable `strtmdbmoviepreprocessawardwinskipreason`; the award tables stay as they were.
+
+- **The logical key of a link row** is (`ID_STATEMENT`, entity id, `AWARD_YEAR`). `ID_STATEMENT` is the P166 statement (`T_WC_WIKIDATA_STATEMENT.ID_STATEMENT`). A statement carrying several years (733 statements on 2026-11-10) gives one row per year.
+- **`AWARD_YEAR`**: qualifier `P585` of the statement, else the year (`P585`) of the ceremony named by its qualifier `P805`; `NULL` when Wikidata gives neither, and when the year is before 1000 or after next year (Wikidata holds a year 15 and a year 19577). For the Oscars and the Césars it is the year of the ceremony, not of the film.
+- **`ID_CEREMONY_WIKIDATA`**: the `P805` ceremony whose year is the year of the row, or the only ceremony of a single-row statement; a Wikidata id, not resolved to a T2S row.
+- **`ID_MOVIE_FOR`, `ID_SERIE_FOR`** (persons only): the work of qualifier `P1686`, resolved through `T_WC_T2S_MOVIE.ID_WIKIDATA` / `T_WC_T2S_SERIE.ID_WIKIDATA`. `NULL` when Wikidata names no work, when the work is not a T2S movie or series, and on a multi-year statement naming several works (nothing says which work goes with which year). A single-year statement naming several works keeps the lowest id.
+- **`DISPLAY_ORDER`** is the rank of the entity within the award, identical on every row of that entity.
+- **`MOVIE_COUNT`, `SERIE_COUNT`, `PERSON_COUNT`** on `T_WC_T2S_AWARD` stay numbers of distinct winners, not of wins.
+- **Readers**: the same (entity, award) pair can sit on several rows, so a list of the awards of an entity or of the winners of an award needs `DISTINCT` or `GROUP BY`; the number of wins is the number of rows.
+- **First run after the migration**: award by award, the win rows are written, then the rows left from before (`ID_STATEMENT IS NULL`) are deleted. The link tables are never empty in between.
+- **`ID_AWARD_PARENT`**: the family of a category, one level. A family is an award row that is an instance (`P31`) of "group of awards" (`Q107655869`); a category reaches it by `P31`, by `P361` (part of), or by the family's `P527` (has parts). With several candidate families: the one with the most member categories, then the route `P31` > `P361` > `P527`, then the lowest Q number. The step changes nothing when it finds no pair while parents exist (a crawler load in progress must not empty the column). Until wikidata-crawler 1.1.25 has run (WIKIDATA-CRAWLER-032, `P361` and `P527` on cached entities), only the `P31` route answers: 1 485 categories on 2026-11-10, and "Academy Award for Best Picture" has no family yet.
+- **Server variables**: `strtmdbmoviepreprocessawardwinrowcount`, `strtmdbmoviepreprocessawardwindeletedcount`, `strtmdbmoviepreprocessawardfamilycount`.
+- **Not covered**: nominations (Process 47) keep one row per (entity, nomination) pair.
 
 ---
 

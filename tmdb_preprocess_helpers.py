@@ -1868,6 +1868,424 @@ def f_awardlinksql(strt2stable, stralias, stridcolumn, strsortcolumn):
     )
 
 
+# ---- TMDB-MOVIE-PREPROCESS-071 : one link row per win (year, work, family) ----
+#
+# Process 44 only. Process 47 (nominations) keeps f_awardlinksql and one row per
+# (entity, nomination) until its own ticket.
+#
+# A link row of T_WC_T2S_MOVIE_AWARD / _SERIE_AWARD / _PERSON_AWARD is one win: one P166
+# statement and one year. Its logical key is (ID_STATEMENT, entity id, AWARD_YEAR).
+# The columns come from doc/sql/migration-071-award-wins.sql.
+
+# The columns the build needs, per table. Read by f_awardwinschemamissing.
+DICT_AWARD_WIN_COLUMNS = {
+    "T_WC_T2S_MOVIE_AWARD": ("ID_STATEMENT", "AWARD_YEAR", "ID_CEREMONY_WIKIDATA"),
+    "T_WC_T2S_SERIE_AWARD": ("ID_STATEMENT", "AWARD_YEAR", "ID_CEREMONY_WIKIDATA"),
+    "T_WC_T2S_PERSON_AWARD": ("ID_STATEMENT", "AWARD_YEAR", "ID_CEREMONY_WIKIDATA", "ID_MOVIE_FOR", "ID_SERIE_FOR"),
+    "T_WC_T2S_AWARD": ("ID_AWARD_PARENT",),
+}
+# A year outside this range is a data error on Wikidata (15 and 19577 were measured on
+# 2026-11-10): the win is kept, its year is left NULL.
+INT_AWARD_YEAR_MIN = 1000
+# "group of awards": what makes an award row the family of its categories.
+STR_AWARD_FAMILY_CLASS = "Q107655869"
+# Routes from a category to its family, strongest first (tie-break of f_awardfamilypick).
+ARR_AWARD_FAMILY_ROUTES = ("P31", "P361", "P527")
+INT_AWARD_SQL_CHUNK = 500
+
+
+def f_awardwinschemamissing():
+    """Return the -071 columns absent from the live schema, as 'TABLE.COLUMN' strings.
+
+    An empty list means Process 44 may run. The code can reach the VPS before the DDL
+    (a git pull deploys it), and writing ID_STATEMENT into a table that has no such
+    column would fail on every row: the process checks first and skips itself.
+    """
+    cursor = cp.connectioncp.cursor()
+    try:
+        cursor.execute(
+            "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ("
+            + ", ".join(["%s"] * len(DICT_AWARD_WIN_COLUMNS)) + ")",
+            list(DICT_AWARD_WIN_COLUMNS.keys()),
+        )
+        setpresent = {(row["TABLE_NAME"], row["COLUMN_NAME"]) for row in cursor.fetchall()}
+    finally:
+        cursor.close()
+    return [
+        f"{strtable}.{strcolumn}"
+        for strtable, arrcolumns in DICT_AWARD_WIN_COLUMNS.items()
+        for strcolumn in arrcolumns
+        if (strtable, strcolumn) not in setpresent
+    ]
+
+
+def f_awardwinsql(strt2stable, stralias, stridcolumn, strsortcolumn):
+    """Who won this award, one line per (statement, qualifier): the wins, read in V2.
+
+    Same FROM, same STRAIGHT_JOIN and same %s order (property, item) as f_awardlinksql,
+    whose docstring says why. Two differences:
+      - no DISTINCT and the statement id is returned: a person who won the same award
+        four times has four statements and must give four rows;
+      - the three qualifiers a win carries are joined: P585 (point in time), P1686 (for
+        work), P805 (statement is subject of, the ceremony). A statement gives one line
+        per qualifier, or one line of NULLs when it has none; f_awardwinentities folds
+        them. No GROUP_CONCAT: its result is cut at group_concat_max_len without error.
+    Each qualifier value table has ID_STATEMENT_QUALIFIER as its primary key, so the two
+    value joins never multiply the lines.
+    """
+    return (
+        f"SELECT {stralias}.{stridcolumn}, {stralias}.{strsortcolumn}, sl.ID_STATEMENT, "
+        "q.ID_QUALIFIER_PROPERTY, qt.YEAR_VALUE, qi.ID_ITEM AS ID_QUALIFIER_ITEM "
+        "FROM T_WC_WIKIDATA_ITEM_VALUE lv "
+        "JOIN T_WC_WIKIDATA_STATEMENT sl ON sl.ID_STATEMENT = lv.ID_STATEMENT "
+        f"STRAIGHT_JOIN {strt2stable} {stralias} ON {stralias}.ID_WIKIDATA = sl.ID_WIKIDATA "
+        "LEFT JOIN T_WC_WIKIDATA_STATEMENT_QUALIFIER q ON q.ID_STATEMENT = sl.ID_STATEMENT "
+        "AND q.ID_QUALIFIER_PROPERTY IN ('P585', 'P1686', 'P805') "
+        "LEFT JOIN T_WC_WIKIDATA_QUALIFIER_TIME_VALUE qt ON qt.ID_STATEMENT_QUALIFIER = q.ID_STATEMENT_QUALIFIER "
+        "LEFT JOIN T_WC_WIKIDATA_QUALIFIER_ITEM_VALUE qi ON qi.ID_STATEMENT_QUALIFIER = q.ID_STATEMENT_QUALIFIER "
+        "WHERE sl.ID_PROPERTY = %s AND lv.ID_ITEM = %s "
+        "AND (sl.`RANK` IS NULL OR sl.`RANK` <> 'deprecated') "
+        f"AND {stralias}.ID_WIKIDATA IS NOT NULL AND {stralias}.ID_WIKIDATA <> '' "
+        f"ORDER BY {stralias}.{strsortcolumn} DESC, {stralias}.{stridcolumn} ASC, sl.ID_STATEMENT ASC "
+    )
+
+
+def f_awardwinentities(arrlines, stridcolumn):
+    """Fold the lines of f_awardwinsql into entities and their statements. Pure.
+
+    Returns a list, in the order of the query (best ranked entity first), of
+        {"id": entity id, "statements": [{"id": ID_STATEMENT, "years": set of int,
+                                          "works": set of Q ids, "ceremonies": set of Q ids}]}
+    The position of an entity in the list, plus one, is its DISPLAY_ORDER.
+    """
+    arrentities = []
+    dictentity = {}
+    for row in arrlines:
+        lngentityid = row[stridcolumn]
+        arrentity = dictentity.get(lngentityid)
+        if arrentity is None:
+            arrentity = {"id": lngentityid, "statements": [], "_bystatement": {}}
+            dictentity[lngentityid] = arrentity
+            arrentities.append(arrentity)
+        lngstatementid = row["ID_STATEMENT"]
+        arrstatement = arrentity["_bystatement"].get(lngstatementid)
+        if arrstatement is None:
+            arrstatement = {"id": lngstatementid, "years": set(), "works": set(), "ceremonies": set()}
+            arrentity["_bystatement"][lngstatementid] = arrstatement
+            arrentity["statements"].append(arrstatement)
+        strqualifier = row.get("ID_QUALIFIER_PROPERTY")
+        if strqualifier == "P585" and row.get("YEAR_VALUE") is not None:
+            arrstatement["years"].add(int(row["YEAR_VALUE"]))
+        elif strqualifier == "P1686" and row.get("ID_QUALIFIER_ITEM"):
+            arrstatement["works"].add(row["ID_QUALIFIER_ITEM"])
+        elif strqualifier == "P805" and row.get("ID_QUALIFIER_ITEM"):
+            arrstatement["ceremonies"].add(row["ID_QUALIFIER_ITEM"])
+    for arrentity in arrentities:
+        del arrentity["_bystatement"]
+    return arrentities
+
+
+def f_awardqnumber(strwikidataid):
+    """Numeric part of a Q id, for a stable 'lowest Q number' order. Unknown shapes go last."""
+    strdigits = str(strwikidataid or "")[1:]
+    return int(strdigits) if strdigits.isdigit() else 10 ** 12
+
+
+def f_awardwinrows(setyears, setworks, setceremonies, dictceremonyyear, dictworkmovie, dictworkserie, lngyearmax):
+    """Turn the qualifiers of ONE statement into its win rows. Pure, no database.
+
+    Returns a list of dicts AWARD_YEAR, ID_CEREMONY_WIKIDATA, ID_MOVIE_FOR, ID_SERIE_FOR,
+    never empty: a statement always gives at least one row, with NULLs where Wikidata
+    says nothing.
+
+    THE YEAR. The P585 years of the statement, one row each. Without any P585, the
+    years of its ceremonies (P805), each ceremony's year being its own P585. A year
+    outside INT_AWARD_YEAR_MIN .. lngyearmax is dropped; if none is left the row keeps
+    AWARD_YEAR NULL rather than a false year.
+
+    THE CEREMONY of a row is the one ceremony of the statement whose own year is the
+    row's year; failing that, the only ceremony of a statement that has one year at
+    most. Several candidates: NULL, the statement does not say which.
+
+    THE WORK (persons). With one row, the works of the statement resolved to T2S: the
+    lowest ID_MOVIE and the lowest ID_SERIE, since a row holds one of each (398 person
+    statements carried several works on 2026-11-10, 0.3 % of the wins). With several
+    rows, the work is set only when the statement names exactly one, which then holds
+    for every year; several works over several years cannot be paired, Wikidata keeps
+    no order between qualifiers, so they stay NULL.
+    """
+    arrvalidyears = sorted(y for y in setyears if INT_AWARD_YEAR_MIN <= y <= lngyearmax)
+    if arrvalidyears:
+        arryears = arrvalidyears
+    elif setyears:
+        arryears = [None]
+    else:
+        arryears = sorted({
+            dictceremonyyear[c] for c in setceremonies
+            if dictceremonyyear.get(c) is not None and INT_AWARD_YEAR_MIN <= dictceremonyyear[c] <= lngyearmax
+        }) or [None]
+
+    lngmoviefor = None
+    lngseriefor = None
+    if len(arryears) == 1 or len(setworks) == 1:
+        arrmovies = [dictworkmovie[w] for w in setworks if dictworkmovie.get(w) is not None]
+        arrseries = [dictworkserie[w] for w in setworks if dictworkserie.get(w) is not None]
+        lngmoviefor = min(arrmovies) if arrmovies else None
+        lngseriefor = min(arrseries) if arrseries else None
+
+    arrrows = []
+    for lngyear in arryears:
+        strceremony = None
+        if lngyear is not None:
+            arrmatching = [c for c in setceremonies if dictceremonyyear.get(c) == lngyear]
+            if len(arrmatching) == 1:
+                strceremony = arrmatching[0]
+        if strceremony is None and len(arryears) == 1 and len(setceremonies) == 1:
+            strceremony = next(iter(setceremonies))
+        arrrows.append({
+            "AWARD_YEAR": lngyear,
+            "ID_CEREMONY_WIKIDATA": strceremony,
+            "ID_MOVIE_FOR": lngmoviefor,
+            "ID_SERIE_FOR": lngseriefor,
+        })
+    return arrrows
+
+
+def f_awardlookup(cursor, setids, dictcache, strsql, strkeycolumn, strvaluecolumn, blnsinglevalue=False):
+    """Resolve Wikidata ids through strsql and remember the answers in dictcache.
+
+    strsql ends with an open IN list: "... IN (" ; the ids are bound, never inlined.
+    Every id asked gets an entry, None when the query returns nothing for it, so an id
+    is looked up once per run however many awards quote it. With blnsinglevalue an id
+    whose rows disagree is None (a ceremony with two years gives no year); without it
+    the lowest value wins (the lowest ID_MOVIE of a Wikidata id shared by two movies).
+    """
+    arrmissing = sorted(i for i in setids if i not in dictcache)
+    for lngstart in range(0, len(arrmissing), INT_AWARD_SQL_CHUNK):
+        arrchunk = arrmissing[lngstart:lngstart + INT_AWARD_SQL_CHUNK]
+        cursor.execute(strsql + ", ".join(["%s"] * len(arrchunk)) + ")", arrchunk)
+        dictfound = {}
+        for row in cursor.fetchall():
+            if row[strvaluecolumn] is None:
+                continue
+            dictfound.setdefault(row[strkeycolumn], set()).add(int(row[strvaluecolumn]))
+        for strid in arrchunk:
+            setvalues = dictfound.get(strid)
+            if not setvalues or (blnsinglevalue and len(setvalues) > 1):
+                dictcache[strid] = None
+            else:
+                dictcache[strid] = min(setvalues)
+
+
+STR_AWARD_WORK_MOVIE_SQL = "SELECT ID_WIKIDATA, ID_MOVIE FROM T_WC_T2S_MOVIE WHERE ID_WIKIDATA IN ("
+STR_AWARD_WORK_SERIE_SQL = "SELECT ID_WIKIDATA, ID_SERIE FROM T_WC_T2S_SERIE WHERE ID_WIKIDATA IN ("
+# The year of a ceremony is its own P585 ("54th Academy Awards": 1982).
+STR_AWARD_CEREMONY_YEAR_SQL = (
+    "SELECT cs.ID_WIKIDATA, ct.YEAR_VALUE "
+    "FROM T_WC_WIKIDATA_STATEMENT cs "
+    "JOIN T_WC_WIKIDATA_TIME_VALUE ct ON ct.ID_STATEMENT = cs.ID_STATEMENT "
+    "WHERE cs.ID_PROPERTY = 'P585' AND (cs.`RANK` IS NULL OR cs.`RANK` <> 'deprecated') "
+    "AND cs.ID_WIKIDATA IN ("
+)
+
+
+def f_awardwincaches():
+    """The three lookup caches of one Process 44 run, shared by every award."""
+    return {"movie": {}, "serie": {}, "ceremony": {}}
+
+
+def f_awardwinsync(cursor, strlinktable, strt2stable, stralias, stridcolumn, strsortcolumn,
+                   strpropertyid, strawardwikidataid, lngawardid, dictcaches, lngyearmax):
+    """Write the wins of one award for one kind of entity, and remove what is no longer one.
+
+    Returns (entities, rows wanted, rows deleted). 'entities' is the number of distinct
+    winners, which is what MOVIE_COUNT / SERIE_COUNT / PERSON_COUNT hold.
+
+    WRITE THEN DELETE, by ID_ROW. Each win is upserted on its logical key
+    (ID_STATEMENT, entity, AWARD_YEAR), then the rows of the award are read back and
+    every row whose key is not wanted, or that repeats a key, is deleted by its ID_ROW.
+    This one pass removes the rows of a win withdrawn on Wikidata, the duplicates, and,
+    at the first run after the migration, the old rows (ID_STATEMENT NULL, one per
+    entity): they go only once the win rows of the award are written. It runs even when
+    the award has no winner of this kind left. A failed upsert deletes nothing: the key
+    stays wanted and the next run writes it.
+
+    DISPLAY_ORDER is the rank of the entity in the award, the same on each of its rows:
+    readers that list distinct entities ORDER BY it.
+    """
+    blnperson = strlinktable == "T_WC_T2S_PERSON_AWARD"
+    cursor.execute(f_awardwinsql(strt2stable, stralias, stridcolumn, strsortcolumn), (strpropertyid, strawardwikidataid))
+    arrentities = f_awardwinentities(cursor.fetchall(), stridcolumn)
+
+    setworks = set()
+    setceremonies = set()
+    for arrentity in arrentities:
+        for arrstatement in arrentity["statements"]:
+            setceremonies |= arrstatement["ceremonies"]
+            if blnperson:
+                setworks |= arrstatement["works"]
+    f_awardlookup(cursor, setceremonies, dictcaches["ceremony"], STR_AWARD_CEREMONY_YEAR_SQL, "ID_WIKIDATA", "YEAR_VALUE", True)
+    f_awardlookup(cursor, setworks, dictcaches["movie"], STR_AWARD_WORK_MOVIE_SQL, "ID_WIKIDATA", "ID_MOVIE")
+    f_awardlookup(cursor, setworks, dictcaches["serie"], STR_AWARD_WORK_SERIE_SQL, "ID_WIKIDATA", "ID_SERIE")
+
+    setwanted = set()
+    lngdisplayorder = 0
+    for arrentity in arrentities:
+        lngdisplayorder += 1
+        lngentityid = arrentity["id"]
+        for arrstatement in arrentity["statements"]:
+            lngstatementid = arrstatement["id"]
+            arrwinrows = f_awardwinrows(
+                arrstatement["years"], arrstatement["works"] if blnperson else set(), arrstatement["ceremonies"],
+                dictcaches["ceremony"], dictcaches["movie"], dictcaches["serie"], lngyearmax)
+            for arrwin in arrwinrows:
+                lngyear = arrwin["AWARD_YEAR"]
+                tupkey = (int(lngstatementid), int(lngentityid), lngyear)
+                if tupkey in setwanted:
+                    continue
+                setwanted.add(tupkey)
+                arrcouples = {
+                    stridcolumn: lngentityid,
+                    'ID_AWARD': lngawardid,
+                    'ID_STATEMENT': lngstatementid,
+                    'AWARD_YEAR': lngyear,
+                    'ID_CEREMONY_WIKIDATA': arrwin["ID_CEREMONY_WIKIDATA"],
+                    'DISPLAY_ORDER': lngdisplayorder,
+                }
+                if blnperson:
+                    arrcouples['ID_MOVIE_FOR'] = arrwin["ID_MOVIE_FOR"]
+                    arrcouples['ID_SERIE_FOR'] = arrwin["ID_SERIE_FOR"]
+                strcondition = (
+                    f"ID_STATEMENT = {int(lngstatementid)} AND {stridcolumn} = {int(lngentityid)} "
+                    f"AND AWARD_YEAR <=> {'NULL' if lngyear is None else int(lngyear)}"
+                )
+                cp.f_sqlupdatearray(strlinktable, arrcouples, strcondition, 1)
+
+    cursor.execute(
+        f"SELECT ID_ROW, ID_STATEMENT, {stridcolumn}, AWARD_YEAR FROM {strlinktable} "
+        "WHERE ID_AWARD = %s ORDER BY ID_ROW ASC", (lngawardid,))
+    setseen = set()
+    arrstalerows = []
+    for row in cursor.fetchall():
+        if row["ID_STATEMENT"] is None:
+            arrstalerows.append(int(row["ID_ROW"]))
+            continue
+        tupkey = (int(row["ID_STATEMENT"]), int(row[stridcolumn]), None if row["AWARD_YEAR"] is None else int(row["AWARD_YEAR"]))
+        if tupkey not in setwanted or tupkey in setseen:
+            arrstalerows.append(int(row["ID_ROW"]))
+        else:
+            setseen.add(tupkey)
+    for lngstart in range(0, len(arrstalerows), INT_AWARD_SQL_CHUNK):
+        arrchunk = arrstalerows[lngstart:lngstart + INT_AWARD_SQL_CHUNK]
+        cursor.execute(
+            f"DELETE FROM {strlinktable} WHERE ID_ROW IN (" + ", ".join(["%s"] * len(arrchunk)) + ")", arrchunk)
+    if arrstalerows:
+        cp.connectioncp.commit()
+        print(f"{strlinktable}: award {lngawardid}, {len(arrstalerows)} row(s) deleted (no longer a win, duplicate, or pre-071 row)")
+    return len(arrentities), len(setwanted), len(arrstalerows)
+
+
+def f_awardfamilysql(strroute):
+    """The (category, family) pairs one route gives, among the rows of T_WC_T2S_AWARD.
+
+    A family is an award row that Wikidata declares an instance of "group of awards"
+    (STR_AWARD_FAMILY_CLASS). A category reaches it by P31 (instance of the family),
+    by P361 (part of the family) or because the family lists it by P527 (has parts).
+    Both ends must already be award rows: this step creates no row. P361 and P527
+    reach the base with WIKIDATA-CRAWLER-032; before its first load only P31 answers.
+    """
+    strfamilyis = (
+        "AND EXISTS (SELECT 1 FROM T_WC_WIKIDATA_STATEMENT gs "
+        "JOIN T_WC_WIKIDATA_ITEM_VALUE gv ON gv.ID_STATEMENT = gs.ID_STATEMENT "
+        "WHERE gs.ID_WIKIDATA = f.ID_WIKIDATA AND gs.ID_PROPERTY = 'P31' "
+        f"AND gv.ID_ITEM = '{STR_AWARD_FAMILY_CLASS}' "
+        "AND (gs.`RANK` IS NULL OR gs.`RANK` <> 'deprecated')) "
+    )
+    strselect = f"SELECT c.ID_AWARD, f.ID_AWARD AS ID_AWARD_FAMILY, f.ID_WIKIDATA AS ID_FAMILY_WIKIDATA, '{strroute}' AS ROUTE "
+    if strroute == "P527":
+        return (
+            strselect +
+            "FROM T_WC_T2S_AWARD f "
+            "JOIN T_WC_WIKIDATA_STATEMENT ls ON ls.ID_WIKIDATA = f.ID_WIKIDATA AND ls.ID_PROPERTY = 'P527' "
+            "AND (ls.`RANK` IS NULL OR ls.`RANK` <> 'deprecated') "
+            "JOIN T_WC_WIKIDATA_ITEM_VALUE lv ON lv.ID_STATEMENT = ls.ID_STATEMENT "
+            "JOIN T_WC_T2S_AWARD c ON c.ID_WIKIDATA = lv.ID_ITEM AND c.AWARD_SOURCE = 'P166' AND c.ID_AWARD <> f.ID_AWARD "
+            "WHERE f.AWARD_SOURCE = 'P166' " + strfamilyis
+        )
+    return (
+        strselect +
+        "FROM T_WC_T2S_AWARD c "
+        f"JOIN T_WC_WIKIDATA_STATEMENT ls ON ls.ID_WIKIDATA = c.ID_WIKIDATA AND ls.ID_PROPERTY = '{strroute}' "
+        "AND (ls.`RANK` IS NULL OR ls.`RANK` <> 'deprecated') "
+        "JOIN T_WC_WIKIDATA_ITEM_VALUE lv ON lv.ID_STATEMENT = ls.ID_STATEMENT "
+        "JOIN T_WC_T2S_AWARD f ON f.ID_WIKIDATA = lv.ID_ITEM AND f.AWARD_SOURCE = 'P166' AND f.ID_AWARD <> c.ID_AWARD "
+        "WHERE c.AWARD_SOURCE = 'P166' " + strfamilyis
+    )
+
+
+def f_awardfamilypick(arrcandidates):
+    """Choose one family per category. Pure, no database.
+
+    arrcandidates: dicts ID_AWARD, ID_AWARD_FAMILY, ID_FAMILY_WIKIDATA, ROUTE.
+    Returns {ID_AWARD: ID_AWARD_FAMILY}.
+
+    A category reaching several families takes the one with the most member categories
+    (the Academy Awards rather than a small group that also claims the category), then
+    the strongest route (P31, P361, P527), then the lowest Q number. One level only: a
+    family that itself belongs to a larger one (Primetime Emmy Award, part of Emmy
+    Award) gets its own parent, and its categories keep pointing to it.
+    """
+    dictmembers = {}
+    for row in arrcandidates:
+        dictmembers.setdefault(row["ID_AWARD_FAMILY"], set()).add(row["ID_AWARD"])
+    dictbest = {}
+    for row in arrcandidates:
+        strroute = row["ROUTE"]
+        tuprank = (
+            -len(dictmembers[row["ID_AWARD_FAMILY"]]),
+            ARR_AWARD_FAMILY_ROUTES.index(strroute) if strroute in ARR_AWARD_FAMILY_ROUTES else len(ARR_AWARD_FAMILY_ROUTES),
+            f_awardqnumber(row["ID_FAMILY_WIKIDATA"]),
+            row["ID_AWARD_FAMILY"],
+        )
+        if row["ID_AWARD"] not in dictbest or tuprank < dictbest[row["ID_AWARD"]][0]:
+            dictbest[row["ID_AWARD"]] = (tuprank, row["ID_AWARD_FAMILY"])
+    return {lngawardid: tupbest[1] for lngawardid, tupbest in dictbest.items()}
+
+
+def f_awardfamilysync(cursor):
+    """Set T_WC_T2S_AWARD.ID_AWARD_PARENT from Wikidata. Returns (linked, changed) or None when skipped.
+
+    Runs after the purge of Process 44, so a family that has just left the table is no
+    longer a parent. Only the rows whose parent changes are written, back to NULL
+    included, and TIM_UPDATED is left alone: the parent is not part of what
+    embedding-update indexes. If the three routes return nothing at all while parents
+    exist, the statements are taken as unreadable rather than the families as gone,
+    and nothing is written.
+    """
+    arrcandidates = []
+    for strroute in ARR_AWARD_FAMILY_ROUTES:
+        cursor.execute(f_awardfamilysql(strroute))
+        arrrows = cursor.fetchall()
+        print(f"44: award families, route {strroute}: {len(arrrows)} (category, family) pair(s)")
+        arrcandidates.extend(arrrows)
+    dictwanted = f_awardfamilypick(arrcandidates)
+    cursor.execute("SELECT ID_AWARD, ID_AWARD_PARENT FROM T_WC_T2S_AWARD")
+    dictcurrent = {row["ID_AWARD"]: row["ID_AWARD_PARENT"] for row in cursor.fetchall()}
+    if not dictwanted and any(v is not None for v in dictcurrent.values()):
+        print("44: award families SKIPPED, no route returned any pair while parents exist.")
+        return None
+    lngchanged = 0
+    for lngawardid, lngcurrentparent in dictcurrent.items():
+        lngwantedparent = dictwanted.get(lngawardid)
+        if lngwantedparent != lngcurrentparent:
+            cursor.execute("UPDATE T_WC_T2S_AWARD SET ID_AWARD_PARENT = %s WHERE ID_AWARD = %s", (lngwantedparent, lngawardid))
+            lngchanged += 1
+    cp.connectioncp.commit()
+    print(f"44: award families, {len(dictwanted)} categories linked to a family, {lngchanged} row(s) changed")
+    return len(dictwanted), lngchanged
+
+
 # ---- TMDB-MOVIE-PREPROCESS-040 et -041 : les processus 43 (groupes) et 46 (deces) ----
 #
 # ⚠ -040 PARTAIT D'UNE LECTURE FAUSSE, corrigee ici. Le ticket decrivait

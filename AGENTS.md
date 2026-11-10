@@ -56,6 +56,10 @@ Tables read and written: README § Source → Target Table Map. When changing sc
 
 `f_awardconeguard()` rebuilds the P279 cone under `Q618779` at the head of 44 and 47 and skips the process (rather than raising) when the cone is below `LNG_AWARD_CONE_FLOOR`; its docstring explains why. The award rule exists once, in `f_awardconefilter()`, shared by each process's driving query and purge `DELETE`: never re-inline it, or the purge and the build drift and the process recreates nightly what it deletes. Its subqueries use the aliases `st` and `iv`: a host query must not use them (silent self-correlation). Watch `strtmdbmoviepreprocessawardconeskipstreak`: three skips in a row means the crawler dependency is broken.
 
+### Award link tables: one row per win (TMDB-MOVIE-PREPROCESS-071)
+
+Since 1.1.54 a row of `T_WC_T2S_MOVIE_AWARD`, `T_WC_T2S_SERIE_AWARD`, `T_WC_T2S_PERSON_AWARD` is one win: logical key (`ID_STATEMENT`, entity id, `AWARD_YEAR`), with `AWARD_YEAR` nullable (hence no `UNIQUE` key, and the `<=>` in the upsert condition of `f_awardwinsync()`). Consequences to keep in mind in this repo and in every reader (tmdb-front, fastapi-text2sql, embedding-update): the (entity, award) pair is no longer unique, so lists need `DISTINCT` or `GROUP BY` and averages count an entity once; `MOVIE_COUNT` / `SERIE_COUNT` / `PERSON_COUNT` are distinct winners; `DISPLAY_ORDER` is the same on every row of an entity. The rules for the year, the ceremony, the work and the family live in the pure helpers `f_awardwinrows()` and `f_awardfamilypick()` (no database, testable by stubbing the imports) and are described in README, Process 44. Process 44 skips itself while `doc/sql/migration-071-award-wins.sql` is not applied or wikidata-crawler is loading (`strtmdbmoviepreprocessawardwinskipreason`). `f_awardlinksql()` is now used by Process 47 only: nominations still hold one row per pair. On demand: `TMDB_PREPROCESS_SCOPE=awards` (`tmdb-movie-preprocess-awards.sh`).
+
 ## Recettes SQL : deux pieges qui ne se voient pas sur le poste de l'auteur
 
 **⚠ Ne jamais placer une requete sur `information_schema` AVANT des instructions qui nomment des tables sans les qualifier.** phpMyAdmin bascule alors la base courante et la suite echoue (« #1109 Table inconnue dans information_schema ») ; le client `mariadb` en ligne de commande ne montre pas le defaut. Mettre ces requetes **en dernier**, ou qualifier les noms.
@@ -77,7 +81,7 @@ Env vars: `.env.example` and README § Secrets handling. Secrets are never commi
 ---
 
 **Last Updated**: 2026-11-10
-**Current Version**: 1.1.53
+**Current Version**: 1.1.54
 
 ## Backlog (Nestor second-brain)
 
