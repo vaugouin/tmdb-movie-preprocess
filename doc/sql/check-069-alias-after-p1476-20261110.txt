@@ -1,0 +1,70 @@
+-- check-069-alias-after-p1476.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-11-10 07:04:41 +0100
+--
++---------------------+--------+--------+---------------------+
+| STEP                | N      | LIVE   | LAST_UPDATE         |
++---------------------+--------+--------+---------------------+
+| A. P1476 statements | 490010 | 490010 | 2026-11-09 01:54:07 |
++---------------------+--------+--------+---------------------+
++----------------+--------------+-------+-------+---------------------+
+| STEP           | ALIAS_SOURCE | N     | LIVE  | LAST_UPDATE         |
++----------------+--------------+-------+-------+---------------------+
+| B. movie alias | alias        | 79847 | 79847 | 2026-11-10 02:45:31 |
+| B. movie alias | label        | 51954 | 51954 | 2026-11-10 02:45:24 |
+| B. movie alias | title        | 21273 | 21273 | 2026-11-10 02:43:27 |
++----------------+--------------+-------+-------+---------------------+
++----------------+--------------+-------+-------+---------------------+
+| STEP           | ALIAS_SOURCE | N     | LIVE  | LAST_UPDATE         |
++----------------+--------------+-------+-------+---------------------+
+| B. serie alias | alias        | 14675 | 14675 | 2026-11-10 02:45:49 |
+| B. serie alias | label        |  8679 |  8679 | 2026-11-10 02:45:47 |
+| B. serie alias | title        |  3452 |  3452 | 2026-11-10 02:45:36 |
++----------------+--------------+-------+-------+---------------------+
++------------------------+-----------+------+
+| STEP                   | LANG_CODE | N    |
++------------------------+-----------+------+
+| C. movie title by lang | en        | 6201 |
+| C. movie title by lang | de        | 2402 |
+| C. movie title by lang | ja        | 1280 |
+| C. movie title by lang | fr        | 1232 |
+| C. movie title by lang | ta        | 1025 |
+| C. movie title by lang | es        |  999 |
+| C. movie title by lang | it        |  828 |
+| C. movie title by lang | ru        |  794 |
+| C. movie title by lang | ml        |  692 |
+| C. movie title by lang | sv        |  486 |
++------------------------+-----------+------+
++---------------------------+----------+----------------------------------------+--------------+-----------+-----------------------------------------+
+| STEP                      | ID_MOVIE | MOVIE_TITLE                            | ALIAS_SOURCE | LANG_CODE | TITLE                                   |
++---------------------------+----------+----------------------------------------+--------------+-----------+-----------------------------------------+
+| D. aliases of known films |       11 | Star Wars                              | alias        | en        | Star Wars: Episode IV                   |
+| D. aliases of known films |       11 | Star Wars                              | alias        | en        | 1977 Star Wars                          |
+| D. aliases of known films |       11 | Star Wars                              | alias        | en        | Star Wars IV                            |
+| D. aliases of known films |       11 | Star Wars                              | alias        | en        | Star Wars: Episode IV A New Hope        |
+| D. aliases of known films |       11 | Star Wars                              | alias        | en        | A New Hope                              |
+| D. aliases of known films |       11 | Star Wars                              | alias        | en        | Star Wars: A New Hope                   |
+| D. aliases of known films |       11 | Star Wars                              | alias        | en        | Star Wars: Episode IV: A New Hope       |
+| D. aliases of known films |       11 | Star Wars                              | alias        | fr        | La Guerre des étoiles, IV               |
+| D. aliases of known films |       11 | Star Wars                              | alias        | fr        | Un nouvel espoir                        |
+| D. aliases of known films |       11 | Star Wars                              | alias        | fr        | Star Wars 4                             |
+| D. aliases of known films |       11 | Star Wars                              | title        | en        | Star Wars: Episode IV – A New Hope      |
+| D. aliases of known films |    10353 | The Visitors II: The Corridors of Time | alias        | en        | Visitors II: The Corridors of Time      |
+| D. aliases of known films |    10353 | The Visitors II: The Corridors of Time | alias        | en        | The Corridors of Time: The Visitors II  |
+| D. aliases of known films |    10353 | The Visitors II: The Corridors of Time | alias        | fr        | Couloirs du temps : Les Visiteurs 2     |
+| D. aliases of known films |    10353 | The Visitors II: The Corridors of Time | title        | fr        | Les Couloirs du temps : Les Visiteurs 2 |
++---------------------------+----------+----------------------------------------+--------------+-----------+-----------------------------------------+
++------------------------------+---------------------------------------------+----------+-------------+--------------+-----------+
+| STEP                         | FORM                                        | ID_MOVIE | MOVIE_TITLE | ALIAS_SOURCE | LANG_CODE |
++------------------------------+---------------------------------------------+----------+-------------+--------------+-----------+
+| E. miss forms in alias table | Au-delà de la vallée des poupées            |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | detective dee sea dragon                    |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | Évaluez tous les risques                    |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | La Veuve insatiable                         |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | Le Faucon contre-attaque                    |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | Les tambours de la rivière Mohawk           |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | Star Wars : épisode IV - Un nouvel espoir   |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | Star Wars: Episode IV - A New Hope          |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | Trois petites bières                        |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | Vingt-quatre heures pour tuer               |     NULL | NULL        | NULL         | NULL      |
+| E. miss forms in alias table | Young Detective Dee: Rise of the Sea Dragon |     NULL | NULL        | NULL         | NULL      |
++------------------------------+---------------------------------------------+----------+-------------+--------------+-----------+
