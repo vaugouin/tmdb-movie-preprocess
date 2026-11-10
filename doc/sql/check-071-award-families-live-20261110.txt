@@ -1,0 +1,168 @@
+-- check-071-award-families-live.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-11-10 08:44:23 +0100
+--
++---------------------+
+| NOW_                |
++---------------------+
+| 2026-11-10 08:44:24 |
++---------------------+
++---------------------------------------------------------------------------+
+| section                                                                   |
++---------------------------------------------------------------------------+
+| === L1. the snapshot, and the part that lands on our award categories === |
++---------------------------------------------------------------------------+
++------------+--------------+---------------+
+| LIVE_PAIRS | LIVE_MEMBERS | LIVE_FAMILIES |
++------------+--------------+---------------+
+|      12338 |         8671 |           791 |
++------------+--------------+---------------+
++-------------------------+----------------+----------+---------------+---------------+---------------+
+| PAIRS_ON_OUR_CATEGORIES | OUR_CATEGORIES | FAMILIES | PAIRS_BY_P361 | PAIRS_BY_P527 | PAIRS_BY_BOTH |
++-------------------------+----------------+----------+---------------+---------------+---------------+
+|                    3874 |           3846 |      531 |          3072 |          2538 |          1736 |
++-------------------------+----------------+----------+---------------+---------------+---------------+
++---------------------------------------------------------------------------------------------+
+| section                                                                                     |
++---------------------------------------------------------------------------------------------+
+| === L2. is the family in our base (ITEM row), and known as a group of awards (its P31)? === |
++---------------------------------------------------------------------------------------------+
++---------------+-------------+----------+------------+
+| GROUP_IN_ITEM | GROUP_KNOWN | FAMILIES | CATEGORIES |
++---------------+-------------+----------+------------+
+|             0 |           0 |       26 |         73 |
+|             0 |           1 |        9 |         82 |
+|             1 |           0 |        1 |          4 |
+|             1 |           1 |      495 |       3689 |
++---------------+-------------+----------+------------+
++------------------------------------------------------------------------------------------------------------------------+
+| section                                                                                                                |
++------------------------------------------------------------------------------------------------------------------------+
+| === L3. coverage: today (P31), after the load (P31 or P361 or P527, family known), and if every family were cached === |
++------------------------------------------------------------------------------------------------------------------------+
++------------+---------+-----------+---------------+---------------+-------------------+--------------------+------------------------+-------------------+-----------------------+
+| CATEGORIES | WINNERS | CAT_TODAY | WINNERS_TODAY | CAT_WITH_P361 | WINNERS_WITH_P361 | CAT_WITH_P361_P527 | WINNERS_WITH_P361_P527 | CAT_IF_ALL_CACHED | WINNERS_IF_ALL_CACHED |
++------------+---------+-----------+---------------+---------------+-------------------+--------------------+------------------------+-------------------+-----------------------+
+|      18117 |  161396 |      1808 |         20600 |          4360 |             42427 |               4455 |                  43042 |              4530 |                 43286 |
++------------+---------+-----------+---------------+---------------+-------------------+--------------------+------------------------+-------------------+-----------------------+
++------------------------------------------------+
+| section                                        |
++------------------------------------------------+
+| === L3b. the same by name (yardstick only) === |
++------------------------------------------------+
++---------------------+------------+---------+-----------+----------------+---------------+--------------------+-------------------+
+| NAME_STARTS_WITH    | CATEGORIES | WINNERS | CAT_TODAY | CAT_AFTER_LOAD | WINNERS_TODAY | WINNERS_AFTER_LOAD | WINNERS_STILL_OUT |
++---------------------+------------+---------+-----------+----------------+---------------+--------------------+-------------------+
+| Academy Award       |         56 |    4610 |        46 |             55 |          3827 |               4593 |                17 |
+| Primetime Emmy      |        115 |    1865 |        20 |             86 |           389 |               1775 |                90 |
+| Grammy              |        154 |    1323 |        40 |            150 |           607 |               1159 |               164 |
+| Golden Globe        |         42 |    1139 |        10 |             37 |           270 |                971 |               168 |
+| Cesar               |         38 |     880 |        30 |             35 |           716 |                817 |                63 |
+| Tony Award          |         35 |     872 |         4 |             34 |            63 |                855 |                17 |
+| BAFTA               |         48 |     790 |        26 |             37 |           651 |                776 |                14 |
+| David di Donatello  |         36 |     700 |         1 |             35 |             6 |                695 |                 5 |
+| Goya                |         29 |     621 |        22 |             28 |           453 |                603 |                18 |
+| Saturn Award        |         40 |     391 |         9 |             38 |            28 |                310 |                81 |
+| Screen Actors Guild |         14 |     324 |         0 |             14 |             0 |                324 |                 0 |
++---------------------+------------+---------+-----------+----------------+---------------+--------------------+-------------------+
++------------------------------------------------------------------------------------+
+| section                                                                            |
++------------------------------------------------------------------------------------+
+| === L3c. the Academy Award... categories still without a family after the load === |
++------------------------------------------------------------------------------------+
++-------------+----------------+---------+--------+
+| ID_CATEGORY | AWARD_NAME     | WINNERS | N_LIVE |
++-------------+----------------+---------+--------+
+| Q19020      | Academy Awards |      17 |      0 |
++-------------+----------------+---------+--------+
++--------------------------------------------------------------------------------------------+
+| section                                                                                    |
++--------------------------------------------------------------------------------------------+
+| === L4. families our base does not know as a group of awards, by what they would carry === |
++--------------------------------------------------------------------------------------------+
++------------+---------------------------------------+---------+------------+---------+
+| ID_GROUP   | LABEL_IN_OUR_BASE                     | IN_ITEM | CATEGORIES | WINNERS |
++------------+---------------------------------------+---------+------------+---------+
+| Q137610127 |                                       |       0 |          8 |      49 |
+| Q136512297 |                                       |       0 |         12 |      46 |
+| Q12398168  |                                       |       0 |          5 |      41 |
+| Q136664528 |                                       |       0 |          6 |      17 |
+| Q124463212 |                                       |       0 |          5 |      13 |
+| Q21866930  | Kansas City Film Critics Circle Award |       1 |          4 |      10 |
+| Q1875474   |                                       |       0 |          3 |       8 |
+| Q16410800  |                                       |       0 |          6 |       7 |
+| Q50359321  |                                       |       0 |          1 |       6 |
+| Q4377073   |                                       |       0 |          3 |       6 |
+| Q10905949  |                                       |       0 |          3 |       5 |
+| Q136484046 |                                       |       0 |          2 |       5 |
+| Q130757677 |                                       |       0 |          2 |       5 |
+| Q136295992 |                                       |       0 |          3 |       4 |
+| Q105870693 |                                       |       0 |          1 |       3 |
+| Q118142547 |                                       |       0 |          1 |       3 |
+| Q2879891   |                                       |       0 |          1 |       3 |
+| Q9378113   |                                       |       0 |          2 |       3 |
+| Q88672834  |                                       |       0 |          1 |       3 |
+| Q118591653 |                                       |       0 |          1 |       3 |
+| Q3405108   |                                       |       0 |          1 |       1 |
+| Q6733361   |                                       |       0 |          1 |       1 |
+| Q127008543 |                                       |       0 |          1 |       1 |
+| Q140448432 |                                       |       0 |          1 |       1 |
+| Q4655201   |                                       |       0 |          1 |       1 |
+| Q108761298 |                                       |       0 |          1 |       1 |
+| Q107548483 |                                       |       0 |          1 |       1 |
++------------+---------------------------------------+---------+------------+---------+
++-------------------------------------------------------------------------------------------------+
+| section                                                                                         |
++-------------------------------------------------------------------------------------------------+
+| === L5. categories by number of distinct families after the load (P31, P361, P527 together) === |
++-------------------------------------------------------------------------------------------------+
++----------+------------+---------+
+| FAMILIES | CATEGORIES | WINNERS |
++----------+------------+---------+
+|        1 |       4421 |   36881 |
+|        2 |         32 |     599 |
+|        3 |          2 |       7 |
++----------+------------+---------+
++-----------------------------------------------------------------------------+
+| section                                                                     |
++-----------------------------------------------------------------------------+
+| === L5b. the 30 biggest categories with several families after the load === |
++-----------------------------------------------------------------------------+
++-------------+-----------------------------------------------------------------------------------+----------+-------------------------------------------------------------------------------------------------------------------+---------+
+| ID_CATEGORY | AWARD_NAME                                                                        | FAMILIES | FAMILY_LIST                                                                                                       | WINNERS |
++-------------+-----------------------------------------------------------------------------------+----------+-------------------------------------------------------------------------------------------------------------------+---------+
+| Q727328     | Academy Honorary Award                                                            |        2 | Q19020 Academy Awards | Q5589762 Governors Awards                                                                 |     178 |
+| Q2089918    | Volpi Cup for Best Actress                                                        |        2 | Q108773780 Venice Film Festival Awards | Q49025 Volpi Cup                                                         |      68 |
+| Q787148     | BAFTA Fellowship                                                                  |        2 | Q546692 British Academy Games Awards | Q732997 British Academy Film Awards                                        |      58 |
+| Q2620100    | Academy of Canadian Cinema and Television Award for Best Motion Picture           |        2 | Q1502249 Genie Awards | Q3459735 Canadian Screen Awards                                                           |      42 |
+| Q1419872    | Sundance Audience Award: U.S. Dramatic                                            |        2 | Q16020747 Sundance Film Festival Audience Award | Q23688051 Sundance Festival Awards                              |      37 |
+| Q2366108    | Sundance Audience Award: U.S. Documentary                                         |        2 | Q16020747 Sundance Film Festival Audience Award | Q23688051 Sundance Festival Awards                              |      29 |
+| Q844273     | Irving G. Thalberg Memorial Award                                                 |        2 | Q19020 Academy Awards | Q5589762 Governors Awards                                                                 |      27 |
+| Q1574973    | Sundance World Cinema Audience Award: Documentary                                 |        2 | Q16020747 Sundance Film Festival Audience Award | Q23688051 Sundance Festival Awards                              |      21 |
+| Q122158106  | Trustees Award                                                                    |        2 | Q123737 Emmy Award | Q594550 Lambda Literary Award                                                                |      19 |
+| Q2366116    | Sundance Film Festival - Audience Award – Best Foreign Feature Film               |        2 | Q16020747 Sundance Film Festival Audience Award | Q23688051 Sundance Festival Awards                              |      15 |
+| Q1414573    | Filmfare Critics Award for Best Movie                                             |        2 | Q107009012 Filmfare Critics Awards | Q37049 Filmfare Awards                                                       |      12 |
+| Q1465984    | Order of Saint John                                                               |        2 | Q1545795 Orders, decorations and medals of Canada | Q768855 orders, decorations, and medals of the United Kingdom |      12 |
+| Q140795228  | Iron Cross (1939), 2nd class                                                      |        2 | Q11371757 Iron Cross, 2nd class | Q140795227 Iron Cross (1939)                                                    |       9 |
+| Q5533176    | Academy of Canadian Cinema and Television Award for Best Animated Short           |        2 | Q1502249 Genie Awards | Q3459735 Canadian Screen Awards                                                           |       9 |
+| Q1414566    | Filmfare Critics Award for Best Actress                                           |        2 | Q107009012 Filmfare Critics Awards | Q37049 Filmfare Awards                                                       |       8 |
+| Q165558     | Knight's Cross of the Iron Cross                                                  |        2 | Q1152354 order, decoration, or medal of Nazi Germany | Q154554 Iron Cross                                         |       8 |
+| Q4631343    | Filmfare Critics Award for Best Actor                                             |        2 | Q107009012 Filmfare Critics Awards | Q37049 Filmfare Awards                                                       |       8 |
+| Q19819292   | Genie Award for Best Actress in a Supporting Role                                 |        2 | Q1502249 Genie Awards | Q3459735 Canadian Screen Awards                                                           |       7 |
+| Q140668176  | Iron Cross (1914), 2nd class                                                      |        2 | Q11371757 Iron Cross, 2nd class | Q140798456 Iron Cross (1914)                                                    |       5 |
+| Q17011108   | Teen Choice Award for Choice Hissy Fit                                            |        2 | Q3233737 World Soundtrack Awards | Q391629 Teen Choice Awards                                                     |       5 |
+| Q140668177  | Iron Cross (1914), 1st class                                                      |        3 | Q11353044 Iron Cross, 1st class | Q140798456 Iron Cross (1914) | Q154554 Iron Cross                               |       4 |
+| Q3404762    | Gemini Award for Best Supporting Role                                             |        2 | Q3404702 Gémeaux Awards | Q923408 Gemini Award                                                                    |       4 |
+| Q140795229  | Iron Cross (1939), 1st class                                                      |        2 | Q11353044 Iron Cross, 1st class | Q140795227 Iron Cross (1939)                                                    |       3 |
+| Q1754284    | Clasp to the Iron Cross                                                           |        3 | Q1152354 order, decoration, or medal of Nazi Germany | Q140795227 Iron Cross (1939) | Q154554 Iron Cross          |       3 |
+| Q4671429    | Academy of Canadian Cinema and Television Award for Best Achievement in Direction |        2 | Q1502249 Genie Awards | Q3459735 Canadian Screen Awards                                                           |       3 |
+| Q11075212   | Golden Bell Award for Best Supporting Actress                                     |        2 | Q5579213 Golden Bell Awards | Q72986689 TV Golden Bell Awards Individual Awards                                   |       2 |
+| Q15903159   | Golden Bell Award for Best Director in a Television Series                        |        2 | Q5579213 Golden Bell Awards | Q72986689 TV Golden Bell Awards Individual Awards                                   |       2 |
+| Q3404706    | Gemini Award for Best Animation                                                   |        2 | Q3404702 Gémeaux Awards | Q923408 Gemini Award                                                                    |       2 |
+| Q52349666   | Bordin Prize                                                                      |        2 | Q137998993 awards of the French Academy of Sciences | Q2694647 Awards of the Académie Française                   |       2 |
+| Q5449091    | Filmfare Award for Best Film – Tamil                                              |        2 | Q37049 Filmfare Awards | Q3775029 Filmfare Awards South                                                           |       2 |
++-------------+-----------------------------------------------------------------------------------+----------+-------------------------------------------------------------------------------------------------------------------+---------+
++---------------------+
+| NOW_                |
++---------------------+
+| 2026-11-10 08:44:29 |
++---------------------+

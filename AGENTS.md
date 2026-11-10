@@ -77,7 +77,7 @@ Env vars: `.env.example` and README § Secrets handling. Secrets are never commi
 ---
 
 **Last Updated**: 2026-11-10
-**Current Version**: 1.1.51
+**Current Version**: 1.1.52
 
 ## Backlog (Nestor second-brain)
 
