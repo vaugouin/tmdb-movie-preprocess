@@ -18,9 +18,12 @@
 -- Une table temporaire porte le choix : MariaDB refuse de lire dans une table derivee la
 -- table qu'il met a jour (1093).
 --
--- Attendu (controle check-075-location-coordinates du 2026-11-12) : environ 11 700 lieux
--- vivants sur 13 075 recoivent une coordonnee ; la fiction et les lieux sans type en
--- restent presque tous prives.
+-- Attendu (check-075-location-coordinates-20261112.txt) : 11 692 lieux vivants sur
+-- 13 076 (89,4 %) recoivent une coordonnee, plus 22 des 30 lieux DELETED = 1. Villes
+-- 99,6 %, iles 99,2 %, nature 98,4 %, regions 96,1 %, structures 95,4 %, pays 95,1 %,
+-- sans type 52,8 %, fiction 5 sur 579. Six P625 hors de la Terre (4 Lune, 2 Mars) et
+-- 26 declarations deprecated sont ecartes. Relecture : Giverny 49.076111, 1.529167 ;
+-- Wadi Rum 29.576500, 35.419928 ; Tokyo (Q1490) 35.689444, 139.691667.
 --
 -- ⚠ Ne pas lancer pendant le processus 72 (sa bascule remplacerait la table) ni pendant
 -- un chargement de wikidata-crawler.
