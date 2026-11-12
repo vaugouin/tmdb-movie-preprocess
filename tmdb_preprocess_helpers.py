@@ -2993,6 +2993,18 @@ def f_buildlocationtables():
         arrresult["episodes_actifs"] = 1 if blnepisodes else 0
         print("72: episodes " + ("inclus (T_WC_T2S_EPISODE_LOCATION presente)." if blnepisodes else
                                  "exclus : T_WC_T2S_EPISODE_LOCATION ou EPISODE_COUNT absente, migration 062 a passer."))
+        # Les coordonnees (TMDB-MOVIE-PREPROCESS-075), meme garde que les episodes :
+        # LATITUDE et LONGITUDE viennent de doc/sql/migration-075-location-coordinates.sql
+        # (voie 2). Absentes, l'etape 4d saute et le dit ; presentes, la table de
+        # construction les herite par le CREATE ... LIKE de 1b et 4d les remplit.
+        cursor.execute("SHOW COLUMNS FROM T_WC_T2S_LOCATION LIKE 'LATITUDE'")
+        blncoordinates = cursor.fetchone() is not None
+        if blncoordinates:
+            cursor.execute("SHOW COLUMNS FROM T_WC_T2S_LOCATION LIKE 'LONGITUDE'")
+            blncoordinates = cursor.fetchone() is not None
+        arrresult["coordonnees_actives"] = 1 if blncoordinates else 0
+        if not blncoordinates:
+            print("72: coordonnees exclues : LATITUDE ou LONGITUDE absente, migration 075 a passer.")
 
         # --- 1. L'entite -----------------------------------------------------
         # Le libelle et la description viennent de V2 seul, jamais de T_WC_T2S_ITEM :
@@ -3287,6 +3299,57 @@ def f_buildlocationtables():
         cursor.execute("SELECT COUNT(*) AS C FROM T_WC_T2S_LOCATION_BUILD "
                        "WHERE DELETED = 0 AND WIKIPEDIA_IMAGE_PATH IS NOT NULL AND WIKIPEDIA_IMAGE_PATH <> ''")
         arrresult["avec_image"] = int(cursor.fetchone()["C"])
+
+        # --- 4d. Les coordonnees du lieu (TMDB-MOVIE-PREPROCESS-075) ---------
+        # Pour la carte des lieux (phase 3 des representations de resultats, decision 3
+        # du 2026-11-12) : l'API lit LATITUDE et LONGITUDE avec les lignes de lieux et
+        # n'entre jamais dans le schema Wikidata.
+        # Source : P625 (coordinate location), T_WC_WIKIDATA_COORDINATE_VALUE
+        # (WIKIDATA-CRAWLER-028). Une valeur par lieu, la regle de f_wikidatabestvaluesql() :
+        # 'deprecated' ecarte, 'preferred' d'abord, puis le plus petit ID_STATEMENT. Les
+        # deux colonnes viennent de la MEME declaration (ROW_NUMBER), jamais de deux
+        # sous-requetes qui pourraient choisir deux declarations differentes.
+        # Globe terrestre seulement : Q2, ou NULL (l'ETL ne le laisse vide que si Wikidata
+        # n'en donne pas, et un P625 sans globe est terrestre par defaut). Un lieu sur la
+        # Lune (Q405) ou sur Mars (Q111) ne doit pas finir epingle sur la Terre.
+        # Valeurs hors bornes ecartees plutot que tronquees par DECIMAL(9,6).
+        # La precision Wikidata n'est pas gardee : un pays ou une region n'est pas un point
+        # (le Japon est a 35, 136), c'est LOCATION_TYPE qui dit au consommateur de colorier
+        # plutot qu'epingler. Recalcul complet chaque nuit, lieux DELETED = 1 compris : la
+        # coordonnee ne depend que de Wikidata, pas du perimetre.
+        # Table temporaire et non jointure directe : MariaDB refuse de lire dans une table
+        # derivee la table qu'il met a jour (1093).
+        if blncoordinates:
+            cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_coordonnees")
+            cursor.execute("CREATE TEMPORARY TABLE tmp_lieu_coordonnees (\n"
+                           "  ID_WIKIDATA VARCHAR(20) NOT NULL PRIMARY KEY,\n"
+                           "  LATITUDE DECIMAL(9,6) NOT NULL, LONGITUDE DECIMAL(9,6) NOT NULL\n"
+                           ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")
+            _f_locationstep(cursor, "4d-1. INSERT des coordonnees P625 (tmp_lieu_coordonnees)", (
+                "INSERT INTO tmp_lieu_coordonnees (ID_WIKIDATA, LATITUDE, LONGITUDE)\n"
+                "SELECT r.ID_WIKIDATA, ROUND(r.LATITUDE, 6), ROUND(r.LONGITUDE, 6)\n"
+                "FROM (\n"
+                "    SELECT st.ID_WIKIDATA, cv.LATITUDE, cv.LONGITUDE,\n"
+                "           ROW_NUMBER() OVER (PARTITION BY st.ID_WIKIDATA\n"
+                "                              ORDER BY (st.`RANK` = 'preferred') DESC, st.ID_STATEMENT ASC) AS RN\n"
+                "    FROM T_WC_T2S_LOCATION_BUILD loc\n"
+                "    INNER JOIN T_WC_WIKIDATA_STATEMENT st ON st.ID_WIKIDATA = loc.ID_WIKIDATA\n"
+                "          AND st.ID_PROPERTY = 'P625'\n"
+                "          AND (st.`RANK` IS NULL OR st.`RANK` <> 'deprecated')\n"
+                "          AND COALESCE(st.DELETED, 0) = 0\n"
+                "    INNER JOIN T_WC_WIKIDATA_COORDINATE_VALUE cv ON cv.ID_STATEMENT = st.ID_STATEMENT\n"
+                "          AND COALESCE(cv.GLOBE_ID_WIKIDATA, 'Q2') = 'Q2'\n"
+                "          AND cv.LATITUDE BETWEEN -90 AND 90 AND cv.LONGITUDE BETWEEN -180 AND 180) r\n"
+                "WHERE r.RN = 1"))
+            _f_locationstep(cursor, "4d-2. UPDATE de LATITUDE et LONGITUDE", (
+                "UPDATE T_WC_T2S_LOCATION_BUILD loc\n"
+                "LEFT JOIN tmp_lieu_coordonnees c ON c.ID_WIKIDATA = loc.ID_WIKIDATA\n"
+                "SET loc.LATITUDE = c.LATITUDE, loc.LONGITUDE = c.LONGITUDE"))
+            connection.commit()
+            cursor.execute("DROP TEMPORARY TABLE IF EXISTS tmp_lieu_coordonnees")
+            cursor.execute("SELECT COUNT(*) AS C FROM T_WC_T2S_LOCATION_BUILD "
+                           "WHERE DELETED = 0 AND LATITUDE IS NOT NULL")
+            arrresult["avec_coordonnees"] = int(cursor.fetchone()["C"])
 
         # --- 5. Les bascules ------------------------------------------------
         # RENAME TABLE d'un seul tenant : MariaDB le traite comme une operation atomique,

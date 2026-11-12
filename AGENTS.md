@@ -44,6 +44,7 @@ Core preprocessing stage of **Agent BBB** (owner `vaugouin`; sibling roster in `
 
 - Libelles (-064) : **un `LOCATION_NAME_FR` egal a `LOCATION_NAME` veut dire « pas de libelle francais propre »**, sans drapeau ; ne pas reintroduire de NULL pour le dire. `OVERVIEW_FR` n'a pas de repli sur l'anglais.
 - Hierarchie `T_WC_T2S_LOCATION_ANCESTOR` (-048) : le lieu lui-meme a la profondeur 0 ; meilleur rang par (item, propriete) ; le parcours traverse des items qui ne sont pas des lieux T2S et ne garde que les paires de lieux vivants ; **jamais `LOCATION_TYPE`** dans le calcul (classification fausse par endroits). Un journal qui atteint `INT_LOCATION_ANCESTOR_MAX_DEPTH` (`3d-2. ATTENTION`) signale un cycle. Consommateur : le prompt de fastapi-text2sql (`data/text_to_sql.md`, section Locations).
+- Coordonnees (-075) : `LATITUDE` / `LONGITUDE` (`decimal(9,6)`, apres `LOCATION_TYPE`) viennent de P625, **les deux de la meme declaration** (`ROW_NUMBER`, `preferred` puis plus petit `ID_STATEMENT`, `deprecated` ecarte), globe terrestre seulement (`Q2` ou NULL), recalculees chaque nuit a l'etape 4d. Colonnes creees par `doc/sql/migration-075-location-coordinates.sql` (voie 2), l'etape saute tant qu'elles manquent ; un code anterieur a 1.1.59 les remettrait a NULL chaque nuit. La precision Wikidata n'est pas gardee : c'est `LOCATION_TYPE` qui dit qu'un pays ou une region se colorie au lieu de s'epingler.
 - Lieux transfrontaliers (-067), trois decisions de Philippe du 2026-10-21 : les lieux disputes vont sous chaque pays revendique ; la Normandie reste sous la France (`TUPLE_LOCATION_P17_DROP`, seule exception nommee) ; seuls les parents `P17` connus de la base comptent.
 
 **Les processus 72, 73 et 75 sautent quand wikidata-crawler ecrit les tables Wikidata (-063).** `f_wikidataloadbusy()` lit les variables serveur du crawler ; un saut laisse la table de la veille, ecrit une ligne `<n>: SKIPPED, ...` et sa raison en variable serveur, et n'ecrase pas les comptes du dernier passage reussi. Tout nouveau processus qui lit les tables cibles Wikidata doit passer par cette garde.
@@ -80,8 +81,8 @@ Env vars: `.env.example` and README § Secrets handling. Secrets are never commi
 
 ---
 
-**Last Updated**: 2026-11-10
-**Current Version**: 1.1.58
+**Last Updated**: 2026-11-12
+**Current Version**: 1.1.59
 
 ## Backlog (Nestor second-brain)
 
