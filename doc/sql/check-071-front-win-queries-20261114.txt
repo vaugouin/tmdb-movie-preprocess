@@ -1,0 +1,149 @@
+-- check-071-front-win-queries.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-11-14 19:03:41 +0100
+--
++-----------------------------------------------------------------------------+
+| section                                                                     |
++-----------------------------------------------------------------------------+
+| === 1. person page: the wins of Katharine Hepburn (6598), with the work === |
++-----------------------------------------------------------------------------+
++----------+------------------------------------------------------------------------------+------------------------------------------------------------------------------------+------------+--------------+------------------------------+-------------------------+--------------+-------------+----------------+
+| ID_AWARD | AWARD_NAME                                                                   | AWARD_NAME_FR                                                                      | AWARD_YEAR | ID_MOVIE_FOR | MOVIE_TITLE                  | MOVIE_TITLE_FR          | ID_SERIE_FOR | SERIE_TITLE | SERIE_TITLE_FR |
++----------+------------------------------------------------------------------------------+------------------------------------------------------------------------------------+------------+--------------+------------------------------+-------------------------+--------------+-------------+----------------+
+|     3624 | Ladies' Home Journal Women of the Year                                       | Ladies' Home Journal Women of the Year                                             |       1974 |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|    22476 | Connecticut Women's Hall of Fame                                             | Temple de la renommée des femmes du Connecticut                                    |       1994 |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|    26358 | CFDA Lifetime Achievement Award                                              | Prix CFDA à la trajectoire                                                         |       1985 |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|    17828 | David di Donatello for Best Foreign Actress                                  | David di Donatello de la meilleure actrice étrangère                               |       NULL |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|    11780 | Volpi Cup for Best Actress                                                   | Coupe Volpi de la meilleure interprétation féminine                                |       NULL |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|    29090 | Cannes Film Festival Award for Best Actress                                  | prix d'interprétation féminine du Festival de Cannes                               |       NULL |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|     7935 | SAG-AFTRA Life Achievement Award                                             | Screen Actors Guild Life Achievement Award                                         |       NULL |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|    30835 | Primetime Emmy Award for Outstanding Lead Actress in a Miniseries or a Movie | Primetime Emmy Award de la meilleure actrice dans une mini-série ou un téléfilm    |       NULL |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|    26480 | BAFTA Award for Best Actress in a Leading Role                               | British Academy Film Award de la meilleure actrice                                 |       NULL |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|      196 | Hasty Pudding Woman of the Year                                              | Hasty Pudding Woman of the Year                                                    |       1958 |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|      269 | Academy Award for Best Actress                                               | Oscar de la meilleure actrice                                                      |       1934 |        31777 | Morning Glory                | Gloire éphémère         |         NULL | NULL        | NULL           |
+|      269 | Academy Award for Best Actress                                               | Oscar de la meilleure actrice                                                      |       1968 |         1879 | Guess Who's Coming to Dinner | Devine qui vient dîner  |         NULL | NULL        | NULL           |
+|      269 | Academy Award for Best Actress                                               | Oscar de la meilleure actrice                                                      |       1969 |        18988 | The Lion in Winter           | Le lion en hiver        |         NULL | NULL        | NULL           |
+|      269 | Academy Award for Best Actress                                               | Oscar de la meilleure actrice                                                      |       1982 |        11816 | On Golden Pond               | La Maison du lac        |         NULL | NULL        | NULL           |
+|     9120 | Kennedy Center Honors                                                        | prix Kennedy                                                                       |       NULL |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
+|     9550 | star on Hollywood Walk of Fame                                               | étoile du Hollywood Walk of Fame                                                   |       NULL |         NULL | NULL                         | NULL                    |         NULL | NULL        | NULL           |
++----------+------------------------------------------------------------------------------+------------------------------------------------------------------------------------+------------+--------------+------------------------------+-------------------------+--------------+-------------+----------------+
++------------------------------------------------------+
+| section                                              |
++------------------------------------------------------+
+| === 2. movie page: the wins of A Prophet (21575) === |
++------------------------------------------------------+
++----------+-----------------------------------------------------------------+-----------------------------------------------------------------------+------------+
+| ID_AWARD | AWARD_NAME                                                      | AWARD_NAME_FR                                                         | AWARD_YEAR |
++----------+-----------------------------------------------------------------+-----------------------------------------------------------------------+------------+
+|    29720 | César Award for Best Actor                                      | César du meilleur acteur                                              |       2010 |
+|    12705 | César Award for Best Cinematography                             | César de la meilleure photographie                                    |       2010 |
+|    13667 | César Award for Best Director                                   | César de la meilleure réalisation                                     |       2010 |
+|    29719 | César Award for Best Editing                                    | César du meilleur montage                                             |       2010 |
+|    21653 | César Award for Best Male Revelation                            | César de la meilleure révélation masculine                            |       2010 |
+|    23201 | César Award for Best Original Screenplay                        | César du meilleur scénario original                                   |       2010 |
+|    29710 | César Award for Best Production Design                          | César des meilleurs décors                                            |       2010 |
+|    29717 | César Award for Best Supporting Actor                           | César du meilleur acteur dans un second rôle                          |       2010 |
+|    13452 | European Film Academy Prix d'Excellence                         | European Film Academy Prix d'Excellence                               |       2009 |
+|     2871 | International Cinephile Society Award for Best Director         | International Cinephile Society Award for Best Director               |       2011 |
+|     4658 | International Cinephile Society Award for Best Supporting Actor | International Cinephile Society Award for Best Supporting Actor       |       2011 |
+|    21571 | BIFA for Best Foreign Independent Film                          | British Independent Film Award du meilleur film étranger              |       2010 |
+|    25677 | César Award for Best Film                                       | César du meilleur film                                                |       2010 |
+|     2715 | International Cinephile Society Award for Best Film             | International Cinephile Society Award for Best Film                   |       2011 |
+|    27380 | Louis Delluc Prize                                              | prix Louis-Delluc                                                     |       2009 |
+|    16018 | BAFTA Award for Best Film Not in the English Language           | British Academy Film Award du meilleur film en langue étrangère       |       2010 |
+|    29147 | Cannes Film Festival Grand Prix                                 | grand prix du Festival de Cannes                                      |       2009 |
+|     5189 | National Board of Review Award for Best Foreign Language Film   | National Board of Review Award du meilleur film en langue étrangère   |       2009 |
+|    30087 | European Film Award for Best Actor                              | prix du cinéma européen du meilleur acteur                            |       2009 |
++----------+-----------------------------------------------------------------+-----------------------------------------------------------------------+------------+
++------------------------------------------------+
+| section                                        |
++------------------------------------------------+
+| === 3. series page: the wins of series 688 === |
++------------------------------------------------+
++----------+-------------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------+------------+
+| ID_AWARD | AWARD_NAME                                                                                | AWARD_NAME_FR                                                                             | AWARD_YEAR |
++----------+-------------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------+------------+
+|    27175 | Primetime Emmy Award for Outstanding Cinematography for a Single-Camera Series            | Primetime Emmy Award for Outstanding Cinematography for a Single-Camera Series            |       2000 |
+|    27175 | Primetime Emmy Award for Outstanding Cinematography for a Single-Camera Series            | Primetime Emmy Award for Outstanding Cinematography for a Single-Camera Series            |       2001 |
+|    27171 | Primetime Emmy Award for Outstanding Casting for a Drama Series                           | Primetime Emmy Award for Outstanding Casting for a Drama Series                           |       2000 |
+|    27171 | Primetime Emmy Award for Outstanding Casting for a Drama Series                           | Primetime Emmy Award for Outstanding Casting for a Drama Series                           |       2001 |
+|    24235 | Primetime Emmy Award for Outstanding Directing for a Drama Series                         | Primetime Emmy Award de la meilleure réalisation pour une série télévisée dramatique      |       2000 |
+|    24235 | Primetime Emmy Award for Outstanding Directing for a Drama Series                         | Primetime Emmy Award de la meilleure réalisation pour une série télévisée dramatique      |       2001 |
+|    24235 | Primetime Emmy Award for Outstanding Directing for a Drama Series                         | Primetime Emmy Award de la meilleure réalisation pour une série télévisée dramatique      |       2003 |
+|    30834 | Primetime Emmy Award for Outstanding Lead Actress in a Drama Series                       | Primetime Emmy Award de la meilleure actrice dans une série télévisée dramatique          |       2002 |
+|    30834 | Primetime Emmy Award for Outstanding Lead Actress in a Drama Series                       | Primetime Emmy Award de la meilleure actrice dans une série télévisée dramatique          |       2004 |
+|    27179 | Primetime Emmy Award for Outstanding Original Main Title Theme Music                      | Primetime Emmy Award for Outstanding Original Main Title Theme Music                      |       2000 |
+|    18168 | Satellite Award for Best Actor – Television Series Drama                                  | Satellite Award du meilleur acteur dans une série télévisée dramatique                    |       2000 |
+|    13302 | Satellite Award for Best Actress – Television Series Drama                                | Satellite Award de la meilleure actrice dans une série télévisée dramatique               |       2001 |
+|    13674 | Screen Actors Guild Award for Outstanding Performance by a Female Actor in a Drama Series | Screen Actors Guild Award de la meilleure actrice dans une série télévisée dramatique     |       2001 |
+|    13674 | Screen Actors Guild Award for Outstanding Performance by a Female Actor in a Drama Series | Screen Actors Guild Award de la meilleure actrice dans une série télévisée dramatique     |       2002 |
+|    28004 | TCA Heritage Award                                                                        | TCA Heritage Award                                                                        |       2006 |
++----------+-------------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------+------------+
++---------------------------------------------------------------------------------------------+
+| section                                                                                     |
++---------------------------------------------------------------------------------------------+
+| === 4. award page, movies: the years of Cesar Award for Best Film (25677), 2008 to 2011 === |
++---------------------------------------------------------------------------------------------+
++----------+------------+
+| ID_MOVIE | AWARD_YEAR |
++----------+------------+
+|    21575 |       2010 |
+|    46332 |       2011 |
++----------+------------+
++------------------------------------------------------------------------------------------+
+| section                                                                                  |
++------------------------------------------------------------------------------------------+
+| === 5. award page, series: rows of the award of series 688 with the most series wins === |
++------------------------------------------------------------------------------------------+
++----------+------------+
+| ID_SERIE | AWARD_YEAR |
++----------+------------+
+|     1396 |       2010 |
+|     1396 |       2014 |
+|     1396 |       2012 |
+|     1399 |       2011 |
+|     1398 |       2003 |
+|     1398 |       2004 |
+|      688 |       2006 |
+|      688 |       2001 |
+|      688 |       2002 |
+|      688 |       2000 |
++----------+------------+
++----------------------------------------------------------------------------------------------------------+
+| section                                                                                                  |
++----------------------------------------------------------------------------------------------------------+
+| === 6. award page, persons: Academy Award for Best Actress (269), wins of 1980 to 1984 with the work === |
++----------------------------------------------------------------------------------------------------------+
++-----------+------------+--------------+-----------------------+--------------------+--------------+-------------+----------------+
+| ID_PERSON | AWARD_YEAR | ID_MOVIE_FOR | MOVIE_TITLE           | MOVIE_TITLE_FR     | ID_SERIE_FOR | SERIE_TITLE | SERIE_TITLE_FR |
++-----------+------------+--------------+-----------------------+--------------------+--------------+-------------+----------------+
+|        35 |       1980 |        40842 | Norma Rae             | Norma Rae          |         NULL | NULL        | NULL           |
+|      5606 |       1981 |        16769 | Coal Miner's Daughter | Nashville Lady     |         NULL | NULL        | NULL           |
+|      6598 |       1982 |        11816 | On Golden Pond        | La Maison du lac   |         NULL | NULL        | NULL           |
+|      5064 |       1983 |        15764 | Sophie's Choice       | Le Choix de Sophie |         NULL | NULL        | NULL           |
+|      4090 |       1984 |        11050 | Terms of Endearment   | Tendres Passions   |         NULL | NULL        | NULL           |
++-----------+------------+--------------+-----------------------+--------------------+--------------+-------------+----------------+
++-----------------------------------------------------------------------------------------------+
+| section                                                                                       |
++-----------------------------------------------------------------------------------------------+
+| === 7. API helper: the wins behind the awards list of a person (6598, awards 269 and 500) === |
++-----------------------------------------------------------------------------------------------+
++----------+------------+--------------+------------------------------+-------------------------+--------------+-------------+----------------+
+| _WIN_KEY | AWARD_YEAR | ID_MOVIE_FOR | MOVIE_TITLE                  | MOVIE_TITLE_FR          | ID_SERIE_FOR | SERIE_TITLE | SERIE_TITLE_FR |
++----------+------------+--------------+------------------------------+-------------------------+--------------+-------------+----------------+
+|      269 |       1934 |        31777 | Morning Glory                | Gloire éphémère         |         NULL | NULL        | NULL           |
+|      269 |       1968 |         1879 | Guess Who's Coming to Dinner | Devine qui vient dîner  |         NULL | NULL        | NULL           |
+|      269 |       1969 |        18988 | The Lion in Winter           | Le lion en hiver        |         NULL | NULL        | NULL           |
+|      269 |       1982 |        11816 | On Golden Pond               | La Maison du lac        |         NULL | NULL        | NULL           |
++----------+------------+--------------+------------------------------+-------------------------+--------------+-------------+----------------+
++----------------------------------------------------------------------------------------+
+| section                                                                                |
++----------------------------------------------------------------------------------------+
+| === 8. size of the award page queries: wins of the award with the most person wins === |
++----------------------------------------------------------------------------------------+
++----------+----------+---------+
+| ID_AWARD | WIN_ROWS | PERSONS |
++----------+----------+---------+
+|     9550 |     2181 |    2179 |
+|    21103 |     1151 |    1151 |
+|    54540 |     1026 |    1026 |
++----------+----------+---------+
