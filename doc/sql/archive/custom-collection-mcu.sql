@@ -15,7 +15,7 @@
 --
 -- Writes T_WC_CUSTOM_LIST only (one row): voie 1.
 --   ssh vps-agent pull tmdb-movie-preprocess
---   ssh vps-agent run tmdb-movie-preprocess/doc/sql/custom-collection-mcu.sql
+--   ssh vps-agent run tmdb-movie-preprocess/doc/sql/archive/custom-collection-mcu.sql
 -- Part 4 reads what the nightly process 41 built: re-run with -f the day after.
 
 -- Part 1. Before: the row and the number of ids it holds (each url holds 'tt' twice, 'https' included)
