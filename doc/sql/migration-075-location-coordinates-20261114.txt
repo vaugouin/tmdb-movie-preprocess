@@ -1,0 +1,16 @@
+-- migration-075-location-coordinates.sql
+-- run on vaugouindb (container damp-vaugouin-com-mariadb-1) at 2026-11-14 14:15:00 +0100
+--
++-------------+
+| SECTION     |
++-------------+
+| 1. Colonnes |
++-------------+
++------------------+---------------+--------------+-------------+
+| ORDINAL_POSITION | COLUMN_NAME   | COLUMN_TYPE  | IS_NULLABLE |
++------------------+---------------+--------------+-------------+
+|                8 | LOCATION_TYPE | varchar(20)  | YES         |
+|                9 | LATITUDE      | decimal(9,6) | YES         |
+|               10 | LONGITUDE     | decimal(9,6) | YES         |
+|               11 | DELETED       | int(5)       | YES         |
++------------------+---------------+--------------+-------------+
