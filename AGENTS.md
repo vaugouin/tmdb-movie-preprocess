@@ -12,7 +12,7 @@ Deeper specs: @doc/sql/*.sql (reference DDL: the `*-tables.sql` files are dumps 
 
 ## Related repositories (project ecosystem)
 
-Core preprocessing stage of **Agent BBB** (owner `vaugouin`; sibling roster in `%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt`). Reads the source tables of the crawlers (`T_WC_TMDB_*`, `T_WC_WIKIDATA_*`, `T_WC_WIKIPEDIA_*`, `T_WC_IMDB_*`) and builds the `T_WC_T2S_*` read model consumed by `fastapi-text2sql` and `embedding-update`. Siblings at the same stage: `tmdb-person-preprocess`, `keywords-processing`.
+Core preprocessing stage of **Cinephile App** (owner `vaugouin`; sibling roster in `%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt`). Reads the source tables of the crawlers (`T_WC_TMDB_*`, `T_WC_WIKIDATA_*`, `T_WC_WIKIPEDIA_*`, `T_WC_IMDB_*`) and builds the `T_WC_T2S_*` read model consumed by `fastapi-text2sql` and `embedding-update`. Siblings at the same stage: `tmdb-person-preprocess`, `keywords-processing`.
 
 ## Where things live (file → role)
 
